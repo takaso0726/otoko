@@ -1,0 +1,29 @@
+/[Ll]ibrary/
+/[Tt]emp/
+/[Obj]/
+/[Bb]uild/
+/[Bb]uilds/
+/[Cc]aptures/
+/[Mm]emoryCaptures/
+/[Ex]port/
+/Logs/
+/UserSettings/
+
+# Visual Studio / Rider / VS Code が生成する一時ファイル
+/.vs/
+/*.csproj
+/*.sln
+/*.suo
+/*.user
+/*.userprefs
+/*.pidb
+/*.booproj
+/*.svd
+/*.pdb
+/*.opendb
+/*.IDB
+
+
+# OSが生成する不要なファイル
+.DS_Store
+Thumbs.db
