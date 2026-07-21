@@ -117,6 +117,20 @@ public class GameMNG : MonoBehaviour
         //EnemyHP_Text.text = e1.ToString();
         E_HPbar.value = e1.HP;
     }
+    //p1側のHPの表示を更新する
+    public void P1_ReduceHP(int hp)
+    {
+        //HPを表示
+        //EnemyHP_Text.text = e1.ToString();
+        E_HPbar.value = p1.HP;
+    }
+    //p2側のHPの表示を更新する
+    public void P2_ReduceHP(int hp)
+    {
+        //HPを表示
+        //EnemyHP_Text.text = e1.ToString();
+        E_HPbar.value = p2.HP;
+    }
     //ド根性復活のタイマーとカウントを表示する
     public void PlayerUI(float Timer,int Cnt)
     {

@@ -31,6 +31,11 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(PlayerInput))]
 public class Player : MonoBehaviour
 {
+    // "ManagerObject"のGameMNGへの参照。毎回GameObject.Findするとタイポや
+    // 非アクティブ状態でnullを返しやすく、そのままGetComponentするとNullReferenceExceptionになるため、
+    // Startで一度だけ探してキャッシュし、以降はこれを使い回す。
+    GameMNG gameMNG;
+
     // 外部（GameMNG等）に見せるおおまかな状態。既存の呼び出し互換のため維持
     public enum Status
     {
@@ -191,6 +196,23 @@ public class Player : MonoBehaviour
         animator = GetComponent<Animator>();
         se = GetComponent<AudioSource>();
 
+        // "ManagerObject"を探してGameMNGをキャッシュしておく。
+        // 見つからない場合はここでハッキリ警告を出し、以降のNullReferenceExceptionを防ぐ。
+        GameObject managerObj = GameObject.Find("GameMNG");
+        if (managerObj == null)
+        {
+            Debug.LogError("シーン内に「ManagerObject」という名前のアクティブなGameObjectが見つかりません。" +
+                "名前のスペルミス／非アクティブ状態／配置し忘れがないか確認してください。");
+        }
+        else
+        {
+            gameMNG = managerObj.GetComponent<GameMNG>();
+            if (gameMNG == null)
+            {
+                Debug.LogError("「ManagerObject」にGameMNGコンポーネントが付いていません。");
+            }
+        }
+
         //<当たり判定の子オブジェクトの取得>
         Head = FindHitbox("P-Head");
         RightArm = FindHitbox("P-RightArm");
@@ -309,6 +331,12 @@ public class Player : MonoBehaviour
     // そうでなければ現在の状態に応じて「拘束中のタイマー消化」か「新しい行動の受付」を行う。
     void Update()
     {
+        // ★追加：PlayerInputが無効化されている（＝DualPlayerDeviceAssignerによって
+        //   コントローラーが割り当てられなかった側）場合は、Update自体を丸ごとスキップする。
+        //   これが無いと、無効化される直前にOnMoveで受け取った古いmoveInputの値が
+        //   残り続け、以降入力が来なくなってもそのまま動き続けてしまう。
+        if (playerInput != null && !playerInput.enabled) return;
+
         if (HP <= 0)
         {
             HandleKnockedDown();
@@ -586,12 +614,11 @@ public class Player : MonoBehaviour
     {
         currentState = PlayerState.KnockedDown;
 
-        GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
-        //mng.PlayerUI(rebornTimer, mashCount);
+        //gameMNG.PlayerUI(rebornTimer, mashCount);
 
         rebornTimer += Time.deltaTime;
         Player_status = Status.Reborn;
-        mng.SettestStatus(Status.Reborn);
+        if (gameMNG != null) gameMNG.SettestStatus(Status.Reborn);
 
         //ダウンした瞬間、一度だけ顔・拳へのクローズアップカメラを開始する
         if (!rebornCamStarted && fightingCamera != null)
@@ -625,8 +652,7 @@ public class Player : MonoBehaviour
                 currentState = PlayerState.Idle;
                 Player_status = Status.Live;
                 //UIにHPを反映させるように指示
-                mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
-                mng.Player_ReduceHP(HP, PlayerName);
+                if (gameMNG != null) gameMNG.Player_ReduceHP(HP, PlayerName);
                 //根性復活成功！咆哮して立ち上がる漢を中心に、カメラが180度高速で回り込む
                 if (fightingCamera != null)
                 {
@@ -641,7 +667,7 @@ public class Player : MonoBehaviour
             //制限時間内に復活できず力尽きた
             currentState = PlayerState.Dead;
             Player_status = Status.Dead;
-            mng.SettestStatus(Status.Dead);
+            if (gameMNG != null) gameMNG.SettestStatus(Status.Dead);
 
             if (fightingCamera != null)
             {
@@ -718,8 +744,14 @@ public class Player : MonoBehaviour
         }
 
         //UIにHPを減らすように指示
-        GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
-        mng.Player_ReduceHP(HP, PlayerName);
+        if (gameMNG != null)
+        {
+            gameMNG.Player_ReduceHP(HP, PlayerName);
+        }
+        else
+        {
+            Debug.LogError("gameMNGがnullのためHP表示を更新できません。ManagerObjectの配置を確認してください。");
+        }
         enemyPlayer.atk = 10;   // 敵の攻撃力を初期値に戻す（一度使ったらリセット）
 
         if (HP < 0) HP = 0;
@@ -747,10 +779,19 @@ public class Player : MonoBehaviour
     {
         HP -= n;
         if (HP < 0) HP = 0;
-        GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
         // ★元コードのまま維持。"Enemy_ReduceHP"という名前だが実際にはプレイヤー自身のHPを渡している。
         //   GameMNG側の実装次第では意図通りかもしれないが、要確認。
-        mng.Enemy_ReduceHP(HP);
+        if (gameMNG != null)
+        {
+            gameMNG.Enemy_ReduceHP(HP);
+            //※開発中
+            //相手のプレイヤーの型を取得してその型のに適したUIの表示を変更する予定。
+            //gameMNG.Player_ReduceHP(HP, Enemyplayer);
+        }
+        else
+        {
+            Debug.LogError("gameMNGがnullのためHP表示を更新できません。ManagerObjectの配置を確認してください。");
+        }
     }
 
     // ★削除：EnemyPlayer() / TakeDamage() は OnTriggerEnter と組み合わさって
