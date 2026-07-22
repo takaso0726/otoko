@@ -2129,17 +2129,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
+  PlayerName: 
+  PLayerTagName: 
   moveSpeed: 5
-  Jumpflag: 0
-  atk: 10
-  force: {x: 0, y: 300, z: 0}
-  HP: 0
-  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
-  Player_status: 0
   turnSpeed: 15
+  moveInputThreshold: 0.03
+  crouchInputThreshold: -0.43
+  upKickInputThreshold: 0.25
+  force: {x: 0, y: 300, z: 0}
+  Jumpflag: 0
+  HP: 0
+  atk: 10
+  Player_status: 0
+  punchDuration: 0.5
+  kickDuration: 0.6
+  upKickDuration: 0.7
+  downKickDuration: 0.5
+  guardDuration: 0.5
+  throwDuration: 1.5
+  rebornTimeLimit: 5
+  rebornHp: 30
+  mashThresholdBase: 11
+  mashThresholdStep: 3
+  standHeight: 2
+  standCenter: {x: 0, y: 1, z: 0}
+  crouchHeight: 0.65
+  crouchCenter: {x: 0, y: 0.5, z: 0}
+  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   enemy: {fileID: 0}
+  enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
   fightingCamera: {fileID: 0}
 --- !u!1 &652997322
@@ -2326,8 +2346,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   PlayerHP_Text: {fileID: 1211297007}
   EnemyHP_Text: {fileID: 1499086765}
-  Player_Timer_Text: {fileID: 1327375630}
-  Player_Cnt_Text: {fileID: 2028786201}
+  p1: {fileID: 0}
+  p2: {fileID: 0}
+  e1: {fileID: 0}
   P_HPbar: {fileID: 1289788541}
   E_HPbar: {fileID: 939642776}
   BGM: {fileID: 8300000, guid: 78215c0163ae6f14e9dbae9023719665, type: 3}
@@ -4176,17 +4197,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
+  PlayerName: 
+  PLayerTagName: 
   moveSpeed: 0.015
-  Jumpflag: 0
-  atk: 0
-  force: {x: 0, y: 300, z: 0}
-  HP: 0
-  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
-  Player_status: 0
   turnSpeed: 15
+  moveInputThreshold: 0.03
+  crouchInputThreshold: -0.43
+  upKickInputThreshold: 0.25
+  force: {x: 0, y: 300, z: 0}
+  Jumpflag: 0
+  HP: 0
+  atk: 0
+  Player_status: 0
+  punchDuration: 0.5
+  kickDuration: 0.6
+  upKickDuration: 0.7
+  downKickDuration: 0.5
+  guardDuration: 0.5
+  throwDuration: 1.5
+  rebornTimeLimit: 5
+  rebornHp: 30
+  mashThresholdBase: 11
+  mashThresholdStep: 3
+  standHeight: 2
+  standCenter: {x: 0, y: 1, z: 0}
+  crouchHeight: 0.65
+  crouchCenter: {x: 0, y: 0.5, z: 0}
+  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   enemy: {fileID: 0}
+  enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
   fightingCamera: {fileID: 0}
 --- !u!4 &1202966597 stripped
@@ -4863,17 +4904,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
+  PlayerName: 
+  PLayerTagName: 
   moveSpeed: 0.015
-  Jumpflag: 0
-  atk: 0
-  force: {x: 0, y: 300, z: 0}
-  HP: 0
-  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
-  Player_status: 0
   turnSpeed: 15
+  moveInputThreshold: 0.03
+  crouchInputThreshold: -0.43
+  upKickInputThreshold: 0.25
+  force: {x: 0, y: 300, z: 0}
+  Jumpflag: 0
+  HP: 0
+  atk: 0
+  Player_status: 0
+  punchDuration: 0.5
+  kickDuration: 0.6
+  upKickDuration: 0.7
+  downKickDuration: 0.5
+  guardDuration: 0.5
+  throwDuration: 1.5
+  rebornTimeLimit: 5
+  rebornHp: 30
+  mashThresholdBase: 11
+  mashThresholdStep: 3
+  standHeight: 2
+  standCenter: {x: 0, y: 1, z: 0}
+  crouchHeight: 0.65
+  crouchCenter: {x: 0, y: 0.5, z: 0}
+  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   enemy: {fileID: 0}
+  enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
   fightingCamera: {fileID: 0}
 --- !u!114 &1475408693
@@ -5143,7 +5204,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Enemy
   atk: 10
   HP: 0
-  Player: {fileID: 0}
+  player: {fileID: 0}
   animator: {fileID: 0}
   force: {x: 0, y: 300, z: 0}
   Enemy_Status: 0
