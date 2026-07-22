@@ -1841,7 +1841,7 @@ MonoBehaviour:
     m_PressedTrigger: Pressed
     m_SelectedTrigger: Selected
     m_DisabledTrigger: Disabled
-  m_Interactable: 1
+  m_Interactable: 0
   m_TargetGraphic: {fileID: 0}
   m_FillRect: {fileID: 411403377}
   m_HandleRect: {fileID: 0}
@@ -1974,7 +1974,7 @@ MonoBehaviour:
   BGM: {fileID: 8300000, guid: 78215c0163ae6f14e9dbae9023719665, type: 3}
   gameOverTime: 2
   PlayerTransform: {fileID: 956537544}
-  EnemyTransform: {fileID: 0}
+  EnemyTransform: {fileID: 1873253616}
   cameraController: {fileID: 330585548}
 --- !u!4 &750834239
 Transform:
@@ -4314,7 +4314,7 @@ MonoBehaviour:
     m_PressedTrigger: Pressed
     m_SelectedTrigger: Selected
     m_DisabledTrigger: Disabled
-  m_Interactable: 1
+  m_Interactable: 0
   m_TargetGraphic: {fileID: 0}
   m_FillRect: {fileID: 968577421}
   m_HandleRect: {fileID: 0}

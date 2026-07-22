@@ -331,15 +331,20 @@ public class Player : MonoBehaviour
     // そうでなければ現在の状態に応じて「拘束中のタイマー消化」か「新しい行動の受付」を行う。
     void Update()
     {
-        // ★追加：PlayerInputが無効化されている（＝DualPlayerDeviceAssignerによって
-        //   コントローラーが割り当てられなかった側）場合は、Update自体を丸ごとスキップする。
-        //   これが無いと、無効化される直前にOnMoveで受け取った古いmoveInputの値が
-        //   残り続け、以降入力が来なくなってもそのまま動き続けてしまう。
-        if (playerInput != null && !playerInput.enabled) return;
-
+        // HP判定・死亡処理は、コントローラーの有無に関係なく常に実行する
         if (HP <= 0)
         {
-            HandleKnockedDown();
+            if (currentState != PlayerState.Dead)
+            {
+                HandleKnockedDown();
+            }
+            ClearInputIntents();
+            return;
+        }
+
+        // ここから下は「操作入力の受付」なので、コントローラー未割り当てなら止める
+        if (playerInput != null && !playerInput.enabled)
+        {
             ClearInputIntents();
             return;
         }
@@ -349,12 +354,10 @@ public class Player : MonoBehaviour
                    || currentState == PlayerState.Crouch;
         if (isFree)
         {
-            // 拘束のない状態（Idle/Move/Crouch）での入力処理
             HandleFreeInput();
         }
         else
         {
-            // 攻撃・ガード・投げなど拘束時間のある行動中はタイマーだけを進める
             TickBusyState();
         }
 
