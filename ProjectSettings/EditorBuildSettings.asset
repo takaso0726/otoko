@@ -21,6 +21,12 @@ EditorBuildSettings:
     path: Assets/Scenes/GameClear.unity
     guid: 87912cdef48a28c439b8c2e69f70f379
   - enabled: 1
+    path: Assets/Scenes/Select.unity
+    guid: ff8ff38a96278d64e9ba4c4d32b2f759
+  - enabled: 1
+    path: Assets/Scenes/SFC.unity
+    guid: 5b413719266a32a4ca9fc47dcdef418d
+  - enabled: 1
     path: Assets/Scenes/InGame.unity
     guid: af336db328aa5e14cb61496104d3a6c5
   m_configObjects:

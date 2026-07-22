@@ -2158,10 +2158,10 @@ MonoBehaviour:
   MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
-  enemy: {fileID: 0}
+  enemy: {fileID: 1593231832}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
-  fightingCamera: {fileID: 0}
+  fightingCamera: {fileID: 330585548}
 --- !u!1 &652997322
 GameObject:
   m_ObjectHideFlags: 0
@@ -5204,7 +5204,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Enemy
   atk: 10
   HP: 0
-  player: {fileID: 0}
+  player: {fileID: 648027777}
   animator: {fileID: 0}
   force: {x: 0, y: 300, z: 0}
   Enemy_Status: 0

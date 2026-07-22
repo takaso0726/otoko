@@ -60,8 +60,8 @@ public class CharacterSelectController : MonoBehaviour
 
         player1.cursor.position = characters[0].anchor.position;
         player2.cursor.position = characters[0].anchor.position;
-        player1.readyMark?.SetActive(false);
-        player2.readyMark?.SetActive(false);
+        SetReadyMarkActive(player1, false);
+        SetReadyMarkActive(player2, false);
     }
 
     void Update()
@@ -86,7 +86,7 @@ public class CharacterSelectController : MonoBehaviour
             if (cancel)
             {
                 p.decided = false;
-                p.readyMark?.SetActive(false);
+                SetReadyMarkActive(p, false);
             }
             return;
         }
@@ -94,7 +94,7 @@ public class CharacterSelectController : MonoBehaviour
         if (nav != 0)
         {
             p.currentIndex = (p.currentIndex + nav + characters.Length) % characters.Length;
-            se.PlayOneShot(moveSE);
+            PlaySE(moveSE);
 
             if (routine != null) StopCoroutine(routine);
             routine = StartCoroutine(MoveCursorSmooth(p.cursor, characters[p.currentIndex].anchor.position));
@@ -103,8 +103,27 @@ public class CharacterSelectController : MonoBehaviour
         if (decide)
         {
             p.decided = true;
-            p.readyMark?.SetActive(true);
-            se.PlayOneShot(decideSE);
+            SetReadyMarkActive(p, true);
+            PlaySE(decideSE);
+        }
+    }
+
+    // GameObjectの「疑似null（参照は残っているが実体が破棄されている状態）」でも
+    // 安全に判定できるよう、?.ではなく明示的なUnityの==比較でチェックする
+    void SetReadyMarkActive(PlayerSelector p, bool active)
+    {
+        if (p.readyMark != null)
+        {
+            p.readyMark.SetActive(active);
+        }
+    }
+
+    // AudioClipがInspectorで未設定の場合にPlayOneShot(null)警告が出るのを防ぐ
+    void PlaySE(AudioClip clip)
+    {
+        if (se != null && clip != null)
+        {
+            se.PlayOneShot(clip);
         }
     }
 
@@ -122,7 +141,7 @@ public class CharacterSelectController : MonoBehaviour
     {
         isTransitioning = true;
 
-        if (bothReadySE != null) se.PlayOneShot(bothReadySE);
+        PlaySE(bothReadySE);
 
         yield return new WaitForSeconds(transitionDelay);
 
