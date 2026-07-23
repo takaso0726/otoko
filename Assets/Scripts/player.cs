@@ -113,6 +113,12 @@ public class Player : MonoBehaviour
     public ParticleSystem Men_particle;      // 仁王立ち用のパーティクル
     public ParticleSystem Hit_particle;      // ヒット時用のパーティクル
 
+    [Header("擬音演出（ドカン・ドドン等）")]
+    public HitEffectData punchHitEffectData;   // パンチ（空中攻撃含む）被弾時に出す擬音の設定
+    public HitEffectData kickHitEffectData;    // キック（通常/上/下すべて共通）被弾時に出す擬音の設定
+    public HitEffectData guardHitEffectData;   // 仁王立ちガード成功時に出す擬音の設定（未設定なら出さない）
+    public HitEffectData mashHitEffectData;    // 根性復活の連打1回ごとに出す擬音の設定（未設定なら出さない）
+
     //=====================================================
     // ★外部参照
     //=====================================================
@@ -161,6 +167,43 @@ public class Player : MonoBehaviour
     public CapsuleCollider[] AttackHitboxes => allHitboxes;
     // ★追加：本体（胴体）コライダーの公開プロパティ。同様にOnTriggerEnterで使う。
     public CapsuleCollider BodyCollider => Player_Collider;
+
+    // ★追加：擬音演出（パンチ/キックで表示を分ける）用に、
+    //   自分が今どの攻撃をしているかを外部（被弾した相手）から問い合わせるための型とプロパティ。
+    //   currentStateはprivateなので、これ経由でしか攻撃種別が見えないようにしている。
+    public enum AttackType { Punch, Kick, UpKick, DownKick, None }
+
+    public AttackType CurrentAttackType
+    {
+        get
+        {
+            switch (currentState)
+            {
+                case PlayerState.Punch: return AttackType.Punch;
+                case PlayerState.Kick: return AttackType.Kick;
+                case PlayerState.UpKick: return AttackType.UpKick;
+                case PlayerState.DownKick: return AttackType.DownKick;
+                default: return AttackType.None;
+            }
+        }
+    }
+
+    // ★追加：攻撃種別に応じて、自分が持っているHitEffectDataのどれを使うかを返す。
+    //   被弾した相手側から「あなたの攻撃はどの擬音を使う？」と問い合わせられるためのメソッド。
+    public HitEffectData GetHitEffectDataFor(AttackType type)
+    {
+        switch (type)
+        {
+            case AttackType.Punch:
+                return punchHitEffectData;
+            case AttackType.Kick:
+            case AttackType.UpKick:
+            case AttackType.DownKick:
+                return kickHitEffectData;
+            default:
+                return null;
+        }
+    }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     // 各種コンポーネント・子オブジェクトの当たり判定の取得と初期化を行う
@@ -274,6 +317,14 @@ public class Player : MonoBehaviour
         {
             // ダウン中は復活チャレンジの連打カウントとして加算するだけ
             mashCount++;
+
+            // 連打1回ごとの擬音演出（「グッ！」「ンン！」等）。
+            // 攻撃者がいないので、常にプレイヤーの正面方向を基準にHitEffectData側のBase Angleで散らす。
+            if (HitEffectSpawner.Instance != null && mashHitEffectData != null)
+            {
+                HitEffectSpawner.Instance.SpawnAtDirection(mashHitEffectData, transform.position, transform.forward);
+            }
+
             return;
         }
 
@@ -715,6 +766,13 @@ public class Player : MonoBehaviour
             {
                 fightingCamera.OnGuardImpact(transform, guardComboCount);
             }
+
+            // ガード成功の擬音演出（攻撃者→自分の方向を基準に、空白地帯へ表示）
+            if (HitEffectSpawner.Instance != null && guardHitEffectData != null)
+            {
+                Transform guardAttackerTf = isEnemyPlayerAttack ? enemyPlayer.transform : enemy.transform;
+                HitEffectSpawner.Instance.Spawn(guardHitEffectData, guardAttackerTf.position, transform.position);
+            }
         }
         else
         {
@@ -726,6 +784,29 @@ public class Player : MonoBehaviour
             ParticleSystem hitParticle = Instantiate(Hit_particle, hitPoint, Quaternion.Euler(-90f, 0f, 0f));
             hitParticle.Play();
             Destroy(hitParticle.gameObject, 1.0f);
+
+            // 「ドカン」「ドドン」等の擬音演出。
+            // 攻撃者に今の攻撃タイプ(パンチ/キック)を問い合わせて、対応する擬音データを選ぶ。
+            // 角度・距離はHitEffectData側（Inspector）で調整する。
+            Transform attackerTf = isEnemyPlayerAttack ? enemyPlayer.transform : enemy.transform;
+            HitEffectData selectedHitEffect = null;
+
+            if (isEnemyPlayerAttack)
+            {
+                // 対人戦：相手Playerの現在の攻撃タイプに応じたHitEffectDataを取得
+                selectedHitEffect = enemyPlayer.GetHitEffectDataFor(enemyPlayer.CurrentAttackType);
+            }
+            else if (enemy != null)
+            {
+                // 対CPU戦：Enemy側にまだ攻撃タイプの区別が無い場合は、暫定でパンチ用を流用。
+                // Enemy.csにも同様のAttackType/GetHitEffectDataForの仕組みを追加すれば統一できる。
+                selectedHitEffect = punchHitEffectData;
+            }
+
+            if (HitEffectSpawner.Instance != null && selectedHitEffect != null)
+            {
+                HitEffectSpawner.Instance.Spawn(selectedHitEffect, attackerTf.position, hitPoint);
+            }
 
             HP -= attackerAtk;
         }
