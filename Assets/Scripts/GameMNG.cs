@@ -19,6 +19,11 @@ public class GameMNG : MonoBehaviour
     public Slider P_HPbar;
     public Slider E_HPbar;
 
+    [Header("漢気ゲージ表示(敵側・2本分)")]
+    [Tooltip("Sliderのmin=0, max=1で設定してください(GetGaugeFillRatioが0〜1を返すため)")]
+    public Slider E_KankiGaugeBar1;
+    public Slider E_KankiGaugeBar2;
+
     float PTimer;
     int PCnt;
 
@@ -70,6 +75,9 @@ public class GameMNG : MonoBehaviour
 
         //プレイヤーのステータスをLiveにする
         player1Status = Player.Status.Live;
+
+        //漢気ゲージUIの初期化(0本分の状態から開始)
+        Enemy_UpdateKankiGauge();
 
         //プレイヤーの状態経過時間タイマー
         playerChangeTimer = 0.0f;
@@ -223,6 +231,25 @@ public class GameMNG : MonoBehaviour
             return;
         }
         E_HPbar.value = e1.HP;
+    }
+
+    //エネミー側の漢気ゲージ(2本分)を表示更新する
+    //Enemy.csのAddKankiGauge/ReduceKankiGaugeが呼ばれた際に呼び出される想定
+    public void Enemy_UpdateKankiGauge()
+    {
+        if (e1 == null)
+        {
+            Debug.LogError("GameMNGのe1（Enemy）がInspectorで未設定です。Enemyオブジェクトをアサインしてください。");
+            return;
+        }
+        if (E_KankiGaugeBar1 == null || E_KankiGaugeBar2 == null)
+        {
+            Debug.LogError("GameMNGのE_KankiGaugeBar1またはE_KankiGaugeBar2がInspectorで未設定です。漢気ゲージ用のSliderをアサインしてください。");
+            return;
+        }
+        //1本目・2本目それぞれの充填率(0〜1)をSliderへ反映
+        E_KankiGaugeBar1.value = e1.GetGaugeFillRatio(0);
+        E_KankiGaugeBar2.value = e1.GetGaugeFillRatio(1);
     }
     //p1側のHPの表示を更新する
     public void P1_ReduceHP(int hp)

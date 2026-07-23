@@ -95,6 +95,26 @@ public class Enemy : MonoBehaviour
     // 投げ攻撃などCPU側の与ダメージにかかる倍率
     private float damageMultiplier = 1.0f;
 
+    // ---- 漢気ゲージ(必殺技ゲージ) ----
+    [Header("漢気ゲージ設定")]
+    [Tooltip("ゲージ1本分の最大値")]
+    public float kankiGaugePerBar = 100f;
+    [Tooltip("ゲージの本数(2本分)")]
+    public int kankiGaugeBarCount = 2;
+    [Tooltip("プレイヤーに攻撃を当てた時に増える量")]
+    public float gaugeGainOnHit = 15f;
+    [Tooltip("後退(敵から離れる)した時に減る量")]
+    public float gaugeLossOnRetreat = 5f;
+    [Tooltip("ゲージ1本(満タン)につき上昇する攻撃力の倍率。0.25なら1本で+25%")]
+    public float atkPowerPerBar = 0.25f;
+
+    // 現在の合計ゲージ量(0 〜 kankiGaugePerBar * kankiGaugeBarCount)
+    private float kankiGauge = 0f;
+    // ゲージによる補正がかかる前の、素の攻撃力
+    private int baseAtk;
+    // プレイヤーのHPが「攻撃が当たって減った」ことを検知するための、直前フレームのHP
+    private int lastPlayerHP;
+
     void Awake()
     {
         // シーン内のカメラコントローラーを自動取得したい場合
@@ -165,10 +185,18 @@ public class Enemy : MonoBehaviour
         //rand = Random.Range(1, 6);
         rb = GetComponent<Rigidbody>();		//EnemyのRigidbodyを取得
         atk = 10;
+        baseAtk = atk;      //漢気ゲージによる攻撃力補正の基準値として保持
+        kankiGauge = 0f;
         HP = 100;
         Menflag = false;
         Enemy_Status = Status.Neutral;
         animator = GetComponent<Animator>();
+
+        //プレイヤーの攻撃命中検知(HP減少検知)用の初期値
+        if (player != null)
+        {
+            lastPlayerHP = player.HP;
+        }
 
         //<当たり判定の子オブジェクトの取得>
         //頭の当たり判定
@@ -230,6 +258,18 @@ public class Enemy : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        // ★追加: プレイヤーのHPが前フレームより減っていたら、
+        //   自分(Enemy)の攻撃(パンチ・キック・投げ等)が当たったとみなして漢気ゲージを増やす。
+        //   Player.csを直接編集しなくても、パンチ/キック含む全ての攻撃命中を検知できる。
+        if (player != null)
+        {
+            if (player.HP < lastPlayerHP)
+            {
+                AddKankiGauge(gaugeGainOnHit);
+            }
+            lastPlayerHP = player.HP;
+        }
+
         // ★追加: プレイヤーが背後に回り込んだら振り向く。
         //   AIの行動判断(reactionInterval)とは別に、毎フレームチェックして即座に反応させる。
         FaceTowardsPlayerIfBehind();
@@ -466,6 +506,9 @@ public class Enemy : MonoBehaviour
                 //移動(後退) ※下がる歩幅は控えめにして引きすぎないようにする
                 transform.Translate(0.0f, 0.0f, -0.08f);
                 ActionTimer = 0.0f;
+
+                //敵(プレイヤー)から離れる行動なので漢気ゲージを減らす
+                ReduceKankiGauge(gaugeLossOnRetreat);
                 break;
 
             case ActionType.Crouch:
@@ -492,6 +535,8 @@ public class Enemy : MonoBehaviour
                     player.transform.Translate(0.0f, 0.0f, -0.0025f);
                     player.animator.SetTrigger("Thrown");
                     player.damege(Mathf.RoundToInt(5 * damageMultiplier));
+
+                    //※漢気ゲージはUpdate()内のプレイヤーHP減少検知で自動的に加算されるため、ここでは呼ばない
                 }
                 break;
 
@@ -572,6 +617,66 @@ public class Enemy : MonoBehaviour
         LeftFoot.enabled = false;
         LeftUpLeg.enabled = false;
         LeftLeg.enabled = false;
+    }
+
+    // ---- 漢気ゲージ操作 ----
+
+    //プレイヤーに攻撃(パンチ・キック等)が当たった時にPlayer側から呼び出す想定の公開メソッド。
+    //※注意: 現在はUpdate()内でプレイヤーHPの減少を自動検知してゲージを増やしているため、
+    //   このメソッドを別途呼び出すと二重加算になります。Player.cs側から明示的に呼ぶ場合は、
+    //   Update()内のHP減少検知処理を削除するかコメントアウトしてください。
+    public void NotifyAttackLandedOnPlayer()
+    {
+        AddKankiGauge(gaugeGainOnHit);
+    }
+
+    //漢気ゲージを増やす(上限は2本分の合計値でクランプ)
+    public void AddKankiGauge(float amount)
+    {
+        float max = kankiGaugePerBar * kankiGaugeBarCount;
+        kankiGauge = Mathf.Clamp(kankiGauge + amount, 0f, max);
+        UpdateAtkByGauge();
+
+        //ゲージUI(2本分のSlider)を更新
+        if (gameMNG != null)
+        {
+            gameMNG.Enemy_UpdateKankiGauge();
+        }
+    }
+
+    //漢気ゲージを減らす(0未満にはならない)
+    public void ReduceKankiGauge(float amount)
+    {
+        kankiGauge = Mathf.Clamp(kankiGauge - amount, 0f, kankiGaugePerBar * kankiGaugeBarCount);
+        UpdateAtkByGauge();
+
+        //ゲージUI(2本分のSlider)を更新
+        if (gameMNG != null)
+        {
+            gameMNG.Enemy_UpdateKankiGauge();
+        }
+    }
+
+    //ゲージの満タン本数に応じて攻撃力を再計算する
+    private void UpdateAtkByGauge()
+    {
+        int filledBars = Mathf.FloorToInt(kankiGauge / kankiGaugePerBar);
+        atk = Mathf.RoundToInt(baseAtk * (1f + atkPowerPerBar * filledBars));
+    }
+
+    //UI(Sliderなど)から参照するための、指定した本数目のゲージの充填率(0〜1)を返す
+    //barIndex: 0 = 1本目, 1 = 2本目
+    public float GetGaugeFillRatio(int barIndex)
+    {
+        float barStart = barIndex * kankiGaugePerBar;
+        float filled = Mathf.Clamp(kankiGauge - barStart, 0f, kankiGaugePerBar);
+        return filled / kankiGaugePerBar;
+    }
+
+    //現在のゲージ合計値(生の値)を取得したい場合用
+    public float GetKankiGauge()
+    {
+        return kankiGauge;
     }
 
     public void damege(int n)
