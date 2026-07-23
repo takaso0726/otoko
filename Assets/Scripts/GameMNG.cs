@@ -1,6 +1,7 @@
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class GameMNG : MonoBehaviour
 {
@@ -29,8 +30,8 @@ public class GameMNG : MonoBehaviour
     //プレイヤーが倒されてからの経過時間
     float playerChangeTimer;
     //プレイヤーの状態
-    Player.Status playerStatus;
-
+    Player.Status player1Status;
+    Player.Status player2Status;
     [Header("勝敗カメラ演出")]
     //プレイヤーのTransform（勝利時にカメラがズームする対象）
     public Transform PlayerTransform;
@@ -39,30 +40,43 @@ public class GameMNG : MonoBehaviour
     //シーン中のカメラコントローラー
     public FightingCameraController cameraController;
 
+    string currentScene = null;
     //初期化
     void Start()
     {
-        
-        //ド根性復活のタイマー
-       // Player_Timer_Text.text = "0";
-        //ド根性復活の回数
-       // Player_Cnt_Text.text = "0";
-        //わからんけどなんかのタイマーとカウント
-        PTimer = 0;
-        PCnt = 0;
+        // 現在アクティブなシーンの名前を取得
+        currentScene = SceneManager.GetActiveScene().name;
+        Debug.Log("現在のシーン名: " + currentScene);
 
-        //HPバーのパーセント
+        // シーン名に応じて表示/非表示を切り替え
+        switch (currentScene)
+        {
+            case "InGame":
+
+                //HPバーを現在出ているキャラクターに設定する
+                E_HPbar.value = e1.HP;
+                break;
+            case "InGame1V1":
+
+                //HPバーを現在出ているキャラクターに設定する
+                E_HPbar.value = p2.HP;
+
+                //プレイヤーのステータスをLiveにする
+                player2Status = Player.Status.Live;
+                break;
+        }
+        //HPバーを現在出ているキャラクターに設定する
         P_HPbar.value = p1.HP;
-        E_HPbar.value = p2.HP;
 
+        //プレイヤーのステータスをLiveにする
+        player1Status = Player.Status.Live;
 
+        //プレイヤーの状態経過時間タイマー
         playerChangeTimer = 0.0f;
-        //プレイヤーのステータス
-        playerStatus = Player.Status.Live;
-
+        
+       
         //効果音再生用のAudioClipを取得
         BGM_Lv1 = GetComponent<AudioSource>();
-
         BGM_Lv1.loop = true;
 
         //BGM再生
@@ -72,33 +86,101 @@ public class GameMNG : MonoBehaviour
     //更新処理
     void Update()
     {
-        //Playerの状態がDeadなら
-        if(playerStatus == Player.Status.Dead)
+
+        // シーン名に応じて表示/非表示を切り替え
+        switch (currentScene)
         {
-            //経過時間を加える
-            playerChangeTimer += Time.deltaTime;
-            //経過時間がgameOverTIme以上になったら
-            if(playerChangeTimer >= gameOverTime)
-            {
-                //ゲームオーバーシーンを読み込む
-                SceneManager.LoadScene("GameOver");
-                //経過時間をリセット
-                playerChangeTimer = 0.0f;
-            }
+            case "InGame":
+                //Player1の状態がDeadなら
+                if (player1Status == Player.Status.Dead)
+                {
+                    //経過時間を加える
+                    playerChangeTimer += Time.deltaTime;
+                    //経過時間がgameOverTIme以上になったら
+                    if (playerChangeTimer >= gameOverTime)
+                    {
+                        //ゲームオーバーシーンを読み込む
+                        SceneManager.LoadScene("GameOver");
+                        //経過時間をリセット
+                        playerChangeTimer = 0.0f;
+                    }
+                }
+                //Player1の状態がWinなら
+                else if (player1Status == Player.Status.Win)
+                {
+                    //経過時間を加える
+                    playerChangeTimer += Time.deltaTime;
+                    //経過時間がgameOverTIme以上になったら
+                    if (playerChangeTimer >= gameOverTime)
+                    {
+                        //ゲームオーバーシーンを読み込む
+                        SceneManager.LoadScene("GameClear");
+                        //経過時間をリセット
+                        playerChangeTimer = 0.0f;
+                    }
+                }
+                //Player2の状態がDeadなら
+                if (player2Status == Player.Status.Dead)
+                {
+                    //経過時間を加える
+                    playerChangeTimer += Time.deltaTime;
+                    //経過時間がgameOverTIme以上になったら
+                    if (playerChangeTimer >= gameOverTime)
+                    {
+                        //ゲームオーバーシーンを読み込む
+                        SceneManager.LoadScene("GameOver");
+                        //経過時間をリセット
+                        playerChangeTimer = 0.0f;
+                    }
+                }
+                //Player2の状態がWinなら
+                else if (player2Status == Player.Status.Win)
+                {
+                    //経過時間を加える
+                    playerChangeTimer += Time.deltaTime;
+                    //経過時間がgameOverTIme以上になったら
+                    if (playerChangeTimer >= gameOverTime)
+                    {
+                        //ゲームオーバーシーンを読み込む
+                        SceneManager.LoadScene("GameClear");
+                        //経過時間をリセット
+                        playerChangeTimer = 0.0f;
+                    }
+                }
+                
+                break;
+            case "InGame1V1":
+                //Player1の状態がDeadなら
+                if (player1Status == Player.Status.Dead)
+                {
+                    //経過時間を加える
+                    playerChangeTimer += Time.deltaTime;
+                    //経過時間がgameOverTIme以上になったら
+                    if (playerChangeTimer >= gameOverTime)
+                    {
+                        //ゲームオーバーシーンを読み込む
+                        SceneManager.LoadScene("GameOver");
+                        //経過時間をリセット
+                        playerChangeTimer = 0.0f;
+                    }
+                }
+                //Player1の状態がWinなら
+                else if (player1Status == Player.Status.Win)
+                {
+                    //経過時間を加える
+                    playerChangeTimer += Time.deltaTime;
+                    //経過時間がgameOverTIme以上になったら
+                    if (playerChangeTimer >= gameOverTime)
+                    {
+                        //ゲームオーバーシーンを読み込む
+                        SceneManager.LoadScene("GameClear");
+                        //経過時間をリセット
+                        playerChangeTimer = 0.0f;
+                    }
+                }
+                break;
         }
-        else if(playerStatus == Player.Status.Win)
-        {
-            //経過時間を加える
-            playerChangeTimer += Time.deltaTime;
-            //経過時間がgameOverTIme以上になったら
-            if (playerChangeTimer >= gameOverTime)
-            {
-                //ゲームオーバーシーンを読み込む
-                SceneManager.LoadScene("GameClear");
-                //経過時間をリセット
-                playerChangeTimer = 0.0f;
-            }
-        }
+        
             
     }
 
@@ -107,52 +189,82 @@ public class GameMNG : MonoBehaviour
     {
         //HPを表示
         //PlayerHP_Text.text = p1.ToString();
-        if (PlayerName == "P1") { P_HPbar.value = p1.HP; }
-        if (PlayerName == "P2") { E_HPbar.value = p2.HP; }
+        if (PlayerName == "P1")
+        {
+            if (P_HPbar == null || p1 == null)
+            {
+                Debug.LogError("GameMNGのP_HPbarまたはp1がInspectorで未設定です。");
+                return;
+            }
+            P_HPbar.value = p1.HP;
+        }
+        if (PlayerName == "P2")
+        {
+            if (E_HPbar == null || p2 == null)
+            {
+                Debug.LogError("GameMNGのE_HPbarまたはp2がInspectorで未設定です。");
+                return;
+            }
+            E_HPbar.value = p2.HP;
+        }
     }
     //エネミー側のHPを表示する
     public void Enemy_ReduceHP(int hp)
     {
         //HPを表示
-        //EnemyHP_Text.text = e1.ToString();
+        if (E_HPbar == null)
+        {
+            Debug.LogError("GameMNGのE_HPbarがInspectorで未設定です。HPバーのSliderをアサインしてください。");
+            return;
+        }
+        if (e1 == null)
+        {
+            Debug.LogError("GameMNGのe1（Enemy）がInspectorで未設定です。Enemyオブジェクトをアサインしてください。");
+            return;
+        }
         E_HPbar.value = e1.HP;
     }
     //p1側のHPの表示を更新する
     public void P1_ReduceHP(int hp)
     {
         //HPを表示
-        //EnemyHP_Text.text = e1.ToString();
-        E_HPbar.value = p1.HP;
+        if (P_HPbar == null || p1 == null)
+        {
+            Debug.LogError("GameMNGのP_HPbarまたはp1がInspectorで未設定です。");
+            return;
+        }
+        P_HPbar.value = p1.HP;
     }
     //p2側のHPの表示を更新する
     public void P2_ReduceHP(int hp)
     {
         //HPを表示
-        //EnemyHP_Text.text = e1.ToString();
+        if (E_HPbar == null || p2 == null)
+        {
+            Debug.LogError("GameMNGのE_HPbarまたはp2がInspectorで未設定です。");
+            return;
+        }
         E_HPbar.value = p2.HP;
     }
     //ド根性復活のタイマーとカウントを表示する
     public void PlayerUI(float Timer,int Cnt)
     {
-        //ド根性復活のタイマーとカウントを表示する
-        //Player_Timer_Text.text = PTimer.ToString();
-        //Player_Cnt_Text.text = PCnt.ToString();
     }
 
     //他のC#スクリプトから呼び出す変数
     public void SettestStatus(Player.Status ps)
     {
-        playerStatus = ps;
+        player1Status = ps;
 
         //勝敗が決まったら、勝った方にカメラをズームする
         if (cameraController != null)
         {
-            if (playerStatus == Player.Status.Win)
+            if (player1Status == Player.Status.Win)
             {
                 //プレイヤーが勝利
                 cameraController.FocusOnTarget(PlayerTransform);
             }
-            else if (playerStatus == Player.Status.Dead)
+            else if (player1Status == Player.Status.Dead)
             {
                 //プレイヤーが敗北＝敵の勝利
                 cameraController.FocusOnTarget(EnemyTransform);

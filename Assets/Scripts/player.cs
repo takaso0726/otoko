@@ -8,31 +8,10 @@ using UnityEngine.InputSystem;
 //   誰の入力かはPlayerInputManagerがデバイス単位で自動的に振り分けます。
 //=====================================================
 // プレイヤーキャラクターの移動・攻撃・被弾・復活などの一連の挙動を管理するメインスクリプト
-//
-// 【今回のバグ修正（被弾判定まわり）】
-// 症状：①攻撃すると自分にもダメージが入る／②相手（P2）の攻撃が当たったり当たらなかったりする
-//
-// 原因は2つ複合していた：
-//   (A) 攻撃用ヒットボックス（手足の子コライダー）は Player 本体の Rigidbody に
-//       属する複合コライダーとして扱われるため、P1の手がP2の胴体に触れると
-//       「P1側のOnTriggerEnter」と「P2側のOnTriggerEnter」が両方発火してしまい、
-//       攻撃した側(P1)まで「被弾した」扱いになっていた。
-//   (B) EnemyPlayer()→TakeDamage() の呼び出し経路が「相手のenemyPlayer(=自分)の
-//       HPを減らす」というたすき掛けになっており、直後の HP -= enemyPlayer.atk と
-//       合わせて同一ヒットで二重にダメージが入っていた。
-//
-// 対策：
-//   (A) 「今トリガーに触れてきたコライダーが“相手の攻撃用ヒットボックス”であるか」
-//       を allHitboxes 配列で判定し、それが true の時だけ被弾処理を行う。
-//       自分のヒットボックスが相手の体（Player_Collider）に触れただけの場合は
-//       この対象では何もしない（それは相手側のOnTriggerEnterで処理される）。
-//   (B) EnemyPlayer()/TakeDamage() の自傷ロジックを削除し、ダメージ適用は
-//       OnTriggerEnter内の1箇所だけに一本化した。
 [RequireComponent(typeof(PlayerInput))]
 public class Player : MonoBehaviour
 {
-    // "ManagerObject"のGameMNGへの参照。毎回GameObject.Findするとタイポや
-    // 非アクティブ状態でnullを返しやすく、そのままGetComponentするとNullReferenceExceptionになるため、
+    // GameMNGへの参照。毎回探すと負荷やタイミング次第でnullを返しやすいため、
     // Startで一度だけ探してキャッシュし、以降はこれを使い回す。
     GameMNG gameMNG;
 
@@ -196,21 +175,14 @@ public class Player : MonoBehaviour
         animator = GetComponent<Animator>();
         se = GetComponent<AudioSource>();
 
-        // "ManagerObject"を探してGameMNGをキャッシュしておく。
+        // GameMNGを名前に依存しない方法で探してキャッシュしておく。
+        // （オブジェクト名が"ManagerObject"や"GameMNG"でなくても正しく取得できるようにする）
         // 見つからない場合はここでハッキリ警告を出し、以降のNullReferenceExceptionを防ぐ。
-        GameObject managerObj = GameObject.Find("GameMNG");
-        if (managerObj == null)
+        gameMNG = FindAnyObjectByType<GameMNG>();
+        if (gameMNG == null)
         {
-            Debug.LogError("シーン内に「ManagerObject」という名前のアクティブなGameObjectが見つかりません。" +
-                "名前のスペルミス／非アクティブ状態／配置し忘れがないか確認してください。");
-        }
-        else
-        {
-            gameMNG = managerObj.GetComponent<GameMNG>();
-            if (gameMNG == null)
-            {
-                Debug.LogError("「ManagerObject」にGameMNGコンポーネントが付いていません。");
-            }
+            Debug.LogError("シーン内にGameMNGコンポーネントを持つGameObjectが見つかりません。" +
+                "配置し忘れ／非アクティブ状態になっていないか確認してください。");
         }
 
         //<当たり判定の子オブジェクトの取得>
@@ -670,6 +642,7 @@ public class Player : MonoBehaviour
             //制限時間内に復活できず力尽きた
             currentState = PlayerState.Dead;
             Player_status = Status.Dead;
+            Debug.Log($"[{PlayerName}] 根性復活失敗。HP={HP}のままDead状態へ移行。");
             if (gameMNG != null) gameMNG.SettestStatus(Status.Dead);
 
             if (fightingCamera != null)
@@ -707,24 +680,35 @@ public class Player : MonoBehaviour
         //自分自身のタグ、またはすでに倒れている場合は無視
         if (collision.gameObject.tag == this.PLayerTagName || HP <= 0) return;
 
-        if (enemyPlayer == null) return;
+        // ★修正：相手が「対人戦のPlayer(enemyPlayer)」か「対CPU戦のEnemy(enemy)」かを
+        //   それぞれ判定する。以前はenemyPlayerしか見ておらず、enemy(CPU)の攻撃が
+        //   一切ヒット判定されずHPが減らないバグの原因になっていた。
+        bool isEnemyPlayerAttack = enemyPlayer != null
+            && enemyPlayer.AttackHitboxes != null
+            && System.Array.Exists(enemyPlayer.AttackHitboxes, hb => hb == collision);
 
-        // ★追加：触れてきたコライダーが「敵プレイヤーの攻撃用ヒットボックス」で
-        //   なければ、このイベントは無視する。
-        //   （＝自分のヒットボックスが敵の体に当たっただけの、攻撃側視点のイベント）
-        if (!System.Array.Exists(enemyPlayer.AttackHitboxes, hb => hb == collision))
+        bool isEnemyAttack = !isEnemyPlayerAttack && enemy != null
+            && enemy.AttackHitboxes != null
+            && System.Array.Exists(enemy.AttackHitboxes, hb => hb == collision);
+
+        // どちらの攻撃用ヒットボックスでもなければ、このイベントは無視する
+        //   （＝自分のヒットボックスが相手の体に当たっただけの、攻撃側視点のイベント等）
+        if (!isEnemyPlayerAttack && !isEnemyAttack)
         {
             return;
         }
+
+        //今回被弾させてきた相手の攻撃力を取得（対人戦かCPU戦かで参照先を切り替える）
+        int attackerAtk = isEnemyPlayerAttack ? enemyPlayer.atk : enemy.atk;
 
         //ここまで来たら「敵の攻撃用ヒットボックスが自分の体に当たった」＝正真正銘の被弾
         if (isGuarding)
         {
             // 仁王立ち（ガード）中に被弾した場合の処理
-            atk += enemyPlayer.atk;                  // ガード成功で自分の攻撃力に敵の攻撃力を上乗せする
+            atk += attackerAtk;                  // ガード成功で自分の攻撃力に敵の攻撃力を上乗せする
             Debug.Log("漢!!");
             se.PlayOneShot(MenBlock_se);       // ガード成功の効果音を再生
-            HP -= enemyPlayer.atk / 2;                // ガード中はダメージを半減させる
+            HP -= attackerAtk / 2;                // ガード中はダメージを半減させる
 
             guardComboCount++;
             if (fightingCamera != null)
@@ -743,7 +727,7 @@ public class Player : MonoBehaviour
             hitParticle.Play();
             Destroy(hitParticle.gameObject, 1.0f);
 
-            HP -= enemyPlayer.atk;
+            HP -= attackerAtk;
         }
 
         //UIにHPを減らすように指示
@@ -755,9 +739,16 @@ public class Player : MonoBehaviour
         {
             Debug.LogError("gameMNGがnullのためHP表示を更新できません。ManagerObjectの配置を確認してください。");
         }
-        enemyPlayer.atk = 10;   // 敵の攻撃力を初期値に戻す（一度使ったらリセット）
+
+        //攻撃力を初期値に戻す（一度使ったらリセット）
+        if (isEnemyPlayerAttack) enemyPlayer.atk = 10;
+        else enemy.atk = 10;
 
         if (HP < 0) HP = 0;
+
+        //デバッグログ：誰からどれだけダメージを受けてHPがいくつになったか
+        string attackerName = isEnemyPlayerAttack ? enemyPlayer.PlayerName : "Enemy(CPU)";
+        Debug.Log($"[{PlayerName}] {attackerName}から被弾。ダメージ={attackerAtk}{(isGuarding ? "(ガード半減)" : "")} / 残りHP={HP}");
     }
 
     //-----------------------------------------------------
@@ -782,6 +773,10 @@ public class Player : MonoBehaviour
     {
         HP -= n;
         if (HP < 0) HP = 0;
+
+        //デバッグログ：ダメージ量と残りHP
+        Debug.Log($"[{PlayerName}] damege()呼び出し。ダメージ={n} / 残りHP={HP}");
+
         // ★元コードのまま維持。"Enemy_ReduceHP"という名前だが実際にはプレイヤー自身のHPを渡している。
         //   GameMNG側の実装次第では意図通りかもしれないが、要確認。
         if (gameMNG != null)
