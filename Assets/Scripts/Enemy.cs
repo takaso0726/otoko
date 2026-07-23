@@ -7,7 +7,7 @@ public class Enemy : MonoBehaviour
     //int rand;           //乱数用変数
     float ActionTimer;  //タイマー
     public int atk;
-    public int HP;
+    public int HP = 100;   // ★宣言時に初期化。Start()の実行順序に関わらず、GameMNG側から参照した時点で正しい値になるようにする
     public Player player;
     bool Menflag;
     public Animator animator;
@@ -31,11 +31,22 @@ public class Enemy : MonoBehaviour
 
     CapsuleCollider Enemy_Collider;
 
+    // 全ての攻撃用当たり判定をまとめた配列（Playerの被弾判定から参照できるようにする）
+    CapsuleCollider[] allHitboxes;
+    // ★追加：Player側から「このコライダーはEnemyの攻撃用ヒットボックスか？」を
+    //   問い合わせるための公開プロパティ。PlayerのOnTriggerEnterでの被弾判定に使う。
+    public CapsuleCollider[] AttackHitboxes => allHitboxes;
+
     public ParticleSystem Men_particle;     //仁王立ち用のパーティクル
     public ParticleSystem Hit_particle;     //ヒット時用のパーティクル
 
     public FightingCameraController cameraController;
     private int currentHP = 100;
+
+    // GameMNGへの参照。毎回GameObject.Findするとオブジェクト名の相違や
+    // タイミングでnullを返し、そのままGetComponentするとNullReferenceExceptionになるため、
+    // Startで一度だけ探してキャッシュし、以降はこれを使い回す。
+    GameMNG gameMNG;
 
     // ---- CPU AI 用 ----
     // 行動の種類。ランダム値(1〜7)の代わりにこの列挙体で意図を表す
@@ -186,6 +197,20 @@ public class Enemy : MonoBehaviour
 
         Enemy_Collider = gameObject.GetComponent<CapsuleCollider>();
 
+        // シーン内のGameMNGを名前に依存しない方法で取得しておく。
+        // （"ManagerObject"という名前のオブジェクトが実際には存在しないシーンでも動くようにする）
+        gameMNG = FindAnyObjectByType<GameMNG>();
+        if (gameMNG == null)
+        {
+            Debug.LogError("シーン内にGameMNGコンポーネントを持つGameObjectが見つかりません。配置を確認してください。");
+        }
+
+        // 一括参照用の配列にまとめておく（Player側の被弾判定で使用）
+        allHitboxes = new[]
+        {
+            Head, RightArm, RightForeArm, RightHand, RightFoot, RightUpLeg, RightLeg,
+            LeftArm, LeftForeArm, LeftHand, LeftFoot, LeftUpLeg, LeftLeg
+        };
 
         AtkHitboxOFF();
         InitRotate = transform.rotation.y;
@@ -464,14 +489,19 @@ public class Enemy : MonoBehaviour
             }
             player.atk = 10;
 
-            //一旦ボツ
-            GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
-            mng.Enemy_ReduceHP(HP);
-
-            if(HP <= 0)
+            if (gameMNG != null)
             {
-                //マネージャーに「勝利状態」を設定する
-                mng.SettestStatus(Player.Status.Win);
+                gameMNG.Enemy_ReduceHP(HP);
+
+                if (HP <= 0)
+                {
+                    //マネージャーに「勝利状態」を設定する
+                    gameMNG.SettestStatus(Player.Status.Win);
+                }
+            }
+            else
+            {
+                Debug.LogError("gameMNGがnullのためHP表示・勝敗判定を更新できません。GameMNGコンポーネントの配置を確認してください。");
             }
         }
     }
@@ -500,8 +530,14 @@ public class Enemy : MonoBehaviour
     public void damege(int n)
     {
         HP -= n;
-        GameMNG mng = GameObject.Find("ManagerObject").GetComponent<GameMNG>();
-        mng.Enemy_ReduceHP(HP);
+        if (gameMNG != null)
+        {
+            gameMNG.Enemy_ReduceHP(HP);
+        }
+        else
+        {
+            Debug.LogError("gameMNGがnullのためHP表示を更新できません。GameMNGコンポーネントの配置を確認してください。");
+        }
     }
 
     public void TakeDamage(int damage)
