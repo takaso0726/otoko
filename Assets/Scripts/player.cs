@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 //=====================================================
 // ★このスクリプトはPlayerInputコンポーネントとセットで使用します。
@@ -700,6 +701,8 @@ public class Player : MonoBehaviour
             {
                 fightingCamera.ClearReborn();
             }
+            //ゲームオーバーシーンを読み込む
+            SceneManager.LoadScene("GameOver");
             rebornCamStarted = false;
         }
     }
