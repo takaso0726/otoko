@@ -76,22 +76,24 @@ public class Enemy : MonoBehaviour
     }
 
     [Header("CPU難易度設定")]
+    [Tooltip("この項目だけでCPUの強さ(反応速度・ミス率・与ダメージなど)がまとめて決まります")]
     public Difficulty difficulty = Difficulty.Normal;
 
-    [Tooltip("ONの場合、Difficultyの選択に応じて下記パラメータを自動設定する。手動で細かく調整したい場合はOFFにする")]
-    public bool useDifficultyPreset = true;
+    // ★変更: 以下の細かいパラメータは difficulty の選択に応じて自動決定されるため、
+    //   Inspectorから直接編集できないよう public を外し private 化した。
+    //   (Editor上で選べるのは上の difficulty プルダウンのみになる)
 
-    [Tooltip("行動を判断する間隔(秒)。小さいほど反応が速い")]
-    public float reactionInterval = 1.0f;
+    // 行動を判断する間隔(秒)。小さいほど反応が速い
+    private float reactionInterval = 1.0f;
 
-    [Tooltip("判断を誤ってランダムな行動を取ってしまう確率(0〜1)。低難易度ほど高い")]
-    [Range(0f, 1f)] public float mistakeChance = 0.1f;
+    // 判断を誤ってランダムな行動を取ってしまう確率(0〜1)。低難易度ほど高い
+    private float mistakeChance = 0.1f;
 
-    [Tooltip("プレイヤーの攻撃に気づいて防御的な行動を選べる確率(0〜1)。低難易度ほど見逃しやすい")]
-    [Range(0f, 1f)] public float defenseAwareness = 0.7f;
+    // プレイヤーの攻撃に気づいて防御的な行動を選べる確率(0〜1)。低難易度ほど見逃しやすい
+    private float defenseAwareness = 0.7f;
 
-    [Tooltip("投げ攻撃などCPU側の与ダメージにかかる倍率")]
-    public float damageMultiplier = 1.0f;
+    // 投げ攻撃などCPU側の与ダメージにかかる倍率
+    private float damageMultiplier = 1.0f;
 
     void Awake()
     {
@@ -99,8 +101,16 @@ public class Enemy : MonoBehaviour
         if (cameraController == null)
             cameraController = FindAnyObjectByType<FightingCameraController>();
 
-        if (useDifficultyPreset)
-            ApplyDifficultyPreset();
+        // difficultyの選択に応じてパラメータを自動設定する
+        ApplyDifficultyPreset();
+    }
+
+    // ★追加: 外部(難易度選択UIなど)から難易度を切り替えたい場合に呼び出す。
+    //   Awake()より後のタイミングでも、このメソッドを呼べばパラメータが反映される。
+    public void SetDifficulty(Difficulty newDifficulty)
+    {
+        difficulty = newDifficulty;
+        ApplyDifficultyPreset();
     }
 
     // 難易度に応じてAIのパラメータをまとめて設定する
@@ -220,11 +230,16 @@ public class Enemy : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        // ★追加: プレイヤーが背後に回り込んだら振り向く。
+        //   AIの行動判断(reactionInterval)とは別に、毎フレームチェックして即座に反応させる。
+        FaceTowardsPlayerIfBehind();
 
         //タイマー加算
         ActionTimer += Time.deltaTime;
 
-        if (ActionTimer >= 1.0f)
+        //★修正: 固定値(1.0f)ではなく難易度ごとのreactionIntervalを使う。
+        //   これにより Easy/Normal/Hard で「判断の速さ」に実際の差が出るようになる。
+        if (ActionTimer >= reactionInterval)
         {
             AtkHitboxOFF();
             Menflag = false;
@@ -246,7 +261,10 @@ public class Enemy : MonoBehaviour
             // 難易度が低いほど、攻撃の気配に気づけないことがある(見逃し)
             bool noticedAttack = playerIsAttacking && (Random.value <= defenseAwareness);
 
-            ActionType action = ChooseAction(distance, playerIsAttacking);
+            // ★修正: noticedAttackを実際にChooseActionへ渡す。
+            //   気づけなかった場合は「相手は攻撃していない」ものとして扱うため、
+            //   低難易度ほど防御行動(しゃがみ/後退)を選ばず攻め込んでしまう。
+            ActionType action = ChooseAction(distance, noticedAttack);
 
             // 難易度が低いほど、判断を誤ってランダムな行動を取ってしまうことがある
             if (Random.value < mistakeChance)
@@ -299,6 +317,32 @@ public class Enemy : MonoBehaviour
     }
 
        
+    // ★追加: プレイヤーが自分の背後(正面と逆側)に回り込んでいたら、その場でプレイヤーの方を向く。
+    //   Translate(0,0,±)はローカル座標基準で移動するため、向きを直すことで
+    //   以降のApproach/Retreatも自然にプレイヤー側へ進むようになる。
+    private void FaceTowardsPlayerIfBehind()
+    {
+        if (player == null) return;
+
+        Vector3 toPlayer = player.transform.position - transform.position;
+        toPlayer.y = 0.0f; // 水平方向のみで判定(高さは無視)
+
+        if (toPlayer.sqrMagnitude < 0.0001f) return; // ほぼ同じ位置なら判定しない
+
+        toPlayer.Normalize();
+
+        // 自分の正面ベクトルとプレイヤー方向の内積。
+        // 0より小さい = プレイヤーは正面より後ろ側にいる(背後に回り込まれた)
+        float facingDot = Vector3.Dot(transform.forward, toPlayer);
+
+        if (facingDot < 0.0f)
+        {
+            // ★変更: プレイヤーの厳密な方向へ向き直す(LookRotation)のではなく、
+            //   正面をプレイヤー側へ180度反転させるだけにする(2D格闘ゲーム的な「振り向き」)
+            transform.Rotate(0.0f, 180.0f, 0.0f);
+        }
+    }
+
     // 距離とプレイヤーの状態から、次に取る行動を重み付き抽選で決める
     private ActionType ChooseAction(float distance, bool playerIsAttacking)
     {
@@ -306,26 +350,28 @@ public class Enemy : MonoBehaviour
 
         if (distance > midRange)
         {
-            // 遠距離: 基本は接近。たまにフェイントで様子を見る
-            table.Add((ActionType.Approach, 0.7f));
-            table.Add((ActionType.Stand, 0.15f));
-            table.Add((ActionType.Idle, 0.15f));
+            // 遠距離: 基本は接近。フェイントや様子見はほぼせず、積極的に詰める
+            table.Add((ActionType.Approach, 0.85f));
+            table.Add((ActionType.Stand, 0.1f));
+            table.Add((ActionType.Idle, 0.05f));
         }
         else if (distance > nearRange)
         {
             // 中距離: 接近しつつ、相手が攻撃中なら距離を取る
             if (playerIsAttacking)
             {
-                table.Add((ActionType.Retreat, 0.5f));
-                table.Add((ActionType.Crouch, 0.3f));
-                table.Add((ActionType.Idle, 0.2f));
+                // 相手が攻撃中でも下がりきらず、しゃがみや反撃キックで押し返す
+                table.Add((ActionType.Retreat, 0.25f));
+                table.Add((ActionType.Crouch, 0.35f));
+                table.Add((ActionType.Kick, 0.3f));
+                table.Add((ActionType.Idle, 0.1f));
             }
             else
             {
-                table.Add((ActionType.Approach, 0.45f));
+                table.Add((ActionType.Approach, 0.65f));
                 table.Add((ActionType.Kick, 0.25f));
-                table.Add((ActionType.Retreat, 0.15f));
-                table.Add((ActionType.Idle, 0.15f));
+                table.Add((ActionType.Retreat, 0.05f));
+                table.Add((ActionType.Idle, 0.05f));
             }
         }
         else
@@ -333,18 +379,19 @@ public class Enemy : MonoBehaviour
             // 近距離: 攻撃の主戦場。相手が攻撃中なら防御寄りの行動を優先
             if (playerIsAttacking)
             {
-                table.Add((ActionType.Crouch, 0.35f));
-                table.Add((ActionType.Retreat, 0.25f));
-                table.Add((ActionType.Punch, 0.2f));
-                table.Add((ActionType.Kick, 0.2f));
+                // 引かずに殴り返す比率を上げる(しゃがみ回避は残しつつ最小限)
+                table.Add((ActionType.Crouch, 0.2f));
+                table.Add((ActionType.Retreat, 0.1f));
+                table.Add((ActionType.Punch, 0.35f));
+                table.Add((ActionType.Kick, 0.35f));
             }
             else
             {
-                table.Add((ActionType.Punch, 0.3f));
+                table.Add((ActionType.Punch, 0.35f));
                 table.Add((ActionType.Kick, 0.5f));
-                table.Add((ActionType.Throw, 0.0f));
-                table.Add((ActionType.Stand, 0.1f));
-                table.Add((ActionType.Retreat, 0.1f));
+                table.Add((ActionType.Throw, 0.05f));
+                table.Add((ActionType.Stand, 0.05f));
+                table.Add((ActionType.Retreat, 0.05f));
             }
         }
 
@@ -410,14 +457,14 @@ public class Enemy : MonoBehaviour
                 break;
 
             case ActionType.Approach:
-                //移動(前進)
-                transform.Translate(0.0f, 0.0f, 0.125f);
+                //移動(前進) ※大胆さを出すため歩幅を拡大
+                transform.Translate(0.0f, 0.0f, 0.2f);
                 ActionTimer = 0.0f;
                 break;
 
             case ActionType.Retreat:
-                //移動(後退)
-                transform.Translate(0.0f, 0.0f, -0.125f);
+                //移動(後退) ※下がる歩幅は控えめにして引きすぎないようにする
+                transform.Translate(0.0f, 0.0f, -0.08f);
                 ActionTimer = 0.0f;
                 break;
 
