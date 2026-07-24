@@ -235,7 +235,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Punth
-  m_Speed: 2
+  m_Speed: 2.56
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: 8772535897826011984}
@@ -248,7 +248,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: 2e1c1928d5de6174eb83c1737187ee87, type: 3}
+  m_Motion: {fileID: -203655887218126122, guid: dee198d2e895c444b88a0dce01fb3b91, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -406,9 +406,9 @@ AnimatorStateTransition:
   m_Mute: 0
   m_IsExit: 0
   serializedVersion: 3
-  m_TransitionDuration: 0.071946844
-  m_TransitionOffset: 0.21090992
-  m_ExitTime: 0.031956047
+  m_TransitionDuration: 0.17740181
+  m_TransitionOffset: 0
+  m_ExitTime: 0
   m_HasExitTime: 0
   m_HasFixedDuration: 1
   m_InterruptionSource: 0
@@ -881,9 +881,9 @@ AnimatorStateTransition:
   m_Mute: 0
   m_IsExit: 0
   serializedVersion: 3
-  m_TransitionDuration: 0.29847133
-  m_TransitionOffset: 0.97617
-  m_ExitTime: 0.39901653
+  m_TransitionDuration: 0.119668335
+  m_TransitionOffset: 1.0048662
+  m_ExitTime: 0.70577323
   m_HasExitTime: 1
   m_HasFixedDuration: 1
   m_InterruptionSource: 0

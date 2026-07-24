@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UIElements;
 
 /// <summary>
 /// ヒット時／根性復活の連打時などに呼び出して、
@@ -46,7 +47,8 @@ public class HitEffectSpawner : MonoBehaviour
     public void SpawnAtDirection(HitEffectData data, Vector3 originPos, Vector3 baseDirection)
     {
         if (data == null || data.effectPrefab == null) return;
-
+        //キャラクターのポジションが下で設定されているので上のほうに出すためにポジションを上にプラスする
+        originPos.y += 2.0f;
         Vector3 baseDir = baseDirection;
         baseDir.z = 0f;
         if (baseDir.sqrMagnitude < 0.0001f) baseDir = Vector3.right;

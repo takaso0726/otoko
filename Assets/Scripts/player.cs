@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.SceneManagement;
 
 //=====================================================
 // ★このスクリプトはPlayerInputコンポーネントとセットで使用します。
@@ -119,6 +118,7 @@ public class Player : MonoBehaviour
     public HitEffectData kickHitEffectData;    // キック（通常/上/下すべて共通）被弾時に出す擬音の設定
     public HitEffectData guardHitEffectData;   // 仁王立ちガード成功時に出す擬音の設定（未設定なら出さない）
     public HitEffectData mashHitEffectData;    // 根性復活の連打1回ごとに出す擬音の設定（未設定なら出さない）
+    public HitEffectData missHitEffectData;    // 攻撃が空振りした時に出す擬音の設定（未設定なら出さない）
 
     //=====================================================
     // ★外部参照
@@ -170,10 +170,9 @@ public class Player : MonoBehaviour
     public CapsuleCollider BodyCollider => Player_Collider;
 
     // ★追加：擬音演出（パンチ/キックで表示を分ける）用に、
-    //   自分が今どの攻撃をしているかを外部（被弾した相手）から問い合わせるための型とプロパティ。
+    //   自分が今どの攻撃をしているかを外部（被弾した相手）から問い合わせるためのプロパティ。
     //   currentStateはprivateなので、これ経由でしか攻撃種別が見えないようにしている。
-    public enum AttackType { Punch, Kick, UpKick, DownKick, None }
-
+    //   AttackType自体はPlayer/Enemy共通の独立ファイル(AttackType.cs)で定義している。
     public AttackType CurrentAttackType
     {
         get
@@ -204,6 +203,16 @@ public class Player : MonoBehaviour
             default:
                 return null;
         }
+    }
+
+    // ★追加：空振り演出用。攻撃を出した瞬間にfalseにし、相手にヒットした瞬間trueにする。
+    //   攻撃モーション終了時にまだfalseなら「空振り」とみなす。
+    private bool attackLandedThisAttack = false;
+
+    // ★追加：被弾した相手側から「あなたの攻撃、当たりましたよ」と通知してもらうための公開メソッド。
+    public void NotifyAttackLanded()
+    {
+        attackLandedThisAttack = true;
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -515,13 +524,13 @@ public class Player : MonoBehaviour
         ResetAttackTriggers();
         currentState = PlayerState.Punch;
         stateTimer = punchDuration;
+        attackLandedThisAttack = false; // 空振り判定用にリセット
 
         if (Jumpflag)
         {
             //弱攻撃(パンチ)
             animator.SetTrigger("Punch");
-            RightFoot.enabled = true;
-            RightLeg.enabled = true;
+            RightHand.enabled = true;
         }
         else
         {
@@ -537,6 +546,7 @@ public class Player : MonoBehaviour
     void EnterKick(bool isCrouchInput)
     {
         ResetAttackTriggers();
+        attackLandedThisAttack = false; // 空振り判定用にリセット
 
         if (isCrouchInput)
         {
@@ -627,6 +637,16 @@ public class Player : MonoBehaviour
         stateTimer -= Time.deltaTime;
         if (stateTimer > 0f) return;
 
+        // 攻撃系の状態（パンチ/キック/上キック/下キック）が、
+        // 一度も命中通知(NotifyAttackLanded)を受けないまま終了したら「空振り」とみなす
+        if (CurrentAttackType != AttackType.None && !attackLandedThisAttack)
+        {
+            if (HitEffectSpawner.Instance != null && missHitEffectData != null)
+            {
+                HitEffectSpawner.Instance.SpawnAtDirection(missHitEffectData, transform.position, transform.forward);
+            }
+        }
+
         DisableAllHitboxes();
         isGuarding = false;
         canThrow = true;
@@ -701,8 +721,6 @@ public class Player : MonoBehaviour
             {
                 fightingCamera.ClearReborn();
             }
-            //ゲームオーバーシーンを読み込む
-            SceneManager.LoadScene("GameOver");
             rebornCamStarted = false;
         }
     }
@@ -771,11 +789,15 @@ public class Player : MonoBehaviour
             }
 
             // ガード成功の擬音演出（攻撃者→自分の方向を基準に、空白地帯へ表示）
+            Transform guardAttackerTf = isEnemyPlayerAttack ? enemyPlayer.transform : enemy.transform;
             if (HitEffectSpawner.Instance != null && guardHitEffectData != null)
             {
-                Transform guardAttackerTf = isEnemyPlayerAttack ? enemyPlayer.transform : enemy.transform;
                 HitEffectSpawner.Instance.Spawn(guardHitEffectData, guardAttackerTf.position, transform.position);
             }
+
+            // ガードされてもヒットはヒット（空振りではない）なので攻撃側に通知
+            if (isEnemyPlayerAttack) enemyPlayer.NotifyAttackLanded();
+            else if (enemy != null) enemy.NotifyAttackLanded();
         }
         else
         {
@@ -798,12 +820,13 @@ public class Player : MonoBehaviour
             {
                 // 対人戦：相手Playerの現在の攻撃タイプに応じたHitEffectDataを取得
                 selectedHitEffect = enemyPlayer.GetHitEffectDataFor(enemyPlayer.CurrentAttackType);
+                enemyPlayer.NotifyAttackLanded(); // 空振りではなく命中したことを攻撃側へ通知
             }
             else if (enemy != null)
             {
-                // 対CPU戦：Enemy側にまだ攻撃タイプの区別が無い場合は、暫定でパンチ用を流用。
-                // Enemy.csにも同様のAttackType/GetHitEffectDataForの仕組みを追加すれば統一できる。
-                selectedHitEffect = punchHitEffectData;
+                // 対CPU戦：Enemy側の現在の攻撃タイプに応じたHitEffectDataを取得
+                selectedHitEffect = enemy.GetHitEffectDataFor(enemy.CurrentAttackType);
+                enemy.NotifyAttackLanded(); // 空振りではなく命中したことを攻撃側へ通知
             }
 
             if (HitEffectSpawner.Instance != null && selectedHitEffect != null)

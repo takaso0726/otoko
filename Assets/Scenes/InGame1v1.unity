@@ -1972,6 +1972,8 @@ MonoBehaviour:
   e1: {fileID: 0}
   P_HPbar: {fileID: 1289788541}
   E_HPbar: {fileID: 660082965}
+  E_KankiGaugeBar1: {fileID: 0}
+  E_KankiGaugeBar2: {fileID: 0}
   BGM: {fileID: 8300000, guid: 78215c0163ae6f14e9dbae9023719665, type: 3}
   gameOverTime: 2
   PlayerTransform: {fileID: 956537544}
@@ -2677,11 +2679,11 @@ MonoBehaviour:
   HP: 100
   atk: 10
   Player_status: 0
-  punchDuration: 0.5
-  kickDuration: 0.4
-  upKickDuration: 0.7
+  punchDuration: 0.15
+  kickDuration: 0.3
+  upKickDuration: 0.5
   downKickDuration: 0.5
-  guardDuration: 0.5
+  guardDuration: 0.3
   throwDuration: 1.5
   rebornTimeLimit: 5
   rebornHp: 30
@@ -2698,6 +2700,7 @@ MonoBehaviour:
   kickHitEffectData: {fileID: 11400000, guid: d4c9d40f25fe1244796e06fbb64cc7fc, type: 2}
   guardHitEffectData: {fileID: 11400000, guid: f94d7da69ad3ede499f8c4f145d7a9eb, type: 2}
   mashHitEffectData: {fileID: 11400000, guid: de286e7f5553bf1418b0df8c98938742, type: 2}
+  missHitEffectData: {fileID: 11400000, guid: 182479a3e4175444d9090102939c91b9, type: 2}
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 1873253615}
   animator: {fileID: 956537541}
@@ -4111,6 +4114,7 @@ MonoBehaviour:
   kickHitEffectData: {fileID: 0}
   guardHitEffectData: {fileID: 0}
   mashHitEffectData: {fileID: 0}
+  missHitEffectData: {fileID: 0}
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
@@ -4988,6 +4992,7 @@ MonoBehaviour:
   kickHitEffectData: {fileID: 0}
   guardHitEffectData: {fileID: 0}
   mashHitEffectData: {fileID: 0}
+  missHitEffectData: {fileID: 0}
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
@@ -6961,11 +6966,11 @@ MonoBehaviour:
   HP: 100
   atk: 10
   Player_status: 0
-  punchDuration: 0.5
-  kickDuration: 0.4
-  upKickDuration: 0.7
+  punchDuration: 0.15
+  kickDuration: 0.3
+  upKickDuration: 0.5
   downKickDuration: 0.5
-  guardDuration: 0.5
+  guardDuration: 0.3
   throwDuration: 1.5
   rebornTimeLimit: 5
   rebornHp: 30
@@ -6982,6 +6987,7 @@ MonoBehaviour:
   kickHitEffectData: {fileID: 11400000, guid: d4c9d40f25fe1244796e06fbb64cc7fc, type: 2}
   guardHitEffectData: {fileID: 11400000, guid: f94d7da69ad3ede499f8c4f145d7a9eb, type: 2}
   mashHitEffectData: {fileID: 11400000, guid: 99debc3a56df75648b48c42066c82a73, type: 2}
+  missHitEffectData: {fileID: 11400000, guid: 182479a3e4175444d9090102939c91b9, type: 2}
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 956537537}
   animator: {fileID: 1873253612}

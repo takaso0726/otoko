@@ -10,9 +10,9 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c78ae74799c0f5b45aa3c941e4c49d2f, type: 3}
-  m_Name: Data_mash_dodo
+  m_Name: Data_miss_suka
   m_EditorClassIdentifier: Assembly-CSharp::HitEffectData
-  effectPrefab: {fileID: 6815328702670523096, guid: e57c04fa4aa5ca3439e63dfff87fa410, type: 3}
+  effectPrefab: {fileID: 6815328702670523096, guid: 0cf321337e00024408ad87a0bd92e211, type: 3}
   baseAngle: 0
   angleRandomRange: 13.6
   distanceRange: {x: -2.2, y: -1.14}
@@ -42,4 +42,4 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  use2DRotation: 1
+  use2DRotation: 0

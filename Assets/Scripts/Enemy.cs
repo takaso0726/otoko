@@ -40,6 +40,55 @@ public class Enemy : MonoBehaviour
     public ParticleSystem Men_particle;     //仁王立ち用のパーティクル
     public ParticleSystem Hit_particle;     //ヒット時用のパーティクル
 
+    [Header("擬音演出（ドカン・ドドン等）")]
+    public HitEffectData punchHitEffectData;   // パンチ被弾時に出す擬音の設定
+    public HitEffectData kickHitEffectData;    // キック被弾時に出す擬音の設定
+    public HitEffectData guardHitEffectData;   // 仁王立ちガード成功時に出す擬音の設定（未設定なら出さない）
+    public HitEffectData missHitEffectData;    // 攻撃が空振りした時に出す擬音の設定（未設定なら出さない）
+
+    // ★追加：空振り演出用。攻撃を出した瞬間にfalseにし、Playerにヒットした瞬間trueにする。
+    private bool attackLandedThisAttack = false;
+
+    // ★追加：被弾したPlayer側から「あなたの攻撃、当たりましたよ」と通知してもらうための公開メソッド。
+    public void NotifyAttackLanded()
+    {
+        attackLandedThisAttack = true;
+    }
+
+    // ★追加：擬音演出用に、自分が今どの攻撃をしているかを外部（被弾したPlayer側）から
+    //   問い合わせるための状態。DoAction()でPunch/Kickを選んだ時に更新する。
+    private ActionType currentAttackAction = ActionType.Idle;
+
+    public AttackType CurrentAttackType
+    {
+        get
+        {
+            switch (currentAttackAction)
+            {
+                case ActionType.Punch: return AttackType.Punch;
+                case ActionType.Kick: return AttackType.Kick;
+                default: return AttackType.None;
+            }
+        }
+    }
+
+    // ★追加：攻撃種別に応じて、自分が持っているHitEffectDataのどれを使うかを返す。
+    //   被弾したPlayer側から「あなたの攻撃はどの擬音を使う？」と問い合わせられるためのメソッド。
+    public HitEffectData GetHitEffectDataFor(AttackType type)
+    {
+        switch (type)
+        {
+            case AttackType.Punch:
+                return punchHitEffectData;
+            case AttackType.Kick:
+            case AttackType.UpKick:
+            case AttackType.DownKick:
+                return kickHitEffectData;
+            default:
+                return null;
+        }
+    }
+
     public FightingCameraController cameraController;
     private int currentHP = 100;
 
@@ -281,9 +330,21 @@ public class Enemy : MonoBehaviour
         //   これにより Easy/Normal/Hard で「判断の速さ」に実際の差が出るようになる。
         if (ActionTimer >= reactionInterval)
         {
+            // 攻撃系の行動（パンチ/キック）が、一度も命中通知(NotifyAttackLanded)を
+            // 受けないまま次の判断に入ったら「空振り」とみなす
+            if ((currentAttackAction == ActionType.Punch || currentAttackAction == ActionType.Kick)
+                && !attackLandedThisAttack)
+            {
+                if (HitEffectSpawner.Instance != null && missHitEffectData != null)
+                {
+                    HitEffectSpawner.Instance.SpawnAtDirection(missHitEffectData, transform.position, transform.forward);
+                }
+            }
+
             AtkHitboxOFF();
             Menflag = false;
             Enemy_Status = Status.Neutral;
+            currentAttackAction = ActionType.Idle; // 新しい行動を選ぶ前に攻撃タイプ情報もリセット
 
             if(animator.GetBool("Crouch"))
             {
@@ -474,6 +535,8 @@ public class Enemy : MonoBehaviour
                 //攻撃(キック)
                 animator.SetTrigger("Kick");
                 Enemy_Status = Status.Attack;
+                currentAttackAction = ActionType.Kick; // 擬音演出の判定用に記録
+                attackLandedThisAttack = false; // 空振り判定用にリセット
 
                 //当たり判定をON
                 RightFoot.enabled = true;
@@ -488,6 +551,8 @@ public class Enemy : MonoBehaviour
                 //攻撃(パンチ)
                 animator.SetTrigger("Punch");
                 Enemy_Status = Status.Attack;
+                currentAttackAction = ActionType.Punch; // 擬音演出の判定用に記録
+                attackLandedThisAttack = false; // 空振り判定用にリセット
 
                 //当たり判定をON
                 RightHand.enabled = true;
@@ -562,6 +627,16 @@ public class Enemy : MonoBehaviour
                 atk += player.atk;
 
                 HP -= player.atk / 2;
+
+                // 仁王立ちガード成功の擬音演出（自分の guardHitEffectData を使用）
+                Vector3 guardHitPoint = collision.ClosestPoint(collision.transform.position);
+                if (HitEffectSpawner.Instance != null && guardHitEffectData != null)
+                {
+                    HitEffectSpawner.Instance.Spawn(guardHitEffectData, player.transform.position, guardHitPoint);
+                }
+
+                // ガードされてもヒットはヒット（空振りではない）なので攻撃側へ通知
+                if (player != null) player.NotifyAttackLanded();
             }
             else
             {
@@ -575,6 +650,20 @@ public class Enemy : MonoBehaviour
                 HitParticle.Play();
                 // ※第一引数をHitParticleだけにするとコンポーネントしか削除されない。
                 Destroy(HitParticle.gameObject, 1.0f);
+
+                // 「ドカン」「ドドン」等の擬音演出。
+                // 攻撃者(player)に今の攻撃タイプ(パンチ/キック)を問い合わせて、対応する擬音データを選ぶ。
+                if (HitEffectSpawner.Instance != null && player != null)
+                {
+                    HitEffectData selectedHitEffect = player.GetHitEffectDataFor(player.CurrentAttackType);
+                    if (selectedHitEffect != null)
+                    {
+                        HitEffectSpawner.Instance.Spawn(selectedHitEffect, player.transform.position, HitPoint);
+                    }
+                }
+
+                // 空振りではなく命中したことをPlayer側(攻撃者)へ通知
+                if (player != null) player.NotifyAttackLanded();
 
                 //プレイヤーのHPを減らす
                 HP -= player.atk;
