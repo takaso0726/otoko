@@ -352,8 +352,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   se: {fileID: 0}
-  hitSE: {fileID: 0}
-  crackSE: {fileID: 0}
+  hitSE: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
+  crackSE: {fileID: 8300000, guid: 3a2df26007a98a94d98eb89c9f9835a5, type: 3}
   hitAnyButtonText: {fileID: 0}
   crackEffect: {fileID: 0}
   requiredHits: 3
