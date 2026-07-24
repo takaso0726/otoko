@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: Data_Kick_poko
   m_EditorClassIdentifier: Assembly-CSharp::HitEffectData
   effectPrefab: {fileID: 6815328702670523096, guid: 3f10fe76e838aab4796aaa4674997eeb, type: 3}
-  baseAngle: 0
-  angleRandomRange: 13.6
-  distanceRange: {x: -2.2, y: -1.14}
+  baseAngle: -180
+  angleRandomRange: 19.6
+  distanceRange: {x: 1.14, y: 2.1}
   scaleRange: {x: 0.9, y: 1.3}
   lifeTime: 0.4
   scaleCurve:

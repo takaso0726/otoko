@@ -13,19 +13,19 @@ MonoBehaviour:
   m_Name: Data_mash_gyakudodo
   m_EditorClassIdentifier: Assembly-CSharp::HitEffectData
   effectPrefab: {fileID: 6815328702670523096, guid: 300fbefd18f8fee4eada6bae9b438132, type: 3}
-  baseAngle: 0
-  angleRandomRange: 13.6
-  distanceRange: {x: -2.2, y: -1.14}
+  baseAngle: 45
+  angleRandomRange: 23.7
+  distanceRange: {x: 0.28, y: 3.56}
   scaleRange: {x: 0.9, y: 1.3}
-  lifeTime: 0.4
+  lifeTime: 2.06
   scaleCurve:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
+      value: -0.004761905
+      inSlope: 2
+      outSlope: 2
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
