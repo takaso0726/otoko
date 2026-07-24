@@ -48,7 +48,7 @@ public class HitEffectSpawner : MonoBehaviour
     {
         if (data == null || data.effectPrefab == null) return;
         //キャラクターのポジションが下で設定されているので上のほうに出すためにポジションを上にプラスする
-        originPos.y += 2.0f;
+        originPos.y += 0.0f;
         Vector3 baseDir = baseDirection;
         baseDir.z = 0f;
         if (baseDir.sqrMagnitude < 0.0001f) baseDir = Vector3.right;

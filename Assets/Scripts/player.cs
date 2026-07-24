@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UIElements;
 
 //=====================================================
 // ★このスクリプトはPlayerInputコンポーネントとセットで使用します。
@@ -643,7 +644,10 @@ public class Player : MonoBehaviour
         {
             if (HitEffectSpawner.Instance != null && missHitEffectData != null)
             {
-                HitEffectSpawner.Instance.SpawnAtDirection(missHitEffectData, transform.position, transform.forward);
+                //出す位置の調整
+                Vector3 transkunn = transform.position;
+                transkunn.y += 2.0f;
+                HitEffectSpawner.Instance.SpawnAtDirection(missHitEffectData, transkunn, transform.forward);
             }
         }
 
