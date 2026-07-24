@@ -15,9 +15,9 @@ MonoBehaviour:
   effectPrefab: {fileID: 6815328702670523096, guid: 0cf321337e00024408ad87a0bd92e211, type: 3}
   baseAngle: 180
   angleRandomRange: 20
-  distanceRange: {x: 1.14, y: 2.1}
+  distanceRange: {x: 1.14, y: 8.23}
   scaleRange: {x: 1.53, y: 1.95}
-  lifeTime: 1.71
+  lifeTime: 0.48
   scaleCurve:
     serializedVersion: 2
     m_Curve:

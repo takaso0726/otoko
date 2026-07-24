@@ -892,6 +892,7 @@ public class Player : MonoBehaviour
         //   GameMNG側の実装次第では意図通りかもしれないが、要確認。
         if (gameMNG != null)
         {
+            gameMNG.Player_ReduceHP(HP, PlayerName);
             gameMNG.Enemy_ReduceHP(HP);
             //※開発中
             //相手のプレイヤーの型を取得してその型のに適したUIの表示を変更する予定。
