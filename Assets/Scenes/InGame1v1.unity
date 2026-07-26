@@ -2717,6 +2717,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
+  enableDebugLog: 1
   PlayerName: P1
   PLayerTagName: 
   moveSpeed: 5
@@ -2726,7 +2727,7 @@ MonoBehaviour:
   upKickInputThreshold: 0.25
   force: {x: 0, y: 300, z: 0}
   Jumpflag: 0
-  HP: 100
+  HP: 1000
   atk: 10
   Player_status: 0
   punchDuration: 0.15
@@ -2751,6 +2752,14 @@ MonoBehaviour:
   guardHitEffectData: {fileID: 11400000, guid: f94d7da69ad3ede499f8c4f145d7a9eb, type: 2}
   mashHitEffectData: {fileID: 11400000, guid: de286e7f5553bf1418b0df8c98938742, type: 2}
   missHitEffectData: {fileID: 11400000, guid: 182479a3e4175444d9090102939c91b9, type: 2}
+  enableHitStop: 1
+  hitStopDuration: 0.15
+  guardHitStopDuration: 0.05
+  freezeAnimatorDuringHitStop: 1
+  enableGuardSuccessEffect: 1
+  guardSuccessEffectPrefab: {fileID: 0}
+  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
+  guardSuccessEffectLifetime: 1
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 1873253615}
   animator: {fileID: 956537541}
@@ -4131,6 +4140,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
+  enableDebugLog: 1
   PlayerName: 
   PLayerTagName: 
   moveSpeed: 0.015
@@ -4165,6 +4175,14 @@ MonoBehaviour:
   guardHitEffectData: {fileID: 0}
   mashHitEffectData: {fileID: 0}
   missHitEffectData: {fileID: 0}
+  enableHitStop: 1
+  hitStopDuration: 0.08
+  guardHitStopDuration: 0.05
+  freezeAnimatorDuringHitStop: 1
+  enableGuardSuccessEffect: 1
+  guardSuccessEffectPrefab: {fileID: 0}
+  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
+  guardSuccessEffectLifetime: 1
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
@@ -5084,6 +5102,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
+  enableDebugLog: 1
   PlayerName: 
   PLayerTagName: 
   moveSpeed: 0.015
@@ -5118,6 +5137,14 @@ MonoBehaviour:
   guardHitEffectData: {fileID: 0}
   mashHitEffectData: {fileID: 0}
   missHitEffectData: {fileID: 0}
+  enableHitStop: 1
+  hitStopDuration: 0.08
+  guardHitStopDuration: 0.05
+  freezeAnimatorDuringHitStop: 1
+  enableGuardSuccessEffect: 1
+  guardSuccessEffectPrefab: {fileID: 0}
+  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
+  guardSuccessEffectLifetime: 1
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
@@ -7289,6 +7316,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
+  enableDebugLog: 1
   PlayerName: P2
   PLayerTagName: 
   moveSpeed: 5
@@ -7298,7 +7326,7 @@ MonoBehaviour:
   upKickInputThreshold: 0.25
   force: {x: 0, y: 300, z: 0}
   Jumpflag: 0
-  HP: 100
+  HP: 1000
   atk: 10
   Player_status: 0
   punchDuration: 0.15
@@ -7323,6 +7351,14 @@ MonoBehaviour:
   guardHitEffectData: {fileID: 11400000, guid: f94d7da69ad3ede499f8c4f145d7a9eb, type: 2}
   mashHitEffectData: {fileID: 11400000, guid: 99debc3a56df75648b48c42066c82a73, type: 2}
   missHitEffectData: {fileID: 11400000, guid: 182479a3e4175444d9090102939c91b9, type: 2}
+  enableHitStop: 1
+  hitStopDuration: 0.15
+  guardHitStopDuration: 0.05
+  freezeAnimatorDuringHitStop: 1
+  enableGuardSuccessEffect: 1
+  guardSuccessEffectPrefab: {fileID: 0}
+  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
+  guardSuccessEffectLifetime: 1
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 956537537}
   animator: {fileID: 1873253612}

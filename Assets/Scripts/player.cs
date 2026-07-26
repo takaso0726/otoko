@@ -46,6 +46,19 @@ public class Player : MonoBehaviour
     }
 
     //=====================================================
+    // ★デバッグ
+    //=====================================================
+    [Header("デバッグ設定")]
+    [SerializeField] bool enableDebugLog = true; // trueの間だけ本スクリプト内のDebug.Logを出力する（Debug.LogErrorは不具合検知のため常時出力）
+
+    // 本スクリプト内のDebug.Log呼び出しはすべてこのメソッド経由にする。
+    // enableDebugLogをfalseにすればインスペクターから一括でログ出力を止められる。
+    void DLog(string message)
+    {
+        if (enableDebugLog) Debug.Log(message);
+    }
+
+    //=====================================================
     // ★名前
     //=====================================================
     public string PlayerName;
@@ -120,6 +133,26 @@ public class Player : MonoBehaviour
     public HitEffectData guardHitEffectData;   // 仁王立ちガード成功時に出す擬音の設定（未設定なら出さない）
     public HitEffectData mashHitEffectData;    // 根性復活の連打1回ごとに出す擬音の設定（未設定なら出さない）
     public HitEffectData missHitEffectData;    // 攻撃が空振りした時に出す擬音の設定（未設定なら出さない）
+
+    //=====================================================
+    // ★ヒットストップ設定
+    //=====================================================
+    [Header("ヒットストップ設定")]
+    [SerializeField] bool enableHitStop = true;             // ヒットストップ機能を使うかどうか
+    [SerializeField] float hitStopDuration = 0.08f;         // 通常被弾時に少しだけ動けなくなる時間（秒）
+    [SerializeField] float guardHitStopDuration = 0.05f;    // 仁王立ちガード成功時に少しだけ動けなくなる時間（秒）
+    [SerializeField] bool freezeAnimatorDuringHitStop = true; // ヒットストップ中はアニメーションも一瞬止めるか
+
+    private float hitStopTimer = 0f;   // 残りヒットストップ時間。0より大きい間は入力処理をすべてスキップする
+
+    //=====================================================
+    // ★仁王立ち（ガード）成功エフェクト設定
+    //=====================================================
+    [Header("仁王立ち成功エフェクト設定")]
+    [SerializeField] bool enableGuardSuccessEffect = true;   // ガード成功時にエフェクトを出すかどうか
+    [SerializeField] ParticleSystem guardSuccessEffectPrefab; // ガード成功時に生成するパーティクル（未設定なら出さない）
+    [SerializeField] Vector3 guardSuccessEffectOffset = new Vector3(0f, 1.0f, 0f); // 生成位置のオフセット（プレイヤー基準）
+    [SerializeField] float guardSuccessEffectLifetime = 1.0f; // 生成したエフェクトを破棄するまでの時間（秒）
 
     //=====================================================
     // ★外部参照
@@ -223,7 +256,7 @@ public class Player : MonoBehaviour
         // 自分にアタッチされているPlayerInputコンポーネントを取得
         playerInput = GetComponent<PlayerInput>();
         // どのプレイヤー番号・どのデバイスが紐づいているかログ出力（デバッグ用）
-        Debug.Log($"{gameObject.name} : PlayerIndex={playerInput.playerIndex} / Device={(playerInput.devices.Count > 0 ? playerInput.devices[0].displayName : "なし")}");
+        DLog($"{gameObject.name} : PlayerIndex={playerInput.playerIndex} / Device={(playerInput.devices.Count > 0 ? playerInput.devices[0].displayName : "なし")}");
 
         rb = GetComponent<Rigidbody>();		//PlayerのRigidbodyを取得
         animator = GetComponent<Animator>();
@@ -262,17 +295,17 @@ public class Player : MonoBehaviour
             LeftArm, LeftForeArm, LeftHand, LeftFoot, LeftUpLeg, LeftLeg,
         };
 
+        // 全身の攻撃用当たり判定コライダーを一括でOFFにする
         DisableAllHitboxes();
 
-        HP = 100;
-        atk = 10;
+        //ステータスを初期化する
         currentState = PlayerState.Idle;
         Player_status = Status.Live;
 
         // ★デバッグ用：自分のヒットボックスが正しく取得できているか確認
         foreach (var hb in allHitboxes)
         {
-            Debug.Log($"[{gameObject.name}] hitbox取得: {(hb != null ? hb.name + " / owner=" + hb.transform.root.name : "null!")}");
+            DLog($"[{gameObject.name}] hitbox取得: {(hb != null ? hb.name + " / owner=" + hb.transform.root.name : "null!")}");
         }
     }
 
@@ -365,6 +398,18 @@ public class Player : MonoBehaviour
     // そうでなければ現在の状態に応じて「拘束中のタイマー消化」か「新しい行動の受付」を行う。
     void Update()
     {
+        // ヒットストップ処理を最優先で消化する。動けない間は他の入力・状態処理を一切行わない。
+        if (hitStopTimer > 0f)
+        {
+            hitStopTimer -= Time.deltaTime;
+            if (hitStopTimer <= 0f)
+            {
+                EndHitStop();
+            }
+            ClearInputIntents();
+            return;
+        }
+
         // HP判定・死亡処理は、コントローラーの有無に関係なく常に実行する
         if (HP <= 0)
         {
@@ -406,6 +451,36 @@ public class Player : MonoBehaviour
         wantKick = false;
         wantGuard = false;
         wantThrow = false;
+    }
+
+    //-----------------------------------------------------
+    // ヒットストップ
+    //-----------------------------------------------------
+    // durationの間だけ、そのフレームから入力・状態更新を止めて「少しだけ動けない」状態にする。
+    // すでにヒットストップ中の場合は、残り時間を延ばしすぎないよう長い方の時間を採用する。
+    void StartHitStop(float duration)
+    {
+        if (!enableHitStop || duration <= 0f) return;
+
+        hitStopTimer = Mathf.Max(hitStopTimer, duration);
+
+        if (freezeAnimatorDuringHitStop && animator != null)
+        {
+            animator.speed = 0f;
+        }
+
+        DLog($"[{PlayerName}] ヒットストップ開始 duration={duration}秒");
+    }
+
+    // ヒットストップ終了時にアニメーション速度を元に戻す
+    void EndHitStop()
+    {
+        if (freezeAnimatorDuringHitStop && animator != null)
+        {
+            animator.speed = 1f;
+        }
+
+        DLog($"[{PlayerName}] ヒットストップ終了");
     }
 
     //-----------------------------------------------------
@@ -603,7 +678,7 @@ public class Player : MonoBehaviour
             (enemyPlayer.transform.position.z - transform.position.z < 1.75f) &&
             canThrow)
         {
-            Debug.Log("投げ成功");
+            DLog("投げ成功");
             enemyPlayer.transform.Translate(0f, 0f, -0.0025f);      // 敵を少し引き寄せる
             enemyPlayer.animator.SetTrigger("Thrown");              // 敵に投げられアニメーションを再生させる
             enemyPlayer.damege(5);                                  // 敵に固定ダメージ5を与える
@@ -615,7 +690,7 @@ public class Player : MonoBehaviour
             (enemyPlayer.transform.position.z - transform.position.z < 1.75f) &&
             canThrow)
         {
-            Debug.Log("投げ成功");
+            DLog("投げ成功");
             enemyPlayer.transform.Translate(0f, 0f, -0.0025f);     // 敵を少し引き寄せる
             enemyPlayer.animator.SetTrigger("Thrown");             // 敵に投げられアニメーションを再生させる
             enemyPlayer.damege(5);                                 // 敵に固定ダメージ5を与える
@@ -718,7 +793,7 @@ public class Player : MonoBehaviour
             //制限時間内に復活できず力尽きた
             currentState = PlayerState.Dead;
             Player_status = Status.Dead;
-            Debug.Log($"[{PlayerName}] 根性復活失敗。HP={HP}のままDead状態へ移行。");
+            DLog($"[{PlayerName}] 根性復活失敗。HP={HP}のままDead状態へ移行。");
             if (gameMNG != null) gameMNG.SettestStatus(Status.Dead);
 
             if (fightingCamera != null)
@@ -782,9 +857,12 @@ public class Player : MonoBehaviour
         {
             // 仁王立ち（ガード）中に被弾した場合の処理
             atk += attackerAtk;                  // ガード成功で自分の攻撃力に敵の攻撃力を上乗せする
-            Debug.Log("漢!!");
+            DLog("漢!!");
             se.PlayOneShot(MenBlock_se);       // ガード成功の効果音を再生
             HP -= attackerAtk / 2;                // ガード中はダメージを半減させる
+
+            // ガード成功時のヒットストップ（少しだけ動けなくする）
+            StartHitStop(guardHitStopDuration);
 
             guardComboCount++;
             if (fightingCamera != null)
@@ -799,6 +877,18 @@ public class Player : MonoBehaviour
                 HitEffectSpawner.Instance.Spawn(guardHitEffectData, guardAttackerTf.position, transform.position);
             }
 
+            // ガード成功専用エフェクト（インスペクターで設定したパーティクルを生成）
+            if (enableGuardSuccessEffect && guardSuccessEffectPrefab != null)
+            {
+                ParticleSystem guardSuccessEffect = Instantiate(
+                    guardSuccessEffectPrefab,
+                    transform.position + guardSuccessEffectOffset,
+                    Quaternion.Euler(-90f, 0f, 0f));
+                guardSuccessEffect.Play();
+                Destroy(guardSuccessEffect.gameObject, guardSuccessEffectLifetime);
+                DLog($"[{PlayerName}] ガード成功エフェクトを再生");
+            }
+
             // ガードされてもヒットはヒット（空振りではない）なので攻撃側に通知
             if (isEnemyPlayerAttack) enemyPlayer.NotifyAttackLanded();
             else if (enemy != null) enemy.NotifyAttackLanded();
@@ -808,6 +898,9 @@ public class Player : MonoBehaviour
             // ガードしていない状態で被弾した場合の処理
             guardComboCount = 0;
             animator.SetTrigger("Hit");
+
+            // 通常被弾時のヒットストップ（少しだけ動けなくする）
+            StartHitStop(hitStopDuration);
 
             Vector3 hitPoint = collision.ClosestPoint(collision.transform.position);
             ParticleSystem hitParticle = Instantiate(Hit_particle, hitPoint, Quaternion.Euler(-90f, 0f, 0f));
@@ -859,7 +952,7 @@ public class Player : MonoBehaviour
 
         //デバッグログ：誰からどれだけダメージを受けてHPがいくつになったか
         string attackerName = isEnemyPlayerAttack ? enemyPlayer.PlayerName : "Enemy(CPU)";
-        Debug.Log($"[{PlayerName}] {attackerName}から被弾。ダメージ={attackerAtk}{(isGuarding ? "(ガード半減)" : "")} / 残りHP={HP}");
+        DLog($"[{PlayerName}] {attackerName}から被弾。ダメージ={attackerAtk}{(isGuarding ? "(ガード半減)" : "")} / 残りHP={HP}");
     }
 
     //-----------------------------------------------------
@@ -886,7 +979,7 @@ public class Player : MonoBehaviour
         if (HP < 0) HP = 0;
 
         //デバッグログ：ダメージ量と残りHP
-        Debug.Log($"[{PlayerName}] damege()呼び出し。ダメージ={n} / 残りHP={HP}");
+        DLog($"[{PlayerName}] damege()呼び出し。ダメージ={n} / 残りHP={HP}");
 
         // ★元コードのまま維持。"Enemy_ReduceHP"という名前だが実際にはプレイヤー自身のHPを渡している。
         //   GameMNG側の実装次第では意図通りかもしれないが、要確認。
