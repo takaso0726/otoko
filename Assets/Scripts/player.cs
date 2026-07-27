@@ -144,6 +144,7 @@ public class Player : MonoBehaviour
     [SerializeField] bool freezeAnimatorDuringHitStop = true; // ヒットストップ中はアニメーションも一瞬止めるか
 
     private float hitStopTimer = 0f;   // 残りヒットストップ時間。0より大きい間は入力処理をすべてスキップする
+    private bool pendingHeadHitAnimation = false; // ヒットストップ終了時にHeadHitアニメーションを再生するか（ガード成功時はfalse）
 
     //=====================================================
     // ★仁王立ち（ガード）成功エフェクト設定
@@ -153,6 +154,19 @@ public class Player : MonoBehaviour
     [SerializeField] ParticleSystem guardSuccessEffectPrefab; // ガード成功時に生成するパーティクル（未設定なら出さない）
     [SerializeField] Vector3 guardSuccessEffectOffset = new Vector3(0f, 1.0f, 0f); // 生成位置のオフセット（プレイヤー基準）
     [SerializeField] float guardSuccessEffectLifetime = 1.0f; // 生成したエフェクトを破棄するまでの時間（秒）
+
+    //=====================================================
+    // ★ガード成功による攻撃力上昇中の持続エフェクト設定
+    //   ガード成功で攻撃力が上昇している間（＝次の自分の攻撃が当たるまで）、
+    //   プレイヤーに追従してループ再生し続けるエフェクト。
+    //=====================================================
+    [Header("攻撃力上昇中エフェクト設定")]
+    [SerializeField] bool enableGuardBuffEffect = true;        // 攻撃力上昇中のエフェクトを出すかどうか
+    [SerializeField] ParticleSystem guardBuffEffectPrefab;     // 上昇中に出し続けるパーティクル（Loopオン推奨・未設定なら出さない）
+    [SerializeField] Vector3 guardBuffEffectOffset = new Vector3(0f, 1.0f, 0f); // 生成位置のオフセット（プレイヤー基準）
+
+    private bool isGuardBuffed = false;               // 現在ガード成功による攻撃力上昇中かどうか
+    private ParticleSystem activeGuardBuffEffect;      // 生成中の攻撃力上昇エフェクトの参照（多重生成防止・停止処理用）
 
     //=====================================================
     // ★外部参照
@@ -166,6 +180,7 @@ public class Player : MonoBehaviour
     //=====================================================
     // ★内部状態
     //=====================================================
+    Animator currentanimator;                               //現在のアニメーションを管理する変数
     private PlayerState currentState = PlayerState.Idle;   // 現在の行動状態
     private float stateTimer;                               // 現在の行動が終わるまでの残り時間（秒）
 
@@ -247,12 +262,21 @@ public class Player : MonoBehaviour
     public void NotifyAttackLanded()
     {
         attackLandedThisAttack = true;
+
+        // ガード成功で上昇していた攻撃力は「次の攻撃が当たるまで」の効果なので、
+        // 自分の攻撃が実際に相手へ命中したこのタイミングでバフとエフェクトを終了する。
+        if (isGuardBuffed)
+        {
+            isGuardBuffed = false;
+            StopGuardBuffEffect();
+        }
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     // 各種コンポーネント・子オブジェクトの当たり判定の取得と初期化を行う
     void Start()
     {
+        
         // 自分にアタッチされているPlayerInputコンポーネントを取得
         playerInput = GetComponent<PlayerInput>();
         // どのプレイヤー番号・どのデバイスが紐づいているかログ出力（デバッグ用）
@@ -458,29 +482,83 @@ public class Player : MonoBehaviour
     //-----------------------------------------------------
     // durationの間だけ、そのフレームから入力・状態更新を止めて「少しだけ動けない」状態にする。
     // すでにヒットストップ中の場合は、残り時間を延ばしすぎないよう長い方の時間を採用する。
-    void StartHitStop(float duration)
+    // playHeadHitAnimation: ヒットストップが終わった瞬間に"HeadHit"（被弾）アニメーションを再生するか。
+    //   通常被弾はtrue、仁王立ちガード成功時はfalse（ガードのポーズを崩したくないため）を渡す。
+    void StartHitStop(float duration, bool playHeadHitAnimation = true)
     {
         if (!enableHitStop || duration <= 0f) return;
 
         hitStopTimer = Mathf.Max(hitStopTimer, duration);
+        pendingHeadHitAnimation = playHeadHitAnimation;
 
         if (freezeAnimatorDuringHitStop && animator != null)
         {
+            // ★修正：ここで即座にHeadHitを再生すると、直後にspeedを0にするせいで
+            //   1フレーム目の姿勢のまま止まってしまい「アニメーションが再生された」ようには見えなかった。
+            //   なので今は「その場でアニメーションを一時停止させる」だけにし、
+            //   実際にHeadHitを再生するのはヒットストップが終わるタイミング（EndHitStop）に任せる。
             animator.speed = 0f;
         }
 
         DLog($"[{PlayerName}] ヒットストップ開始 duration={duration}秒");
     }
 
-    // ヒットストップ終了時にアニメーション速度を元に戻す
+    // ヒットストップ終了時にアニメーション速度を元に戻し、必要ならHeadHitアニメーションを再生する
     void EndHitStop()
     {
         if (freezeAnimatorDuringHitStop && animator != null)
         {
             animator.speed = 1f;
+
+            // ヒットストップで一瞬止めていたぶん、止まった直後に被弾（HeadHit）アニメーションを再生する。
+            // ガード成功時のヒットストップ（pendingHeadHitAnimation=false）ではここは実行されない。
+            if (pendingHeadHitAnimation)
+            {
+                animator.Play("HeadHit", 0, 0.0f);
+            }
         }
 
         DLog($"[{PlayerName}] ヒットストップ終了");
+    }
+
+    //-----------------------------------------------------
+    // ガード成功時の攻撃力上昇エフェクト（次の攻撃が当たるまで出し続ける）
+    //-----------------------------------------------------
+
+    // 攻撃力上昇エフェクトを開始する。すでに出ている場合は再生し直すだけで多重生成はしない。
+    void StartGuardBuffEffect()
+    {
+        if (!enableGuardBuffEffect || guardBuffEffectPrefab == null) return;
+
+        if (activeGuardBuffEffect != null)
+        {
+            // 連続でガード成功した場合はそのまま再生を継続（作り直さない）
+            if (!activeGuardBuffEffect.isPlaying) activeGuardBuffEffect.Play();
+            return;
+        }
+
+        activeGuardBuffEffect = Instantiate(
+            guardBuffEffectPrefab,
+            transform.position + guardBuffEffectOffset,
+            Quaternion.identity,
+            transform); // プレイヤーに追従させるため子オブジェクトにする
+        activeGuardBuffEffect.transform.localPosition = guardBuffEffectOffset;
+        activeGuardBuffEffect.Play();
+
+        DLog($"[{PlayerName}] 攻撃力上昇エフェクト開始");
+    }
+
+    // 攻撃力上昇エフェクトを停止する（次の攻撃が当たった時に呼ばれる）
+    void StopGuardBuffEffect()
+    {
+        if (activeGuardBuffEffect == null) return;
+
+        // 新規パーティクルの発生だけ止め、出ている分は自然にフェードアウトさせる
+        activeGuardBuffEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        Destroy(activeGuardBuffEffect.gameObject, activeGuardBuffEffect.main.startLifetime.constantMax + 0.5f);
+        activeGuardBuffEffect = null;
+
+        DLog($"[{PlayerName}] 攻撃力上昇エフェクト終了");
     }
 
     //-----------------------------------------------------
@@ -856,13 +934,18 @@ public class Player : MonoBehaviour
         if (isGuarding)
         {
             // 仁王立ち（ガード）中に被弾した場合の処理
-            atk += attackerAtk;                  // ガード成功で自分の攻撃力に敵の攻撃力を上乗せする
+            atk += attackerAtk;                  // ガード成功で自分の攻撃力に敵の攻撃力を上乗せする（次の自分の攻撃が当たるまで持続）
             DLog("漢!!");
             se.PlayOneShot(MenBlock_se);       // ガード成功の効果音を再生
             HP -= attackerAtk / 2;                // ガード中はダメージを半減させる
 
-            // ガード成功時のヒットストップ（少しだけ動けなくする）
-            StartHitStop(guardHitStopDuration);
+            // 攻撃力上昇中であることを示すエフェクトを出し続ける（次に自分の攻撃が当たるまで）
+            isGuardBuffed = true;
+            StartGuardBuffEffect();
+
+            // ガード成功時のヒットストップ（少しだけ動けなくする）。
+            // ガードのポーズを崩したくないのでHeadHitアニメーションは再生しない。
+            StartHitStop(guardHitStopDuration, false);
 
             guardComboCount++;
             if (fightingCamera != null)

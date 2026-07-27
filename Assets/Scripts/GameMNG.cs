@@ -21,6 +21,8 @@ public class GameMNG : MonoBehaviour
 
     [Header("漢気ゲージ表示(敵側・2本分)")]
     [Tooltip("Sliderのmin=0, max=1で設定してください(GetGaugeFillRatioが0〜1を返すため)")]
+    public Slider P1_KankiGaugeBar; // player1の漢気ゲージ1本目
+    public Slider P2_KankiGaugeBar; // player2の漢気ゲージ1本目
     public Slider E_KankiGaugeBar1; // 敵の漢気ゲージ1本目
     public Slider E_KankiGaugeBar2; // 敵の漢気ゲージ2本目
 

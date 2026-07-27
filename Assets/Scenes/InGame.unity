@@ -422,7 +422,7 @@ GameObject:
   - component: {fileID: 77014342}
   - component: {fileID: 77014343}
   m_Layer: 5
-  m_Name: E_Otokogibar (1)
+  m_Name: E_Otokogibar2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2666,6 +2666,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
+  enableDebugLog: 1
   PlayerName: P1
   PLayerTagName: 
   moveSpeed: 5
@@ -2700,6 +2701,17 @@ MonoBehaviour:
   guardHitEffectData: {fileID: 11400000, guid: f94d7da69ad3ede499f8c4f145d7a9eb, type: 2}
   mashHitEffectData: {fileID: 11400000, guid: d4c9d40f25fe1244796e06fbb64cc7fc, type: 2}
   missHitEffectData: {fileID: 11400000, guid: 182479a3e4175444d9090102939c91b9, type: 2}
+  enableHitStop: 1
+  hitStopDuration: 0.08
+  guardHitStopDuration: 0.05
+  freezeAnimatorDuringHitStop: 1
+  enableGuardSuccessEffect: 1
+  guardSuccessEffectPrefab: {fileID: 0}
+  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
+  guardSuccessEffectLifetime: 1
+  enableGuardBuffEffect: 1
+  guardBuffEffectPrefab: {fileID: 0}
+  guardBuffEffectOffset: {x: 0, y: 1, z: 0}
   enemy: {fileID: 1593231832}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 648027774}
@@ -4553,6 +4565,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
+  enableDebugLog: 1
   PlayerName: 
   PLayerTagName: 
   moveSpeed: 0.015
@@ -4587,6 +4600,17 @@ MonoBehaviour:
   guardHitEffectData: {fileID: 0}
   mashHitEffectData: {fileID: 0}
   missHitEffectData: {fileID: 0}
+  enableHitStop: 1
+  hitStopDuration: 0.08
+  guardHitStopDuration: 0.05
+  freezeAnimatorDuringHitStop: 1
+  enableGuardSuccessEffect: 1
+  guardSuccessEffectPrefab: {fileID: 0}
+  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
+  guardSuccessEffectLifetime: 1
+  enableGuardBuffEffect: 1
+  guardBuffEffectPrefab: {fileID: 0}
+  guardBuffEffectOffset: {x: 0, y: 1, z: 0}
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
@@ -5377,6 +5401,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
+  enableDebugLog: 1
   PlayerName: 
   PLayerTagName: 
   moveSpeed: 0.015
@@ -5411,6 +5436,17 @@ MonoBehaviour:
   guardHitEffectData: {fileID: 0}
   mashHitEffectData: {fileID: 0}
   missHitEffectData: {fileID: 0}
+  enableHitStop: 1
+  hitStopDuration: 0.08
+  guardHitStopDuration: 0.05
+  freezeAnimatorDuringHitStop: 1
+  enableGuardSuccessEffect: 1
+  guardSuccessEffectPrefab: {fileID: 0}
+  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
+  guardSuccessEffectLifetime: 1
+  enableGuardBuffEffect: 1
+  guardBuffEffectPrefab: {fileID: 0}
+  guardBuffEffectOffset: {x: 0, y: 1, z: 0}
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
@@ -6196,8 +6232,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 011a7f353d2bae244ba6aa56e91c8583, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  PlayerHP_Text: {fileID: 0}
-  EnemyHP_Text: {fileID: 0}
   p1: {fileID: 648027777}
   p2: {fileID: 0}
   e1: {fileID: 1593231832}
@@ -6205,11 +6239,11 @@ MonoBehaviour:
   E_HPbar: {fileID: 939642776}
   E_KankiGaugeBar1: {fileID: 14241809}
   E_KankiGaugeBar2: {fileID: 77014343}
-  BGM: {fileID: 8300000, guid: 78215c0163ae6f14e9dbae9023719665, type: 3}
-  gameOverTime: 2
   PlayerTransform: {fileID: 648027778}
   EnemyTransform: {fileID: 1593231836}
   cameraController: {fileID: 330585548}
+  BGM: {fileID: 8300000, guid: 78215c0163ae6f14e9dbae9023719665, type: 3}
+  gameOverTime: 2
 --- !u!4 &1702718112
 Transform:
   m_ObjectHideFlags: 0
