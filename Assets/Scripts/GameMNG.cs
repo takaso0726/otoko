@@ -85,7 +85,10 @@ public class GameMNG : MonoBehaviour
         player1Status = Player.Status.Live;
 
         // 漢気ゲージUIの初期化(0本分の状態から開始)
-        Enemy_UpdateKankiGauge();
+        // ※Enemy_UpdateKankiGauge()はe1(Enemy)を参照するため、e1が存在するとき(対CPU戦)のみ呼ぶ。
+        //   InGame1V1(対人戦)ではe1が未設定のため、無条件に呼ぶとエラーになる。
+        if (e1 != null) Enemy_UpdateKankiGauge();
+        Player_UpdateKankiGauge();
 
         // プレイヤーの状態経過時間タイマー
         playerChangeTimer = 0.0f;
@@ -239,7 +242,11 @@ public class GameMNG : MonoBehaviour
         }
         // 1本目・2本目それぞれの充填率(0〜1)をSliderへ反映
         P1_KankiGaugeBar.value = p1.GetGaugeFillRatio(0);
-        P2_KankiGaugeBar.value = p2.GetGaugeFillRatio(0);
+        // p2は1v1モードでのみ使用するため、対CPU戦（InGame）などp2未設定の構成ではスキップする
+        if (p2 != null)
+        {
+            P2_KankiGaugeBar.value = p2.GetGaugeFillRatio(0);
+        }
     }
     // ド根性復活のタイマーとカウントを表示する
     public void PlayerUI(float Timer, int Cnt)
