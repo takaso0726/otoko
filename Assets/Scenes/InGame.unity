@@ -6237,6 +6237,8 @@ MonoBehaviour:
   e1: {fileID: 1593231832}
   P_HPbar: {fileID: 1289788541}
   E_HPbar: {fileID: 939642776}
+  P1_KankiGaugeBar: {fileID: 0}
+  P2_KankiGaugeBar: {fileID: 0}
   E_KankiGaugeBar1: {fileID: 14241809}
   E_KankiGaugeBar2: {fileID: 77014343}
   PlayerTransform: {fileID: 648027778}
