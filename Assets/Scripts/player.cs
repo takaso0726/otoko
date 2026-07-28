@@ -167,6 +167,26 @@ public class Player : MonoBehaviour
 
     private bool isGuardBuffed = false;               // 現在ガード成功による攻撃力上昇中かどうか
     private ParticleSystem activeGuardBuffEffect;      // 生成中の攻撃力上昇エフェクトの参照（多重生成防止・停止処理用）
+    //=====================================================
+    // ---- 漢気ゲージ(必殺技ゲージ) ----
+    //=====================================================
+    [Header("漢気ゲージ設定")]
+    [Tooltip("ゲージ1本分の最大値")]
+    public float kankiGaugePerBar = 100f;
+    [Tooltip("ゲージの本数(2本分)")]
+    public int kankiGaugeBarCount = 2;
+    [Tooltip("プレイヤーに攻撃を当てた時に増える量")]
+    public float gaugeGainOnHit = 15f;
+    [Tooltip("後退(敵から離れる)した時に減る量")]
+    public float gaugeLossOnRetreat = 5f;
+    [Tooltip("ゲージ1本(満タン)につき上昇する攻撃力の倍率。0.25なら1本で+25%")]
+    public float atkPowerPerBar = 0.25f;
+
+    // 現在の合計ゲージ量(0 〜 kankiGaugePerBar * kankiGaugeBarCount)
+    private float kankiGauge = 0f;
+
+    // ゲージによる補正がかかる前の、素の攻撃力
+    private int baseAtk;
 
     //=====================================================
     // ★外部参照
@@ -276,7 +296,8 @@ public class Player : MonoBehaviour
     // 各種コンポーネント・子オブジェクトの当たり判定の取得と初期化を行う
     void Start()
     {
-        
+        //男気ゲージに使用する。素のatkを参照するために代入
+        baseAtk = atk;
         // 自分にアタッチされているPlayerInputコンポーネントを取得
         playerInput = GetComponent<PlayerInput>();
         // どのプレイヤー番号・どのデバイスが紐づいているかログ出力（デバッグ用）
@@ -331,6 +352,7 @@ public class Player : MonoBehaviour
         {
             DLog($"[{gameObject.name}] hitbox取得: {(hb != null ? hb.name + " / owner=" + hb.transform.root.name : "null!")}");
         }
+        
     }
 
     // 指定した名前の子オブジェクトからCapsuleColliderを取得するヘルパー
@@ -444,7 +466,6 @@ public class Player : MonoBehaviour
             ClearInputIntents();
             return;
         }
-
         // ここから下は「操作入力の受付」なので、コントローラー未割り当てなら止める
         if (playerInput != null && !playerInput.enabled)
         {
@@ -540,7 +561,7 @@ public class Player : MonoBehaviour
         activeGuardBuffEffect = Instantiate(
             guardBuffEffectPrefab,
             transform.position + guardBuffEffectOffset,
-            Quaternion.identity,
+            Quaternion.Euler(-90f, 0f, 0f),
             transform); // プレイヤーに追従させるため子オブジェクトにする
         activeGuardBuffEffect.transform.localPosition = guardBuffEffectOffset;
         activeGuardBuffEffect.Play();
@@ -1080,9 +1101,64 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★削除：EnemyPlayer() / TakeDamage() は OnTriggerEnter と組み合わさって
-    //   二重ダメージ・自傷ダメージの原因になっていたため撤去した。
-    //   ダメージ適用は OnTriggerEnter 内の1箇所に一本化している。
-    //   もし「攻撃側が能動的に相手へダメージを与える」設計に変更したい場合は、
-    //   OnTriggerEnter側のダメージ処理をこちらに移し替える形で作り直すこと。
+    //==============================================
+    // ---- 漢気ゲージ操作 ----
+    //==============================================
+    //プレイヤーに攻撃(パンチ・キック等)が当たった時にPlayer側から呼び出す想定の公開メソッド。
+    //※注意: 現在はUpdate()内でプレイヤーHPの減少を自動検知してゲージを増やしているため、
+    //   このメソッドを別途呼び出すと二重加算になります。Player.cs側から明示的に呼ぶ場合は、
+    //   Update()内のHP減少検知処理を削除するかコメントアウトしてください。
+    public void NotifyAttackLandedOnPlayer()
+    {
+        AddKankiGauge(gaugeGainOnHit);
+    }
+
+    //漢気ゲージを増やす(上限は1本分の合計値でクランプ)
+    public void AddKankiGauge(float amount)
+    {
+        float max = kankiGaugePerBar * kankiGaugeBarCount;
+        kankiGauge = Mathf.Clamp(kankiGauge + amount, 0f, max);
+        UpdateAtkByGauge();
+
+        //ゲージUI(2本分のSlider)を更新
+        if (gameMNG != null)
+        {
+            gameMNG.Player_UpdateKankiGauge();
+        }
+    }
+
+    //漢気ゲージを減らす(0未満にはならない)
+    public void ReduceKankiGauge(float amount)
+    {
+        kankiGauge = Mathf.Clamp(kankiGauge - amount, 0f, kankiGaugePerBar * kankiGaugeBarCount);
+        UpdateAtkByGauge();
+
+        //ゲージUI(2本分のSlider)を更新
+        if (gameMNG != null)
+        {
+            gameMNG.Enemy_UpdateKankiGauge();
+        }
+    }
+
+    //ゲージの満タン本数に応じて攻撃力を再計算する
+    private void UpdateAtkByGauge()
+    {
+        int filledBars = Mathf.FloorToInt(kankiGauge / kankiGaugePerBar);
+        atk = Mathf.RoundToInt(baseAtk * (1f + atkPowerPerBar * filledBars));
+    }
+
+    //UI(Sliderなど)から参照するための、指定した本数目のゲージの充填率(0〜1)を返す
+    //barIndex: 0 = 1本目, 1 = 2本目
+    public float GetGaugeFillRatio(int barIndex)
+    {
+        float barStart = barIndex * kankiGaugePerBar;
+        float filled = Mathf.Clamp(kankiGauge - barStart, 0f, kankiGaugePerBar);
+        return filled / kankiGaugePerBar;
+    }
+
+    //現在のゲージ合計値(生の値)を取得したい場合用
+    public float GetKankiGauge()
+    {
+        return kankiGauge;
+    }
 }

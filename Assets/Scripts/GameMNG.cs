@@ -223,6 +223,24 @@ public class GameMNG : MonoBehaviour
         E_KankiGaugeBar2.value = e1.GetGaugeFillRatio(1);
     }
 
+    // Playerの漢気ゲージ(両方)を表示更新する
+    // Enemy.csのAddKankiGauge/ReduceKankiGaugeが呼ばれた際に呼び出される想定
+    public void Player_UpdateKankiGauge()
+    {
+        if (p1 == null)
+        {
+            Debug.LogError("GameMNGのp1（Player）がInspectorで未設定です。Playerオブジェクトをアサインしてください。");
+            return;
+        }
+        if (P1_KankiGaugeBar == null || P2_KankiGaugeBar == null)
+        {
+            Debug.LogError("GameMNGのP1_KankiGaugeBarまたはP2_KankiGaugeBarがInspectorで未設定です。漢気ゲージ用のSliderをアサインしてください。");
+            return;
+        }
+        // 1本目・2本目それぞれの充填率(0〜1)をSliderへ反映
+        P1_KankiGaugeBar.value = p1.GetGaugeFillRatio(0);
+        P2_KankiGaugeBar.value = p2.GetGaugeFillRatio(0);
+    }
     // ド根性復活のタイマーとカウントを表示する
     public void PlayerUI(float Timer, int Cnt)
     {
