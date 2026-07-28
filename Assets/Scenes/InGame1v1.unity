@@ -2922,11 +2922,11 @@ MonoBehaviour:
   freezeAnimatorDuringHitStop: 1
   enableGuardSuccessEffect: 1
   guardSuccessEffectPrefab: {fileID: 0}
-  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
+  guardSuccessEffectOffset: {x: 0, y: 0, z: 0}
   guardSuccessEffectLifetime: 1
   enableGuardBuffEffect: 1
-  guardBuffEffectPrefab: {fileID: 6444108975891323404, guid: 896f84c572f6469408639a823d0ea7cf, type: 3}
-  guardBuffEffectOffset: {x: 0, y: 1, z: 0}
+  guardBuffEffectPrefab: {fileID: 6444108975891323404, guid: c26d343dbab92854094e6b601f000473, type: 3}
+  guardBuffEffectOffset: {x: 0, y: 0, z: 0}
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 1873253615}
   animator: {fileID: 956537541}
@@ -7843,11 +7843,11 @@ MonoBehaviour:
   freezeAnimatorDuringHitStop: 1
   enableGuardSuccessEffect: 1
   guardSuccessEffectPrefab: {fileID: 0}
-  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
+  guardSuccessEffectOffset: {x: 0, y: 0, z: 0}
   guardSuccessEffectLifetime: 1
   enableGuardBuffEffect: 1
-  guardBuffEffectPrefab: {fileID: 6444108975891323404, guid: 896f84c572f6469408639a823d0ea7cf, type: 3}
-  guardBuffEffectOffset: {x: 0, y: 1, z: 0}
+  guardBuffEffectPrefab: {fileID: 6444108975891323404, guid: c26d343dbab92854094e6b601f000473, type: 3}
+  guardBuffEffectOffset: {x: 0, y: 0, z: 0}
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 956537537}
   animator: {fileID: 1873253612}
