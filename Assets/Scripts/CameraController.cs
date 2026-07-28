@@ -8,6 +8,16 @@ using UnityEngine.Rendering; // 被写界深度(背景ボケ)用のVolume制御�
 /// カメラがその座標へスムーズに移動する。
 /// キャラクター同士の距離に応じてズーム（カメラ距離）も自動調整する。
 /// </summary>
+/// <summary>
+/// ガードインパクトカメラが、被弾したキャラクターのどちら側から捉えるかの基準
+/// </summary>
+public enum GuardImpactCameraSide
+{
+    MainCameraView, // 被弾直前にメインカメラに映っていた側（プレイヤーの向きに関わらず、見えていた顔側を映す）
+    PlayerFront,    // 常にキャラクターのForward側
+    PlayerBack,     // 常にキャラクターの背後側
+}
+
 public class FightingCameraController : MonoBehaviour
 {
     [Header("追従対象")]
@@ -66,11 +76,18 @@ public class FightingCameraController : MonoBehaviour
     [Tooltip("正面に対してどれだけ横に回り込むか（度）。斜めからの見上げ画角になる")]
     public float guardImpactHorizontalAngle = 35f;
 
-    [Tooltip("ONにするとキャラクターの正面側（顔が見える側）にカメラを配置する。モデルのForwardが逆向きの場合はOFFにして調整する")]
-    public bool guardImpactFilmFromFront = true;
+    [Tooltip(
+        "ガードインパクトカメラがどちら側から捉えるかの基準。\n" +
+        "MainCameraView：被弾直前にメインカメラに映っていた側を基準にする（推奨。左右どちらを向いていても、直前まで見えていた顔側を映す）\n" +
+        "PlayerFront：常にキャラクターのForward側を基準にする\n" +
+        "PlayerBack：常にキャラクターの背後側を基準にする（モデルのForwardが逆向きの場合の調整用）")]
+    public GuardImpactCameraSide guardImpactCameraSide = GuardImpactCameraSide.MainCameraView;
 
     [Tooltip("見上げる注視点の高さ（頭上あたりを見ることで見上げ角が強調される）")]
     public float guardImpactLookAtHeight = 1.9f;
+
+    [Tooltip("注視点を、メインカメラに向いていた側面方向へどれだけずらすか（m）。0だと体の中心を見るだけになり、大きいほど側面（顔の輪郭側）を強く見る画になる")]
+    public float guardImpactLookAtSideOffset = 0.3f;
 
     [Tooltip("突入時のカメラ移動の速さ（小さいほど素早くグッと寄る）")]
     public float guardImpactMoveInSmoothTime = 0.08f;
@@ -151,6 +168,7 @@ public class FightingCameraController : MonoBehaviour
     private float _guardImpactHoldTimer = 0f;
     private Vector3 _guardImpactVelocityPos;
     private float _currentVolumeWeight = 0f;
+    private Vector3 _guardImpactBaseDir; // 被弾直前（まだ通常モードの位置）に確定させた、映すべき水平方向
 
     // 根性復活演出（リバースカム）関連
     private bool _isRebornCloseUpMode = false;
@@ -353,6 +371,41 @@ public class FightingCameraController : MonoBehaviour
         _guardImpactTarget = target;
         _guardImpactComboCount = Mathf.Max(1, comboCount);
         _guardImpactHoldTimer = guardImpactHoldDuration;
+
+        // ここで確定させる（毎フレーム計算し直すと、カメラ自身が対象へ寄っていく途中の位置を
+        // 基準にしてしまい、向きの基準がズレていく）
+        _guardImpactBaseDir = CalculateGuardImpactBaseDirection(target);
+    }
+
+    /// <summary>
+    /// ガードインパクトカメラがどちら側から捉えるかを、guardImpactCameraSideの設定に応じて算出する。
+    /// プレイヤーの向き（Forward）そのものを使うか、被弾直前にメインカメラへ映っていた側を使うかを切り替える。
+    /// </summary>
+    /// <param name="target">被弾したキャラクターのTransform</param>
+    private Vector3 CalculateGuardImpactBaseDirection(Transform target)
+    {
+        switch (guardImpactCameraSide)
+        {
+            case GuardImpactCameraSide.PlayerFront:
+                return target.forward;
+
+            case GuardImpactCameraSide.PlayerBack:
+                return -target.forward;
+
+            case GuardImpactCameraSide.MainCameraView:
+            default:
+                // このスクリプトはメインカメラに付いている想定。まだ通常追従モードの位置にいるうちに、
+                // 「カメラから見て対象がどちら向きに見えているか」を水平方向だけで算出する
+                Vector3 toCamera = transform.position - target.position;
+                toCamera.y = 0f;
+
+                // 真上・至近距離などでベクトルが潰れてしまった場合は、プレイヤーの正面側にフォールバックする
+                if (toCamera.sqrMagnitude < 0.01f)
+                {
+                    return target.forward;
+                }
+                return toCamera.normalized;
+        }
     }
 
     /// <summary>
@@ -363,6 +416,7 @@ public class FightingCameraController : MonoBehaviour
         _isGuardImpactMode = false;
         _guardImpactTarget = null;
         _guardImpactComboCount = 0;
+        _guardImpactBaseDir = Vector3.zero;
     }
 
     /// <summary>
@@ -386,12 +440,15 @@ public class FightingCameraController : MonoBehaviour
         }
 
         // 1. 見上げる注視点（対象の頭上あたり）を設定
-        Vector3 lookAtTarget = _guardImpactTarget.position + Vector3.up * guardImpactLookAtHeight;
+        //    さらに、メインカメラに向いていた側面方向（_guardImpactBaseDir）へ少しずらすことで、
+        //    体の中心ではなく「見えている側面」を注視するようにする
+        Vector3 lookAtTarget = _guardImpactTarget.position
+            + Vector3.up * guardImpactLookAtHeight
+            + _guardImpactBaseDir * guardImpactLookAtSideOffset;
 
-        // 2. 対象の向きを基準に、斜め横・低い位置へ回り込んだカメラ位置を算出
-        //    guardImpactFilmFromFrontがtrueなら「正面（顔が見える側）」、falseなら背後側を基準にする
-        Vector3 baseDir = guardImpactFilmFromFront ? _guardImpactTarget.forward : -_guardImpactTarget.forward;
-        Vector3 diagonalDir = Quaternion.AngleAxis(guardImpactHorizontalAngle, Vector3.up) * baseDir;
+        // 2. 被弾直前に確定させておいた向き（_guardImpactBaseDir）を基準に、
+        //    斜め横・低い位置へ回り込んだカメラ位置を算出する
+        Vector3 diagonalDir = Quaternion.AngleAxis(guardImpactHorizontalAngle, Vector3.up) * _guardImpactBaseDir;
         Vector3 desiredCameraPos = _guardImpactTarget.position + diagonalDir.normalized * guardImpactDistance;
         desiredCameraPos.y = _guardImpactTarget.position.y + guardImpactCamHeight;
 
