@@ -29,13 +29,6 @@ public class Player : MonoBehaviour
         Win,        //勝利
     };
 
-    // 左右方向を表す列挙型。自分の向いている方向や、相手が自分から見てどちら側にいるかの判定に使う
-    public enum HorizontalDirection
-    {
-        Right,
-        Left
-    }
-
     // 内部の行動制御用ステート。今どの行動をしているかをこれ1つで管理する
     private enum PlayerState
     {
@@ -79,10 +72,6 @@ public class Player : MonoBehaviour
     [SerializeField] float moveInputThreshold = 0.03f;    // 左右移動と判定するスティックの入力量
     [SerializeField] float crouchInputThreshold = -0.43f; // しゃがみ／下キックと判定するスティックの下入力量
     [SerializeField] float upKickInputThreshold = 0.25f;  // 上キックと判定するスティックの上入力量
-
-    // 後退判定（漢気ゲージ減少）用に、前フレームの相手との距離を記憶しておく変数。
-    // 負の値は「まだ計測していない（初回フレーム）」ことを表す。
-    private float previousDistanceToEnemy = -1f;
 
     //=====================================================
     // ★ジャンプ
@@ -184,13 +173,11 @@ public class Player : MonoBehaviour
     [Header("漢気ゲージ設定")]
     [Tooltip("ゲージ1本分の最大値")]
     public float kankiGaugePerBar = 100f;
-    [Tooltip("ゲージの本数(P1/P2は1本ずつ。Enemy(CPU)は2本なのでEnemy.cs側で別途設定)")]
-    public int kankiGaugeBarCount = 1;
+    [Tooltip("ゲージの本数(2本分)")]
+    public int kankiGaugeBarCount = 2;
     [Tooltip("プレイヤーに攻撃を当てた時に増える量")]
     public float gaugeGainOnHit = 15f;
-    [Tooltip("相手の攻撃をガードした時に増える量")]
-    public float gaugeGainOnGuard = 10f;
-    [Tooltip("相手に背を向けて逃げた(後退)時に、1秒あたり減る量")]
+    [Tooltip("後退(敵から離れる)した時に減る量")]
     public float gaugeLossOnRetreat = 5f;
     [Tooltip("ゲージ1本(満タン)につき上昇する攻撃力の倍率。0.25なら1本で+25%")]
     public float atkPowerPerBar = 0.25f;
@@ -311,13 +298,6 @@ public class Player : MonoBehaviour
     {
         //男気ゲージに使用する。素のatkを参照するために代入
         baseAtk = atk;
-
-        // ★診断用：漢気ゲージ関連のInspector設定値と初期HPをここで必ず出しておく。
-        //   想定値からズレていないか（既定はkankiGaugePerBar=100, kankiGaugeBarCount=1, HP=100）を
-        //   プレイ開始直後に確認できるようにするため。
-        DLog($"[{PlayerName}] 漢気ゲージ設定確認: kankiGaugePerBar={kankiGaugePerBar} / " +
-             $"kankiGaugeBarCount={kankiGaugeBarCount} / 合計上限={kankiGaugePerBar * kankiGaugeBarCount} / 初期HP={HP}");
-
         // 自分にアタッチされているPlayerInputコンポーネントを取得
         playerInput = GetComponent<PlayerInput>();
         // どのプレイヤー番号・どのデバイスが紐づいているかログ出力（デバッグ用）
@@ -504,10 +484,6 @@ public class Player : MonoBehaviour
         {
             TickBusyState();
         }
-
-        // 相手から離れる方向へ移動している（後退している）かどうかを毎フレーム判定し、
-        // 条件を満たしていれば漢気ゲージを減らす
-        CheckRetreatAndReduceGauge();
 
         ClearInputIntents();
     }
@@ -867,7 +843,7 @@ public class Player : MonoBehaviour
 
         rebornTimer += Time.deltaTime;
         Player_status = Status.Reborn;
-        if (gameMNG != null) gameMNG.SettestStatus(Status.Reborn);
+        if (gameMNG != null) gameMNG.SettestStatus(PlayerName, Status.Reborn);
 
         //ダウンした瞬間、一度だけ顔・拳へのクローズアップカメラを開始する
         if (!rebornCamStarted && fightingCamera != null)
@@ -917,7 +893,7 @@ public class Player : MonoBehaviour
             currentState = PlayerState.Dead;
             Player_status = Status.Dead;
             DLog($"[{PlayerName}] 根性復活失敗。HP={HP}のままDead状態へ移行。");
-            if (gameMNG != null) gameMNG.SettestStatus(Status.Dead);
+            if (gameMNG != null) gameMNG.SettestStatus(PlayerName, Status.Dead);
 
             if (fightingCamera != null)
             {
@@ -984,9 +960,6 @@ public class Player : MonoBehaviour
             se.PlayOneShot(MenBlock_se);       // ガード成功の効果音を再生
             HP -= attackerAtk / 2;                // ガード中はダメージを半減させる
 
-            // ガードに成功した自分自身の漢気ゲージを増やす
-            AddKankiGauge(gaugeGainOnGuard);
-
             // 攻撃力上昇中であることを示すエフェクトを出し続ける（次に自分の攻撃が当たるまで）
             isGuardBuffed = true;
             StartGuardBuffEffect();
@@ -1021,11 +994,7 @@ public class Player : MonoBehaviour
             }
 
             // ガードされてもヒットはヒット（空振りではない）なので攻撃側に通知
-            if (isEnemyPlayerAttack)
-            {
-                enemyPlayer.NotifyAttackLanded();
-                enemyPlayer.NotifyAttackLandedOnPlayer(); // 攻撃側(P同士)の漢気ゲージを増やす
-            }
+            if (isEnemyPlayerAttack) enemyPlayer.NotifyAttackLanded();
             else if (enemy != null) enemy.NotifyAttackLanded();
         }
         else
@@ -1053,7 +1022,6 @@ public class Player : MonoBehaviour
                 // 対人戦：相手Playerの現在の攻撃タイプに応じたHitEffectDataを取得
                 selectedHitEffect = enemyPlayer.GetHitEffectDataFor(enemyPlayer.CurrentAttackType);
                 enemyPlayer.NotifyAttackLanded(); // 空振りではなく命中したことを攻撃側へ通知
-                enemyPlayer.NotifyAttackLandedOnPlayer(); // 攻撃側(P同士)の漢気ゲージを増やす
             }
             else if (enemy != null)
             {
@@ -1086,16 +1054,9 @@ public class Player : MonoBehaviour
 
         if (HP < 0) HP = 0;
 
-        //デバッグログ：誰からどれだけダメージを受けてHPがいくつになったか、また現在の漢気ゲージ量
+        //デバッグログ：誰からどれだけダメージを受けてHPがいくつになったか
         string attackerName = isEnemyPlayerAttack ? enemyPlayer.PlayerName : "Enemy(CPU)";
-        // 本数(kankiGaugeBarCount)に合わせて「n本目=xx%」を可変で組み立てる（P1/P2は1本、Enemyは2本などに対応）
-        string gaugeBarsLog = "";
-        for (int i = 0; i < kankiGaugeBarCount; i++)
-        {
-            gaugeBarsLog += $"{i + 1}本目={GetGaugeFillRatio(i) * 100f:F0}% ";
-        }
-        DLog($"[{PlayerName}] {attackerName}から被弾。ダメージ={attackerAtk}{(isGuarding ? "(ガード半減)" : "")} / 残りHP={HP} / " +
-             $"漢気ゲージ={GetKankiGauge():F1}({kankiGaugePerBar * kankiGaugeBarCount:F0}中) [{gaugeBarsLog.Trim()}]");
+        DLog($"[{PlayerName}] {attackerName}から被弾。ダメージ={attackerAtk}{(isGuarding ? "(ガード半減)" : "")} / 残りHP={HP}");
     }
 
     //-----------------------------------------------------
@@ -1141,73 +1102,12 @@ public class Player : MonoBehaviour
     }
 
     //==============================================
-    // ---- 左右方向判定・後退検知（漢気ゲージ減少）----
-    //==============================================
-
-    // 対戦相手（対人ならenemyPlayer、対CPUならenemy）のTransformを取得する
-    Transform GetEnemyTransform()
-    {
-        if (enemyPlayer != null) return enemyPlayer.transform;
-        if (enemy != null) return enemy.transform;
-        return null;
-    }
-
-    // 自分が現在向いている方向を左右で取得する（transform.forwardのZ成分の符号で判定。
-    // ワールド座標のプラスZ方向を向いていればRight、マイナスZ方向を向いていればLeftとする）
-    public HorizontalDirection GetFacingDirection()
-    {
-        return transform.forward.z >= 0f ? HorizontalDirection.Right : HorizontalDirection.Left;
-    }
-
-    // 相手が自分から見てどちら側（左右）にいるかを取得する
-    public HorizontalDirection GetDirectionToEnemy()
-    {
-        Transform enemyTf = GetEnemyTransform();
-        if (enemyTf == null) return GetFacingDirection(); // 相手が見つからない場合は判定不能なので自分の向きをそのまま返す（フォールバック）
-
-        Vector3 diff = enemyTf.position - transform.position;
-        return diff.z >= 0f ? HorizontalDirection.Right : HorizontalDirection.Left;
-    }
-
-    // 「自分が相手に背を向けている（＝相手のいる方向とは逆を向いている）」かつ「移動入力がある」かつ
-    // 「相手との距離が前フレームより遠くなっている（＝実際に離れていっている）」場合に、
-    // 「背を向けて逃げ出した」とみなして漢気ゲージを減らす。毎フレームUpdate()から呼び出される想定。
-    void CheckRetreatAndReduceGauge()
-    {
-        Transform enemyTf = GetEnemyTransform();
-        if (enemyTf == null) return;
-
-        float currentDistance = Vector3.Distance(transform.position, enemyTf.position);
-
-        // 初回フレームは比較対象となる「前フレームの距離」がまだないので、記録だけして今回は判定しない
-        if (previousDistanceToEnemy < 0f)
-        {
-            previousDistanceToEnemy = currentDistance;
-            return;
-        }
-
-        bool hasMoveInput = Mathf.Abs(moveInput.x) >= moveInputThreshold;
-        bool isFacingAwayFromEnemy = GetFacingDirection() != GetDirectionToEnemy();
-        bool isMovingAwayFromEnemy = currentDistance > previousDistanceToEnemy;
-
-        if (isFacingAwayFromEnemy && hasMoveInput && isMovingAwayFromEnemy)
-        {
-            // ★注意：この判定は毎フレーム成立し続けるため、gaugeLossOnRetreatをそのまま渡すと
-            //   「1フレームごとにフル量減算」されてしまい、数フレームでゲージが即ゼロになってしまう。
-            //   そのためTime.deltaTimeを掛けて「1秒あたりの減少量」として扱う。
-            ReduceKankiGauge(gaugeLossOnRetreat * Time.deltaTime);
-            DLog($"[{PlayerName}] 相手に背を向けて逃走したため漢気ゲージ減少。距離={currentDistance:F2}");
-        }
-
-        previousDistanceToEnemy = currentDistance;
-    }
-
-    //==============================================
     // ---- 漢気ゲージ操作 ----
     //==============================================
-    //プレイヤー同士(P1↔P2)の対戦で、自分の攻撃が相手に命中した際、命中された側(被弾側)の
-    //OnTriggerEnter処理から攻撃側(このメソッドの持ち主)に対して呼び出される想定の公開メソッド。
-    //ガード成功時・通常被弾時のどちらでも呼ばれ、攻撃を当てた側の漢気ゲージを増やす。
+    //プレイヤーに攻撃(パンチ・キック等)が当たった時にPlayer側から呼び出す想定の公開メソッド。
+    //※注意: 現在はUpdate()内でプレイヤーHPの減少を自動検知してゲージを増やしているため、
+    //   このメソッドを別途呼び出すと二重加算になります。Player.cs側から明示的に呼ぶ場合は、
+    //   Update()内のHP減少検知処理を削除するかコメントアウトしてください。
     public void NotifyAttackLandedOnPlayer()
     {
         AddKankiGauge(gaugeGainOnHit);
@@ -1220,17 +1120,10 @@ public class Player : MonoBehaviour
         kankiGauge = Mathf.Clamp(kankiGauge + amount, 0f, max);
         UpdateAtkByGauge();
 
-        // ★診断用：このインスタンス自身のゲージが実際に増えているかを直接確認できるようにする
-        DLog($"[{PlayerName}] AddKankiGauge(+{amount}) 呼び出し → 漢気ゲージ={kankiGauge:F1}/{max:F0}");
-
         //ゲージUI(2本分のSlider)を更新
         if (gameMNG != null)
         {
             gameMNG.Player_UpdateKankiGauge();
-        }
-        else
-        {
-            Debug.LogError($"[{PlayerName}] gameMNGがnullのため漢気ゲージUIを更新できません。");
         }
     }
 
@@ -1240,21 +1133,10 @@ public class Player : MonoBehaviour
         kankiGauge = Mathf.Clamp(kankiGauge - amount, 0f, kankiGaugePerBar * kankiGaugeBarCount);
         UpdateAtkByGauge();
 
-        // ★診断用：このインスタンス自身のゲージが実際に減っているかを直接確認できるようにする
-        DLog($"[{PlayerName}] ReduceKankiGauge(-{amount:F2}) 呼び出し → 漢気ゲージ={kankiGauge:F1}/{kankiGaugePerBar * kankiGaugeBarCount:F0}");
-
-        //ゲージUI(P1/P2それぞれのSlider)を更新
-        //※以前はEnemy_UpdateKankiGauge()を呼んでいたが、これはEnemy(e1)のUI更新用であり、
-        //  Player自身のゲージ減少時に呼ぶべきものではなかった（コピペミス）。
-        //  Enemy(e1)が未アサインの構成（例：InGame1V1）だとnullチェックに引っかかりエラーになるため、
-        //  AddKankiGauge()と同じPlayer_UpdateKankiGauge()に統一する。
+        //ゲージUI(2本分のSlider)を更新
         if (gameMNG != null)
         {
-            gameMNG.Player_UpdateKankiGauge();
-        }
-        else
-        {
-            Debug.LogError($"[{PlayerName}] gameMNGがnullのため漢気ゲージUIを更新できません。");
+            gameMNG.Enemy_UpdateKankiGauge();
         }
     }
 

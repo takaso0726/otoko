@@ -1692,9 +1692,9 @@ MonoBehaviour:
   m_HandleRect: {fileID: 0}
   m_Direction: 0
   m_MinValue: 0
-  m_MaxValue: 1
+  m_MaxValue: 100
   m_WholeNumbers: 0
-  m_Value: 0
+  m_Value: 100
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -2893,8 +2893,8 @@ MonoBehaviour:
   upKickInputThreshold: 0.25
   force: {x: 0, y: 300, z: 0}
   Jumpflag: 0
-  HP: 100
-  atk: 2
+  HP: 1000
+  atk: 10
   Player_status: 0
   punchDuration: 0.15
   kickDuration: 0.3
@@ -2903,7 +2903,7 @@ MonoBehaviour:
   guardDuration: 0.3
   throwDuration: 1.5
   rebornTimeLimit: 5
-  rebornHp: 70
+  rebornHp: 30
   mashThresholdBase: 11
   mashThresholdStep: 3
   standHeight: 2
@@ -2927,13 +2927,12 @@ MonoBehaviour:
   guardSuccessEffectOffset: {x: 0, y: 0, z: 0}
   guardSuccessEffectLifetime: 1
   enableGuardBuffEffect: 1
-  guardBuffEffectPrefab: {fileID: 6444108975891323404, guid: d73d5330ad0cf064383c2a385bec93d9, type: 3}
+  guardBuffEffectPrefab: {fileID: 6444108975891323404, guid: c26d343dbab92854094e6b601f000473, type: 3}
   guardBuffEffectOffset: {x: 0, y: 0, z: 0}
   kankiGaugePerBar: 100
   kankiGaugeBarCount: 2
   gaugeGainOnHit: 15
-  gaugeGainOnGuard: 10
-  gaugeLossOnRetreat: 15
+  gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 1873253615}
@@ -4380,7 +4379,6 @@ MonoBehaviour:
   kankiGaugePerBar: 100
   kankiGaugeBarCount: 2
   gaugeGainOnHit: 15
-  gaugeGainOnGuard: 10
   gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
   enemy: {fileID: 0}
@@ -5387,7 +5385,6 @@ MonoBehaviour:
   kankiGaugePerBar: 100
   kankiGaugeBarCount: 2
   gaugeGainOnHit: 15
-  gaugeGainOnGuard: 10
   gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
   enemy: {fileID: 0}
@@ -7304,9 +7301,9 @@ MonoBehaviour:
   m_HandleRect: {fileID: 0}
   m_Direction: 0
   m_MinValue: 0
-  m_MaxValue: 1
+  m_MaxValue: 100
   m_WholeNumbers: 0
-  m_Value: 0
+  m_Value: 100
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -7868,8 +7865,8 @@ MonoBehaviour:
   upKickInputThreshold: 0.25
   force: {x: 0, y: 300, z: 0}
   Jumpflag: 0
-  HP: 100
-  atk: 2
+  HP: 10
+  atk: 10
   Player_status: 0
   punchDuration: 0.15
   kickDuration: 0.3
@@ -7878,7 +7875,7 @@ MonoBehaviour:
   guardDuration: 0.3
   throwDuration: 1.5
   rebornTimeLimit: 5
-  rebornHp: 70
+  rebornHp: 30
   mashThresholdBase: 11
   mashThresholdStep: 3
   standHeight: 2
@@ -7902,13 +7899,12 @@ MonoBehaviour:
   guardSuccessEffectOffset: {x: 0, y: 0, z: 0}
   guardSuccessEffectLifetime: 1
   enableGuardBuffEffect: 1
-  guardBuffEffectPrefab: {fileID: 6444108975891323404, guid: d73d5330ad0cf064383c2a385bec93d9, type: 3}
+  guardBuffEffectPrefab: {fileID: 6444108975891323404, guid: c26d343dbab92854094e6b601f000473, type: 3}
   guardBuffEffectOffset: {x: 0, y: 0, z: 0}
   kankiGaugePerBar: 100
   kankiGaugeBarCount: 2
   gaugeGainOnHit: 15
-  gaugeGainOnGuard: 10
-  gaugeLossOnRetreat: 15
+  gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 956537537}
