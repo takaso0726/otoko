@@ -16,7 +16,9 @@ MonoBehaviour:
   baseAngle: 180
   angleRandomRange: 20
   distanceRange: {x: 1.14, y: 8.23}
-  scaleRange: {x: 1.53, y: 1.95}
+  spawnPositionOffset: {x: 0, y: 1.37, z: 3.08}
+  overallScale: 1
+  scaleRange: {x: 2.71, y: 2.6}
   lifeTime: 0.48
   scaleCurve:
     serializedVersion: 2

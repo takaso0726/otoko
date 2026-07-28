@@ -23,6 +23,14 @@ public class HitEffectData : ScriptableObject
     [Tooltip("被弾地点からどれくらい離すか")]
     public Vector2 distanceRange = new Vector2(1.0f, 1.8f);
 
+    [Header("生成位置の微調整")]
+    [Tooltip("計算後の生成位置にさらに加算するオフセット。X=左右（右が+）、Y=上下（上が+）、Z=奥行き（奥が+）")]
+    public Vector3 spawnPositionOffset = new Vector3(0f, 1.0f, 0f);
+
+    [Header("全体の大きさ")]
+    [Tooltip("scaleRangeにさらに掛け合わせる全体スケール倍率。1で等倍、大きくすると全体的に大きく表示される")]
+    public float overallScale = 1.0f;
+
     [Header("見た目")]
     public Vector2 scaleRange = new Vector2(0.9f, 1.3f);
     public float lifeTime = 0.6f;

@@ -47,8 +47,7 @@ public class HitEffectSpawner : MonoBehaviour
     public void SpawnAtDirection(HitEffectData data, Vector3 originPos, Vector3 baseDirection)
     {
         if (data == null || data.effectPrefab == null) return;
-        //キャラクターのポジションが下で設定されているので上のほうに出すためにポジションを上にプラスする
-        originPos.y += 0.0f;
+
         Vector3 baseDir = baseDirection;
         baseDir.z = 0f;
         if (baseDir.sqrMagnitude < 0.0001f) baseDir = Vector3.right;
@@ -72,6 +71,9 @@ public class HitEffectSpawner : MonoBehaviour
         float distance = Random.Range(data.distanceRange.x, data.distanceRange.y);
         Vector3 spawnPos = originPos + spawnDir * distance;
 
+        // 手動での位置微調整（上下左右奥）を反映。HitEffectDataのInspectorで技ごとに調整できる
+        spawnPos += data.spawnPositionOffset;
+
         // 生成
         GameObject fx = Instantiate(data.effectPrefab, spawnPos, Quaternion.identity);
 
@@ -81,8 +83,8 @@ public class HitEffectSpawner : MonoBehaviour
             fx.transform.rotation = Quaternion.LookRotation(fx.transform.position - targetCamera.transform.position);
         }
 
-        // スケール・寿命の演出
-        float scale = Random.Range(data.scaleRange.x, data.scaleRange.y);
+        // スケール・寿命の演出（全体スケール倍率も反映）
+        float scale = Random.Range(data.scaleRange.x, data.scaleRange.y) * data.overallScale;
         fx.transform.localScale = Vector3.one * scale;
 
         HitEffectAnimator animator = fx.GetComponent<HitEffectAnimator>();
