@@ -41,6 +41,14 @@ public class GameMNG : MonoBehaviour
     AudioSource BGM_Lv1;            // 音を鳴らすためのスピーカー
     public AudioClip BGM;           // ゲーム中に流すBGM
 
+    //=======================================================================
+    // シーン遷移先
+    //=======================================================================
+    [Header("シーン遷移先（Inspectorで変更可）")]
+    [SerializeField] string gameOverSceneName = "GameOver";               // InGame（エネミー戦）敗北時
+    [SerializeField] string gameClearSceneName = "GameClear";             // InGame（エネミー戦）勝利時
+    [SerializeField] string inGame1v1ResultSceneName = "Judgment"; // InGame1v1（対人戦）の勝敗結果画面
+
     //=========================================
     // 内部処理変数
     //=========================================
@@ -69,12 +77,16 @@ public class GameMNG : MonoBehaviour
                 if (E_HPbar != null && e1 != null) E_HPbar.value = e1.HP;
                 break;
 
-            case "InGame1V1":
+            case "InGame1v1":
                 // HPバーを現在出ているキャラクターに設定する
                 if (E_HPbar != null && p2 != null) E_HPbar.value = p2.HP;
 
                 // プレイヤーのステータスをLiveにする
                 player2Status = Player.Status.Live;
+
+                // 前回対戦の結果が残っていると次の結果画面に誤表示されるため、
+                // 対戦開始時に必ずリセットしておく
+                MatchResult.Reset();
                 break;
         }
 
@@ -85,10 +97,7 @@ public class GameMNG : MonoBehaviour
         player1Status = Player.Status.Live;
 
         // 漢気ゲージUIの初期化(0本分の状態から開始)
-        // ※Enemy_UpdateKankiGauge()はe1(Enemy)を参照するため、e1が存在するとき(対CPU戦)のみ呼ぶ。
-        //   InGame1V1(対人戦)ではe1が未設定のため、無条件に呼ぶとエラーになる。
-        if (e1 != null) Enemy_UpdateKankiGauge();
-        Player_UpdateKankiGauge();
+        Enemy_UpdateKankiGauge();
 
         // プレイヤーの状態経過時間タイマー
         playerChangeTimer = 0.0f;
@@ -125,14 +134,15 @@ public class GameMNG : MonoBehaviour
                 CheckGameResult(player2Status);
                 break;
 
-            case "InGame1V1":
-                CheckGameResult(player1Status);
+            case "InGame1v1":
+                // 1v1はplayer1Status・player2Statusの両方を見て勝敗を判定する
+                CheckGameResult1V1();
                 break;
         }
     }
 
     //=======================================================================
-    // 勝敗チェック＆シーン遷移タイマー処理（Updateから呼出）
+    // 勝敗チェック＆シーン遷移タイマー処理（Updateから呼出：InGame＝エネミー戦用）
     //=======================================================================
     private void CheckGameResult(Player.Status status)
     {
@@ -142,7 +152,7 @@ public class GameMNG : MonoBehaviour
             playerChangeTimer += Time.deltaTime; // 経過時間を加える
             if (playerChangeTimer >= gameOverTime)
             {
-                SceneManager.LoadScene("GameOver");
+                SceneManager.LoadScene(gameOverSceneName);
                 playerChangeTimer = 0.0f; // 経過時間をリセット
             }
         }
@@ -152,8 +162,40 @@ public class GameMNG : MonoBehaviour
             playerChangeTimer += Time.deltaTime; // 経過時間を加える
             if (playerChangeTimer >= gameOverTime)
             {
-                SceneManager.LoadScene("GameClear");
+                SceneManager.LoadScene(gameClearSceneName);
                 playerChangeTimer = 0.0f; // 経過時間をリセット
+            }
+        }
+    }
+
+    //=======================================================================
+    // 勝敗チェック＆シーン遷移タイマー処理（Updateから呼出：InGame1v1＝対人戦用）
+    //
+    // player1Status・player2Statusのそれぞれを見て、どちらかがDead（敗北）に
+    // なった時点で、もう一方の勝ちとしてMatchResultに書き込み、結果画面へ遷移する。
+    // ※ SettestStatus(string playerName, Player.Status ps) 経由で、
+    //    死んだ本人のPlayerNameに対応するステータスだけが更新される前提。
+    //=======================================================================
+    private void CheckGameResult1V1()
+    {
+        if (player1Status == Player.Status.Dead)
+        {
+            playerChangeTimer += Time.deltaTime;
+            if (playerChangeTimer >= gameOverTime)
+            {
+                MatchResult.LastWinner = MatchResult.Winner.Player2; // 1Pが敗北＝2Pの勝ち
+                SceneManager.LoadScene(inGame1v1ResultSceneName);
+                playerChangeTimer = 0.0f;
+            }
+        }
+        else if (player2Status == Player.Status.Dead)
+        {
+            playerChangeTimer += Time.deltaTime;
+            if (playerChangeTimer >= gameOverTime)
+            {
+                MatchResult.LastWinner = MatchResult.Winner.Player1; // 2Pが敗北＝1Pの勝ち
+                SceneManager.LoadScene(inGame1v1ResultSceneName);
+                playerChangeTimer = 0.0f;
             }
         }
     }
@@ -226,28 +268,22 @@ public class GameMNG : MonoBehaviour
         E_KankiGaugeBar2.value = e1.GetGaugeFillRatio(1);
     }
 
-    // Playerの漢気ゲージ(両方)を表示更新する
-    // Enemy.csのAddKankiGauge/ReduceKankiGaugeが呼ばれた際に呼び出される想定
+    // プレイヤー側(1P・2P)の漢気ゲージ(1本分ずつ)を表示更新する
+    // Player.csのAddKankiGauge/ReduceKankiGaugeが呼ばれた際に呼び出される想定。
+    // p1・p2のどちらが呼び出した場合でも、両方のバーをまとめて最新値に更新する
+    // （Enemy_UpdateKankiGauge()と同じ設計）。
     public void Player_UpdateKankiGauge()
     {
-        if (p1 == null)
+        if (p1 != null && P1_KankiGaugeBar != null)
         {
-            Debug.LogError("GameMNGのp1（Player）がInspectorで未設定です。Playerオブジェクトをアサインしてください。");
-            return;
+            P1_KankiGaugeBar.value = p1.GetGaugeFillRatio(0);
         }
-        if (P1_KankiGaugeBar == null || P2_KankiGaugeBar == null)
-        {
-            Debug.LogError("GameMNGのP1_KankiGaugeBarまたはP2_KankiGaugeBarがInspectorで未設定です。漢気ゲージ用のSliderをアサインしてください。");
-            return;
-        }
-        // 1本目・2本目それぞれの充填率(0〜1)をSliderへ反映
-        P1_KankiGaugeBar.value = p1.GetGaugeFillRatio(0);
-        // p2は1v1モードでのみ使用するため、対CPU戦（InGame）などp2未設定の構成ではスキップする
-        if (p2 != null)
+        if (p2 != null && P2_KankiGaugeBar != null)
         {
             P2_KankiGaugeBar.value = p2.GetGaugeFillRatio(0);
         }
     }
+
     // ド根性復活のタイマーとカウントを表示する
     public void PlayerUI(float Timer, int Cnt)
     {
@@ -259,6 +295,8 @@ public class GameMNG : MonoBehaviour
     //=======================================================================
 
     // 他のC#スクリプトから呼び出す変数
+    // 旧シグネチャ：呼び出し元が1P/2Pどちらでも player1Status を書き換える。
+    // InGame（対エネミー戦）モードなど、プレイヤーが1人しかいない場面での互換性のために残している。
     public void SettestStatus(Player.Status ps)
     {
         player1Status = ps;
@@ -276,6 +314,26 @@ public class GameMNG : MonoBehaviour
                 // プレイヤーが敗北＝敵の勝利
                 cameraController.FocusOnTarget(EnemyTransform);
             }
+        }
+    }
+
+    // 新シグネチャ：PlayerNameで「どのプレイヤーの状態か」を明示する。
+    // InGame1v1（1P vs 2P対戦）モードで、player.cs側から必ずこちらを呼ぶこと。
+    // これが無いと、2Pが死んだ時にもplayer1Statusが上書きされてしまい、
+    // 勝敗判定が逆転する不具合の原因になる。
+    public void SettestStatus(string playerName, Player.Status ps)
+    {
+        if (playerName == "P1")
+        {
+            player1Status = ps;
+        }
+        else if (playerName == "P2")
+        {
+            player2Status = ps;
+        }
+        else
+        {
+            Debug.LogWarning($"[GameMNG] SettestStatus: 不明なPlayerName '{playerName}' が渡されました。PlayerNameがP1/P2に設定されているか確認してください。");
         }
     }
 

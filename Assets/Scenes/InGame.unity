@@ -2712,6 +2712,11 @@ MonoBehaviour:
   enableGuardBuffEffect: 1
   guardBuffEffectPrefab: {fileID: 0}
   guardBuffEffectOffset: {x: 0, y: 1, z: 0}
+  kankiGaugePerBar: 100
+  kankiGaugeBarCount: 2
+  gaugeGainOnHit: 15
+  gaugeLossOnRetreat: 5
+  atkPowerPerBar: 0.25
   enemy: {fileID: 1593231832}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 648027774}
@@ -4611,6 +4616,11 @@ MonoBehaviour:
   enableGuardBuffEffect: 1
   guardBuffEffectPrefab: {fileID: 0}
   guardBuffEffectOffset: {x: 0, y: 1, z: 0}
+  kankiGaugePerBar: 100
+  kankiGaugeBarCount: 2
+  gaugeGainOnHit: 15
+  gaugeLossOnRetreat: 5
+  atkPowerPerBar: 0.25
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
@@ -5447,6 +5457,11 @@ MonoBehaviour:
   enableGuardBuffEffect: 1
   guardBuffEffectPrefab: {fileID: 0}
   guardBuffEffectOffset: {x: 0, y: 1, z: 0}
+  kankiGaugePerBar: 100
+  kankiGaugeBarCount: 2
+  gaugeGainOnHit: 15
+  gaugeLossOnRetreat: 5
+  atkPowerPerBar: 0.25
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
