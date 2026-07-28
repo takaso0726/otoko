@@ -14,6 +14,14 @@ public class FightingCameraController : MonoBehaviour
     [Tooltip("現在出場中のキャラクターのTransformリスト。動的に増減してOK")]
     public List<Transform> targets = new List<Transform>();
 
+    [Header("中心点の高さ調整")]
+    [Tooltip("中心点の高さ位置。0=足元、1=頭とした比率で指定する（0.5なら腰〜胸あたり）")]
+    [Range(0f, 1f)]
+    public float centerHeightRatio = 0f;
+
+    [Tooltip("中心点の高さ計算に使う身長の目安（メートル）。targets内の全キャラクターで共通の値として扱う")]
+    public float characterHeightEstimate = 1.8f;
+
     [Header("カメラ追従設定")]
     [Tooltip("中心点への移動速度（大きいほど速く追従）")]
     public float followSmoothTime = 0.25f;
@@ -243,17 +251,21 @@ public class FightingCameraController : MonoBehaviour
 
     /// <summary>
     /// 出場中の全キャラクターの中心点（重心）を算出する
+    /// centerHeightRatio（0=足元、1=頭）に応じて、中心点の高さを上下に調整できる
     /// </summary>
     private Vector3 CalculateCenterPoint()
     {
         if (targets.Count == 0) return transform.position;
+
+        // キャラクターのTransformの原点（足元想定）から、頭方向へどれだけ持ち上げるか
+        Vector3 heightOffset = Vector3.up * (characterHeightEstimate * centerHeightRatio);
 
         Vector3 sum = Vector3.zero;
         int count = 0;
         foreach (var t in targets)
         {
             if (t == null) continue;
-            sum += t.position;
+            sum += t.position + heightOffset;
             count++;
         }
 
