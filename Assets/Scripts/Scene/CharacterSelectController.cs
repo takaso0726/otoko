@@ -56,14 +56,46 @@ public class CharacterSelectController : MonoBehaviour
     [SerializeField] float transitionDelay = 0.7f;
 
     bool isTransitioning;
+    bool groupsBuilt;
     Coroutine p1CursorRoutine;
     Coroutine p2CursorRoutine;
 
+    void OnEnable()
+    {
+        // シーンに戻ってきた／再アクティブ化された時に必ずリセットする。
+        // isTransitioning や decided が戻らないと、一度両者が決定した後に
+        // このオブジェクトが再利用された場合、二度と入力を受け付けなくなる。
+        isTransitioning = false;
+
+        if (player1 != null)
+        {
+            player1.decided = false;
+            SetReadyMarkActive(player1, false);
+        }
+        if (player2 != null)
+        {
+            player2.decided = false;
+            SetReadyMarkActive(player2, false);
+        }
+
+        // Start()は初回のみ呼ばれる仕様なので、2回目以降の有効化時は
+        // ここでカーソル位置とドアップ表示も選択初期状態へ戻しておく。
+        if (groupsBuilt)
+        {
+            ResetSelectionPositions();
+        }
+    }
+
     void Start()
     {
-        if (characters.Length == 0) return;
+        if (characters == null || characters.Length == 0)
+        {
+            Debug.LogWarning("[CharacterSelectController] characters が設定されていません。", this);
+            return;
+        }
 
         BuildSideGroups();
+        groupsBuilt = true;
 
         if (player1.allowedIndices.Length == 0)
         {
@@ -74,16 +106,23 @@ public class CharacterSelectController : MonoBehaviour
             Debug.LogWarning("[CharacterSelectController] 2P側（画面右）に該当するキャラクターがありません。anchorの配置を確認してください。");
         }
 
+        ResetSelectionPositions();
+    }
+
+    void ResetSelectionPositions()
+    {
         player1.currentIndex = 0;
         player2.currentIndex = 0;
 
-        if (player1.allowedIndices.Length > 0)
+        if (player1.allowedIndices != null && player1.allowedIndices.Length > 0 && player1.cursor != null)
         {
-            player1.cursor.position = characters[player1.allowedIndices[0]].anchor.position;
+            var anchor = characters[player1.allowedIndices[0]].anchor;
+            if (anchor != null) player1.cursor.position = anchor.position;
         }
-        if (player2.allowedIndices.Length > 0)
+        if (player2.allowedIndices != null && player2.allowedIndices.Length > 0 && player2.cursor != null)
         {
-            player2.cursor.position = characters[player2.allowedIndices[0]].anchor.position;
+            var anchor = characters[player2.allowedIndices[0]].anchor;
+            if (anchor != null) player2.cursor.position = anchor.position;
         }
 
         SetReadyMarkActive(player1, false);
@@ -125,6 +164,7 @@ public class CharacterSelectController : MonoBehaviour
     void Update()
     {
         if (isTransitioning) return;
+        if (characters == null || characters.Length == 0) return;
 
         HandlePlayer(player1, ReadP1Direction(), ReadP1Decide(), ReadP1Cancel(), ref p1CursorRoutine);
         HandlePlayer(player2, ReadP2Direction(), ReadP2Decide(), ReadP2Cancel(), ref p2CursorRoutine);
@@ -168,8 +208,11 @@ public class CharacterSelectController : MonoBehaviour
                     p.currentIndex = localIndex;
                     PlaySE(moveSE);
 
-                    if (routine != null) StopCoroutine(routine);
-                    routine = StartCoroutine(MoveCursorSmooth(p.cursor, characters[nextGlobalIndex].anchor.position));
+                    if (p.cursor != null && characters[nextGlobalIndex].anchor != null)
+                    {
+                        if (routine != null) StopCoroutine(routine);
+                        routine = StartCoroutine(MoveCursorSmooth(p.cursor, characters[nextGlobalIndex].anchor.position));
+                    }
 
                     UpdatePortrait(p);
                 }
@@ -232,7 +275,7 @@ public class CharacterSelectController : MonoBehaviour
     // 安全に判定できるよう、?.ではなく明示的なUnityの==比較でチェックする
     void SetReadyMarkActive(PlayerSelector p, bool active)
     {
-        if (p.readyMark != null)
+        if (p != null && p.readyMark != null)
         {
             p.readyMark.SetActive(active);
         }
@@ -242,7 +285,7 @@ public class CharacterSelectController : MonoBehaviour
     // （1P用Imageは画面左、2P用Imageは画面右のRectTransformに配置しておく想定）
     void UpdatePortrait(PlayerSelector p)
     {
-        if (p.portraitImage == null) return;
+        if (p == null || p.portraitImage == null) return;
         if (p.allowedIndices == null || p.allowedIndices.Length == 0) return;
 
         int charIndex = p.allowedIndices[p.currentIndex];

@@ -40,14 +40,39 @@ public class MainMenuController : MonoBehaviour
     bool inputLocked;
     Coroutine cursorMoveRoutine;
 
+    void OnEnable()
+    {
+        // シーンに戻ってきた／再アクティブ化されたときに必ず入力ロックを解除する。
+        // これが無いと、一度決定した後に元のオブジェクトが再利用された場合、
+        // 二度と入力を受け付けなくなる不具合の原因になっていた。
+        inputLocked = false;
+    }
+
     void Start()
     {
-        if (items.Length > 0) fireCursor.position = items[0].anchor.position;
+        // items や anchor が未設定の場合に例外で Update が止まらないよう防御。
+        if (items == null || items.Length == 0)
+        {
+            Debug.LogWarning("[MainMenuController] items が設定されていません。", this);
+            return;
+        }
+
+        currentIndex = 0;
+
+        if (fireCursor != null && items[0].anchor != null)
+        {
+            fireCursor.position = items[0].anchor.position;
+        }
+        else
+        {
+            Debug.LogWarning("[MainMenuController] fireCursor または items[0].anchor が未設定です。", this);
+        }
     }
 
     void Update()
     {
         if (inputLocked) return;
+        if (items == null || items.Length == 0) return;
 
         int nav = ReadVerticalNav();
         if (nav != 0)
@@ -86,11 +111,14 @@ public class MainMenuController : MonoBehaviour
     {
         currentIndex = (currentIndex + dir + items.Length) % items.Length;
 
-        se.PlayOneShot(moveSE);
+        if (se != null && moveSE != null) se.PlayOneShot(moveSE);
         idleShowcase?.NotifyInput();
 
-        if (cursorMoveRoutine != null) StopCoroutine(cursorMoveRoutine);
-        cursorMoveRoutine = StartCoroutine(MoveCursorSmooth(items[currentIndex].anchor.position));
+        if (fireCursor != null && items[currentIndex].anchor != null)
+        {
+            if (cursorMoveRoutine != null) StopCoroutine(cursorMoveRoutine);
+            cursorMoveRoutine = StartCoroutine(MoveCursorSmooth(items[currentIndex].anchor.position));
+        }
     }
 
     IEnumerator MoveCursorSmooth(Vector3 target)
@@ -106,7 +134,7 @@ public class MainMenuController : MonoBehaviour
     void Decide()
     {
         idleShowcase?.NotifyInput();
-        se.PlayOneShot(decideSE);
+        if (se != null && decideSE != null) se.PlayOneShot(decideSE);
 
         var item = items[currentIndex];
 

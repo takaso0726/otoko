@@ -47,12 +47,35 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
     bool isTransitioning;
     Coroutine cursorRoutine;
 
+    void OnEnable()
+    {
+        // シーンに戻ってきた／再アクティブ化された時に必ずリセットする。
+        // これが無いと、一度決定した後にこのオブジェクトが再利用された場合、
+        // 二度と入力を受け付けなくなる不具合の原因になっていた。
+        decided = false;
+        isTransitioning = false;
+        SetReadyMarkActive(false);
+    }
+
     void Start()
     {
-        if (characters.Length == 0) return;
+        if (characters == null || characters.Length == 0)
+        {
+            Debug.LogWarning("[CharacterSelect_SFC_Controller] characters が設定されていません。", this);
+            return;
+        }
 
         currentIndex = 0;
-        cursor.position = characters[0].anchor.position;
+
+        if (cursor != null && characters[0].anchor != null)
+        {
+            cursor.position = characters[0].anchor.position;
+        }
+        else
+        {
+            Debug.LogWarning("[CharacterSelect_SFC_Controller] cursor または characters[0].anchor が未設定です。", this);
+        }
+
         SetReadyMarkActive(false);
         UpdatePortrait();
     }
@@ -60,6 +83,7 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
     void Update()
     {
         if (isTransitioning || decided) return;
+        if (characters == null || characters.Length == 0) return;
 
         Vector2Int dir = ReadDirection();
         if (dir != Vector2Int.zero)
@@ -70,8 +94,11 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
                 currentIndex = nextIndex;
                 PlaySE(moveSE);
 
-                if (cursorRoutine != null) StopCoroutine(cursorRoutine);
-                cursorRoutine = StartCoroutine(MoveCursorSmooth(cursor, characters[currentIndex].anchor.position));
+                if (cursor != null && characters[currentIndex].anchor != null)
+                {
+                    if (cursorRoutine != null) StopCoroutine(cursorRoutine);
+                    cursorRoutine = StartCoroutine(MoveCursorSmooth(cursor, characters[currentIndex].anchor.position));
+                }
 
                 UpdatePortrait();
             }
@@ -169,6 +196,7 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
     void UpdatePortrait()
     {
         if (portraitImage == null) return;
+        if (characters == null || characters.Length == 0) return;
 
         var sprite = characters[currentIndex].portrait;
         portraitImage.sprite = sprite;

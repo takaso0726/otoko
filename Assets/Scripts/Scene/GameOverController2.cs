@@ -6,10 +6,10 @@ using UnityEngine.SceneManagement;
 using TMPro;
 
 /// <summary>
-/// タイトル画面（待機画面）の制御。
+/// ゲームオーバー画面の制御。
 /// 「HIT ANY BUTTON」を点滅させつつ、3回連打されたら
-/// 画面が割れる演出→メインメニューへ遷移する。
-/// 旧Title.csのバグ（SEが毎フレーム再生される／連打を数えていない）を修正。
+/// 画面が割れる演出→タイトル画面へ遷移する。
+/// TitleController.cs の構成を踏襲（SEが毎フレーム再生される／連打を数えていないバグの修正版）。
 /// </summary>
 public class GameOverController : MonoBehaviour
 {
@@ -26,27 +26,40 @@ public class GameOverController : MonoBehaviour
     [SerializeField] int requiredHits = 3;         // 遷移に必要な連打回数
     [SerializeField] float blinkInterval = 0.4f;   // 文字の点滅間隔
     [SerializeField] float transitionDelay = 0.7f; // 割れる演出後、シーン遷移までのウェイト
-    //[SerializeField] string nextSceneName = "MainMenu"; // 直接InGameではなくメインメニューへ
+    [SerializeField] string nextSceneName = "Title"; // 遷移先シーン名
 
     int hitCount;
     bool isTransitioning;
     System.IDisposable anyButtonListener;
+    Coroutine blinkRoutine;
+
+    void OnEnable()
+    {
+        // シーンに戻ってきた／再アクティブ化された時に必ずリセットする。
+        // isTransitioning や hitCount が戻らないと、一度この画面を通過した後に
+        // オブジェクトが再利用された場合、二度と入力を受け付けなくなる。
+        hitCount = 0;
+        isTransitioning = false;
+
+        if (crackEffect != null) crackEffect.SetActive(false);
+        if (hitAnyButtonText != null) hitAnyButtonText.enabled = true;
+
+        // 「何らかのボタンが押された」を検知（キーボード／ゲームパッド／マウス共通）
+        anyButtonListener = InputSystem.onAnyButtonPress.Call(OnAnyButtonPressed);
+
+        if (blinkRoutine != null) StopCoroutine(blinkRoutine);
+        blinkRoutine = StartCoroutine(BlinkText());
+    }
 
     void Start()
     {
         if (se == null) se = GetComponent<AudioSource>();
-        StartCoroutine(BlinkText());
-    }
-
-    void OnEnable()
-    {
-        // 「何らかのボタンが押された」を検知（キーボード／ゲームパッド／マウス共通）
-        anyButtonListener = InputSystem.onAnyButtonPress.Call(OnAnyButtonPressed);
     }
 
     void OnDisable()
     {
         anyButtonListener?.Dispose();
+        anyButtonListener = null;
     }
 
     void OnAnyButtonPressed(InputControl control)
@@ -54,7 +67,7 @@ public class GameOverController : MonoBehaviour
         if (isTransitioning) return;
 
         hitCount++;
-        se.PlayOneShot(hitSE);
+        if (se != null && hitSE != null) se.PlayOneShot(hitSE);
 
         if (hitCount >= requiredHits)
         {
@@ -67,11 +80,11 @@ public class GameOverController : MonoBehaviour
         isTransitioning = true;
 
         if (crackEffect != null) crackEffect.SetActive(true);
-        se.PlayOneShot(crackSE);
+        if (se != null && crackSE != null) se.PlayOneShot(crackSE);
 
         yield return new WaitForSeconds(transitionDelay);
 
-        SceneManager.LoadScene("Title");
+        SceneManager.LoadScene(nextSceneName);
     }
 
     IEnumerator BlinkText()
