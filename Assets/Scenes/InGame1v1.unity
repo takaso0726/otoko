@@ -1135,16 +1135,17 @@ MonoBehaviour:
   focusZoomDistance: 2
   focusLookAtHeightOffset: 1.2
   guardImpactDistance: 3
-  guardImpactCamHeight: 0.4
-  guardImpactHorizontalAngle: -30
-  guardImpactFilmFromFront: 0
+  guardImpactCamHeight: 1
+  guardImpactHorizontalAngle: -20
+  guardImpactCameraSide: 0
   guardImpactLookAtHeight: 1.9
+  guardImpactLookAtSideOffset: 0.3
   guardImpactMoveInSmoothTime: 0.08
   guardImpactHoldDuration: 0.6
-  shakeBaseAmplitude: 0.1
-  shakeAmplitudePerCombo: 0.02
+  shakeBaseAmplitude: 0
+  shakeAmplitudePerCombo: 0
   shakeMaxAmplitude: 0.4
-  shakeFrequency: 150
+  shakeFrequency: 0
   guardImpactVolume: {fileID: 832575518}
   guardImpactVolumeWeight: 1
   volumeWeightSmoothSpeed: 8
@@ -2119,6 +2120,9 @@ MonoBehaviour:
   EnemyTransform: {fileID: 1873253616}
   cameraController: {fileID: 330585548}
   BGM: {fileID: 8300000, guid: 78215c0163ae6f14e9dbae9023719665, type: 3}
+  gameOverSceneName: GameOver
+  gameClearSceneName: GameClear
+  inGame1v1ResultSceneName: Judgment
   gameOverTime: 2
 --- !u!4 &750834239
 Transform:
@@ -7865,7 +7869,7 @@ MonoBehaviour:
   upKickInputThreshold: 0.25
   force: {x: 0, y: 300, z: 0}
   Jumpflag: 0
-  HP: 10
+  HP: 1000
   atk: 10
   Player_status: 0
   punchDuration: 0.15
