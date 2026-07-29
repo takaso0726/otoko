@@ -10,6 +10,10 @@ public class HitEffectAnimator : MonoBehaviour
     private float baseScale;
     private float timer;
 
+    // ★追加：あと何秒でこの演出が消えるか。Spawner側が「重ねて出してよいタイミングか」を
+    //   判定するのに使う。dataが未設定（Play前）の場合は0を返す。
+    public float RemainingTime => data != null ? Mathf.Max(0f, data.lifeTime - timer) : 0f;
+
     public void Play(HitEffectData sourceData, float scale)
     {
         data = sourceData;

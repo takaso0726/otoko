@@ -1,4 +1,5 @@
 {
+    "version": 1,
     "name": "PlayerControls",
     "maps": [
         {
@@ -45,7 +46,7 @@
                     "name": "Stand",
                     "type": "Button",
                     "id": "66adb2b8-9db7-4eb1-a952-3fc0eb883ba7",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -55,6 +56,15 @@
                     "type": "Button",
                     "id": "d783718b-c0cf-4a67-b149-380172fe45cb",
                     "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "L1",
+                    "type": "Button",
+                    "id": "75c3d333-78a7-40db-8f1b-96e84209d0e8",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -124,6 +134,17 @@
                     "processors": "",
                     "groups": "Gamepad",
                     "action": "Throw",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "aad4bcca-357c-461e-8d16-d66b937c5fb5",
+                    "path": "<Gamepad>/leftShoulder",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "L1",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

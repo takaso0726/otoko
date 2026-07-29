@@ -19,10 +19,14 @@ public class GameMNG : MonoBehaviour
     public Slider P_HPbar;          // 1人目のHPゲージ
     public Slider E_HPbar;          // 2人目/敵のHPゲージ
 
-    [Header("漢気ゲージ表示(敵側・2本分)")]
+    [Header("漢気ゲージ表示(プレイヤー側・2本分)")]
     [Tooltip("Sliderのmin=0, max=1で設定してください(GetGaugeFillRatioが0〜1を返すため)")]
-    public Slider P1_KankiGaugeBar; // player1の漢気ゲージ1本目
-    public Slider P2_KankiGaugeBar; // player2の漢気ゲージ1本目
+    public Slider P1_KankiGaugeBar;  // player1の漢気ゲージ1本目
+    public Slider P1_KankiGaugeBar2; // player1の漢気ゲージ2本目
+    public Slider P2_KankiGaugeBar;  // player2の漢気ゲージ1本目
+    public Slider P2_KankiGaugeBar2; // player2の漢気ゲージ2本目
+
+    [Header("漢気ゲージ表示(敵側・2本分)")]
     public Slider E_KankiGaugeBar1; // 敵の漢気ゲージ1本目
     public Slider E_KankiGaugeBar2; // 敵の漢気ゲージ2本目
 
@@ -274,13 +278,18 @@ public class GameMNG : MonoBehaviour
     // （Enemy_UpdateKankiGauge()と同じ設計）。
     public void Player_UpdateKankiGauge()
     {
-        if (p1 != null && P1_KankiGaugeBar != null)
+        // p1側：1本目・2本目それぞれの充填率(0〜1)をSliderへ反映
+        if (p1 != null)
         {
-            P1_KankiGaugeBar.value = p1.GetGaugeFillRatio(0);
+            if (P1_KankiGaugeBar != null) P1_KankiGaugeBar.value = p1.GetGaugeFillRatio(0);
+            if (P1_KankiGaugeBar2 != null) P1_KankiGaugeBar2.value = p1.GetGaugeFillRatio(1);
         }
-        if (p2 != null && P2_KankiGaugeBar != null)
+
+        // p2側：1本目・2本目それぞれの充填率(0〜1)をSliderへ反映
+        if (p2 != null)
         {
-            P2_KankiGaugeBar.value = p2.GetGaugeFillRatio(0);
+            if (P2_KankiGaugeBar != null) P2_KankiGaugeBar.value = p2.GetGaugeFillRatio(0);
+            if (P2_KankiGaugeBar2 != null) P2_KankiGaugeBar2.value = p2.GetGaugeFillRatio(1);
         }
     }
 

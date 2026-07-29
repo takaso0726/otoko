@@ -18,6 +18,11 @@ public class HitEffectSpawner : MonoBehaviour
     [Header("任意：常にプレイヤー向きに合わせたい場合はCameraを指定")]
     [SerializeField] private Camera targetCamera;
 
+    // ★追加：allowOverlap=falseなHitEffectDataについて、「今表示中のインスタンス」を1つだけ覚えておく。
+    //   同じdataでの新規生成リクエストが来たとき、ここを見て出してよいか判定する。
+    private readonly System.Collections.Generic.Dictionary<HitEffectData, HitEffectAnimator> activeInstances
+        = new System.Collections.Generic.Dictionary<HitEffectData, HitEffectAnimator>();
+
     private void Awake()
     {
         if (Instance == null) Instance = this;
@@ -47,6 +52,9 @@ public class HitEffectSpawner : MonoBehaviour
     public void SpawnAtDirection(HitEffectData data, Vector3 originPos, Vector3 baseDirection)
     {
         if (data == null || data.effectPrefab == null) return;
+
+        // ★追加：重ねて出してはいけない演出の場合、今出してよいタイミングかを判定する
+        if (!CanSpawn(data)) return;
 
         Vector3 baseDir = baseDirection;
         baseDir.z = 0f;
@@ -90,6 +98,37 @@ public class HitEffectSpawner : MonoBehaviour
         HitEffectAnimator animator = fx.GetComponent<HitEffectAnimator>();
         if (animator == null) animator = fx.AddComponent<HitEffectAnimator>();
         animator.Play(data, scale);
+
+        // ★追加：重ねて出してはいけない演出なら、今生成したものを「表示中」として覚えておく
+        if (!data.allowOverlap)
+        {
+            activeInstances[data] = animator;
+        }
+    }
+
+    /// <summary>
+    /// このHitEffectDataについて、今新しく生成してよいかどうかを判定する。
+    /// ・allowOverlap=trueなら常にOK（従来通り、何個でも重ねられる）。
+    /// ・allowOverlap=falseの場合、今表示中のインスタンスが無ければOK。
+    ///   表示中のインスタンスがある場合は、その残り時間が
+    ///   overlapAllowedBeforeEnd以下（＝もうすぐ消える）になっていればOK、
+    ///   まだ十分残っていればNG（＝重ねずに待たせる）。
+    /// </summary>
+    private bool CanSpawn(HitEffectData data)
+    {
+        if (data.allowOverlap) return true;
+
+        if (activeInstances.TryGetValue(data, out HitEffectAnimator existing) && existing != null)
+        {
+            // Unity側でDestroy済みのオブジェクトはnull判定になるため、
+            // ここに来るのは「まだ表示中」の場合のみ
+            if (existing.RemainingTime > data.overlapAllowedBeforeEnd)
+            {
+                return false; // まだ消える直前ではないので、重ねて出さない
+            }
+        }
+
+        return true;
     }
 }
 

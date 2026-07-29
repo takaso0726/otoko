@@ -41,6 +41,7 @@ public class Player : MonoBehaviour
         DownKick,   // 下キック
         Guard,      // 仁王立ち
         Throw,      // 投げ
+        Special,    // 必殺技（漢気ゲージ消費技）
         KnockedDown,// ダウン中（根性復活チャレンジ中）
         Dead,       // 死亡（復活失敗）
     }
@@ -56,6 +57,17 @@ public class Player : MonoBehaviour
     void DLog(string message)
     {
         if (enableDebugLog) Debug.Log(message);
+    }
+
+    // ★追加：漢気ゲージ専用のデバッグログ。F2キーでON/OFFをトグルする。
+    //   増減が多くログが流れやすいため、通常のenableDebugLogとは別に管理する。
+    private bool kankiGaugeDebugLogEnabled = false;
+
+    // 漢気ゲージ関連（増減・後退判定）のログはこのメソッド経由にする。
+    // F2でトグルした時だけ出力される（enableDebugLogの影響は受けない）。
+    void GaugeDLog(string message)
+    {
+        if (kankiGaugeDebugLogEnabled) Debug.Log(message);
     }
 
     //=====================================================
@@ -87,7 +99,7 @@ public class Player : MonoBehaviour
     //=====================================================
     [Header("ステータス")]
     public int HP = 100;                     // 体力
-    public int atk = 10;                     // 攻撃力
+    public int atk = 10;                     // 現在の攻撃力（直近に出した攻撃の種類・漢気ゲージ・ガード成功で自動計算される。Inspectorの値は初期表示用）
     public Player.Status Player_status;        // 外部から参照される、プレイヤーの現在の大まかな状態
 
     //=====================================================
@@ -100,6 +112,26 @@ public class Player : MonoBehaviour
     [SerializeField] float downKickDuration = 0.5f; // 下キックの拘束時間
     [SerializeField] float guardDuration = 0.5f;    // 仁王立ちの拘束時間
     [SerializeField] float throwDuration = 1.5f;    // 投げの拘束時間
+
+    //=====================================================
+    // ★攻撃の種類ごとの攻撃力（Inspectorで個別に調整可能）
+    //   ここに新しい技を追加する場合は、対応するフィールドを増やし、
+    //   GetAttackPower() の switch にもケースを追加すること。
+    //=====================================================
+    [Header("攻撃力設定（攻撃の種類ごと）")]
+    [SerializeField] int punchAtk = 10;    // パンチ（空中攻撃含む）の攻撃力
+    [SerializeField] int kickAtk = 10;     // 通常キックの攻撃力
+    [SerializeField] int upKickAtk = 10;   // 上キックの攻撃力
+    [SerializeField] int downKickAtk = 10; // 下キックの攻撃力
+    [SerializeField] int throwAtk = 5;     // 投げ（つかみ）成立時の固定ダメージ
+
+    //=====================================================
+    // ★ガード（仁王立ち）成功時の攻撃力上昇設定
+    //=====================================================
+    [Header("ガード成功時の攻撃力上昇設定")]
+    [Tooltip("ガード成功時、「相手の攻撃力 × この倍率」を自分の攻撃力に上乗せする。" +
+             "1なら相手の攻撃力をそのまま加算、0.5なら半分だけ加算、0なら上昇なし。")]
+    [SerializeField] float guardAtkBonusMultiplier = 1.0f;
 
     //=====================================================
     // ★根性復活（ダウン後の復活チャレンジ）設定
@@ -175,11 +207,13 @@ public class Player : MonoBehaviour
     public float kankiGaugePerBar = 100f;
     [Tooltip("ゲージの本数(2本分)")]
     public int kankiGaugeBarCount = 2;
-    [Tooltip("プレイヤーに攻撃を当てた時に増える量")]
+    [Tooltip("相手に攻撃を当てた（ダメージを与えた）時に増える量")]
     public float gaugeGainOnHit = 15f;
-    [Tooltip("後退(敵から離れる)した時に減る量")]
+    [Tooltip("仁王立ちでガードに成功した時に増える量")]
+    public float gaugeGainOnGuard = 10f;
+    [Tooltip("後退（相手から離れる方向へ移動）している間、1秒あたりに減る量")]
     public float gaugeLossOnRetreat = 5f;
-    [Tooltip("ゲージ1本(満タン)につき上昇する攻撃力の倍率。0.25なら1本で+25%")]
+    [Tooltip("ゲージ1本(満タン)につき上昇する基礎攻撃力倍率。0.25なら1本で+25%（実際のダメージ＝基礎攻撃力倍率×技の攻撃力）")]
     public float atkPowerPerBar = 0.25f;
 
     // 現在の合計ゲージ量(0 〜 kankiGaugePerBar * kankiGaugeBarCount)
@@ -187,6 +221,31 @@ public class Player : MonoBehaviour
 
     // ゲージによる補正がかかる前の、素の攻撃力
     private int baseAtk;
+
+    //=====================================================
+    // ---- 必殺技（漢気ゲージ消費） ----
+    //=====================================================
+    [Header("必殺技設定")]
+    [Tooltip("必殺技を発動するために必要な漢気ゲージ量。デフォルトはゲージ満タン(2本分)。")]
+    public float specialRequiredGauge = 200f;
+
+    [Tooltip("必殺技発動で消費する漢気ゲージ量。")]
+    public float specialGaugeCost = 200f;
+
+    [Tooltip("必殺技命中時に、相手の【現在HP】から何割(0〜1)減らすか。0.5なら現在HPの半分を削る。")]
+    [Range(0f, 1f)]
+    public float specialDamageRatio = 0.5f;
+
+    [Tooltip("必殺技発動中の拘束時間(秒)")]
+    [SerializeField] float specialDuration = 1.0f;
+
+    [Header("必殺技演出（任意設定）")]
+    [Tooltip("必殺技発動時に鳴らす効果音（未設定なら鳴らさない）")]
+    [SerializeField] AudioClip specialSe;
+    [Tooltip("必殺技発動時に生成するパーティクル（未設定なら出さない）")]
+    [SerializeField] ParticleSystem specialEffectPrefab;
+    [SerializeField] Vector3 specialEffectOffset = new Vector3(0f, 1.0f, 0f);
+    [SerializeField] float specialEffectLifetime = 1.5f;
 
     //=====================================================
     // ★外部参照
@@ -215,6 +274,7 @@ public class Player : MonoBehaviour
     bool wantKick;
     bool wantGuard;
     bool wantThrow;
+    bool wantSpecial;   // L1（必殺技ボタン）
 
     bool isGuarding;                 // 仁王立ち中かどうか（被弾処理の分岐に使う）
     int guardComboCount;             // 仁王立ちで連続して耐えた回数
@@ -257,6 +317,21 @@ public class Player : MonoBehaviour
         }
     }
 
+    // ★追加：攻撃種別に応じた「基準攻撃力」を返す。
+    //   漢気ゲージやガード上昇分は含まない、Inspectorで設定した素の値。
+    //   新しい技を追加したときはここにもケースを追加すること。
+    int GetAttackPower(AttackType type)
+    {
+        switch (type)
+        {
+            case AttackType.Punch: return punchAtk;
+            case AttackType.Kick: return kickAtk;
+            case AttackType.UpKick: return upKickAtk;
+            case AttackType.DownKick: return downKickAtk;
+            default: return punchAtk; // 想定外の場合のフォールバック
+        }
+    }
+
     // ★追加：攻撃種別に応じて、自分が持っているHitEffectDataのどれを使うかを返す。
     //   被弾した相手側から「あなたの攻撃はどの擬音を使う？」と問い合わせられるためのメソッド。
     public HitEffectData GetHitEffectDataFor(AttackType type)
@@ -283,6 +358,9 @@ public class Player : MonoBehaviour
     {
         attackLandedThisAttack = true;
 
+        // 相手にダメージを与えた（攻撃を命中させた）ので、漢気ゲージを増やす
+        AddKankiGauge(gaugeGainOnHit);
+
         // ガード成功で上昇していた攻撃力は「次の攻撃が当たるまで」の効果なので、
         // 自分の攻撃が実際に相手へ命中したこのタイミングでバフとエフェクトを終了する。
         if (isGuardBuffed)
@@ -296,8 +374,11 @@ public class Player : MonoBehaviour
     // 各種コンポーネント・子オブジェクトの当たり判定の取得と初期化を行う
     void Start()
     {
-        //男気ゲージに使用する。素のatkを参照するために代入
-        baseAtk = atk;
+        //男気ゲージに使用する、補正前の素の攻撃力。
+        //攻撃の種類ごとに変わるため、実際の値は各攻撃発生時（EnterPunch/EnterKick）に設定し直す。
+        //ここでは戦闘開始直後の表示用にパンチの攻撃力で初期化しておく。
+        baseAtk = GetAttackPower(AttackType.Punch);
+        UpdateAtkByGauge();
         // 自分にアタッチされているPlayerInputコンポーネントを取得
         playerInput = GetComponent<PlayerInput>();
         // どのプレイヤー番号・どのデバイスが紐づいているかログ出力（デバッグ用）
@@ -439,11 +520,26 @@ public class Player : MonoBehaviour
         if (value.isPressed) wantThrow = true;
     }
 
+    // ★追加：L1ボタン（必殺技）押下時のコールバック
+    //   ※Input Actionsアセット側に"L1"という名前のActionを追加し、
+    //     コントローラーのL1ボタンを割り当てておく必要があります。
+    public void OnL1(InputValue value)
+    {
+        if (value.isPressed) wantSpecial = true;
+    }
+
     // Update is called once per frame
     // 毎フレームの更新処理。HPが尽きていれば復活チャレンジへ、
     // そうでなければ現在の状態に応じて「拘束中のタイマー消化」か「新しい行動の受付」を行う。
     void Update()
     {
+        // F2キーで漢気ゲージ専用デバッグログのON/OFFを切り替える
+        if (Keyboard.current != null && Keyboard.current.f2Key.wasPressedThisFrame)
+        {
+            kankiGaugeDebugLogEnabled = !kankiGaugeDebugLogEnabled;
+            Debug.Log($"[{PlayerName}] 漢気ゲージデバッグログ: {(kankiGaugeDebugLogEnabled ? "ON" : "OFF")}");
+        }
+
         // ヒットストップ処理を最優先で消化する。動けない間は他の入力・状態処理を一切行わない。
         if (hitStopTimer > 0f)
         {
@@ -496,6 +592,7 @@ public class Player : MonoBehaviour
         wantKick = false;
         wantGuard = false;
         wantThrow = false;
+        wantSpecial = false;
     }
 
     //-----------------------------------------------------
@@ -585,7 +682,7 @@ public class Player : MonoBehaviour
     //-----------------------------------------------------
     // 拘束のない状態（Idle/Move/Crouch）での入力処理
     //-----------------------------------------------------
-    // 優先度：ジャンプ ＞ 投げ ＞ パンチ ＞ キック ＞ 仁王立ち ＞ 移動
+    // 優先度：必殺技 ＞ ジャンプ ＞ 投げ ＞ パンチ ＞ キック ＞ 仁王立ち ＞ 移動
     void HandleFreeInput()
     {
         bool isCrouchInput = moveInput.y <= crouchInputThreshold;
@@ -601,6 +698,15 @@ public class Player : MonoBehaviour
         }
 
         // --- アクションボタン ---
+        if (wantSpecial)
+        {
+            if (CanUseSpecial())
+            {
+                EnterSpecial();
+                return;
+            }
+            GaugeDLog($"[{PlayerName}] 漢気ゲージが足りず必殺技を発動できません（現在{kankiGauge}/{specialRequiredGauge}）");
+        }
         if (wantJump && Jumpflag)
         {
             DoJump();
@@ -652,6 +758,41 @@ public class Player : MonoBehaviour
         // ※Space.Worldを指定し、向きが変わっても常に世界座標の指定方向へ移動するようにする
         transform.Translate(worldDirection * moveSpeed * Time.deltaTime, Space.World);
         FaceDirection(worldDirection);
+
+        // 漢気ゲージ：相手から離れる方向へ移動している間は減らす
+        ApplyGaugeLossIfRetreating(worldDirection);
+    }
+
+    // 相手の現在位置を基準に「今の移動方向が相手から離れる方向かどうか」を判定し、
+    // 離れる方向であれば漢気ゲージを1秒あたりgaugeLossOnRetreatだけ減らす。
+    void ApplyGaugeLossIfRetreating(Vector3 worldDirection)
+    {
+        Transform opponentTf = GetOpponentTransform();
+        if (opponentTf == null)
+        {
+            GaugeDLog($"[{PlayerName}] 後退判定スキップ：enemyPlayer/enemyのどちらもInspectorで未設定です。");
+            return;
+        }
+
+        Vector3 toOpponent = opponentTf.position - transform.position;
+        toOpponent.y = 0f;
+        if (toOpponent.sqrMagnitude < 0.0001f) return;
+
+        // 移動方向と「相手への方向」の内積が負＝相手から離れる方向へ動いている
+        float dot = Vector3.Dot(worldDirection.normalized, toOpponent.normalized);
+        GaugeDLog($"[{PlayerName}] 後退判定：dot={dot:F2}（負なら後退とみなす）");
+        if (dot < 0f)
+        {
+            ReduceKankiGauge(gaugeLossOnRetreat * Time.deltaTime);
+        }
+    }
+
+    // 対人戦(enemyPlayer)／対CPU戦(enemy)どちらの場合でも、相手のTransformを取得する
+    Transform GetOpponentTransform()
+    {
+        if (enemyPlayer != null) return enemyPlayer.transform;
+        if (enemy != null) return enemy.transform;
+        return null;
     }
 
     // 指定した世界座標方向へプレイヤーの向きを滑らかに回転させる
@@ -701,6 +842,10 @@ public class Player : MonoBehaviour
         stateTimer = punchDuration;
         attackLandedThisAttack = false; // 空振り判定用にリセット
 
+        // パンチの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映して攻撃力を確定する
+        baseAtk = GetAttackPower(AttackType.Punch);
+        UpdateAtkByGauge();
+
         if (Jumpflag)
         {
             //弱攻撃(パンチ)
@@ -730,7 +875,10 @@ public class Player : MonoBehaviour
             animator.SetTrigger("DownKick");
             RightFoot.enabled = true;
             RightLeg.enabled = true;
-            
+
+            // 下キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
+            baseAtk = GetAttackPower(AttackType.DownKick);
+            UpdateAtkByGauge();
         }
         else if (moveInput.y > upKickInputThreshold)
         {
@@ -739,6 +887,10 @@ public class Player : MonoBehaviour
             animator.SetTrigger("UpKick");
             RightFoot.enabled = true;
             RightLeg.enabled = true;
+
+            // 上キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
+            baseAtk = GetAttackPower(AttackType.UpKick);
+            UpdateAtkByGauge();
         }
         else
         {
@@ -748,6 +900,10 @@ public class Player : MonoBehaviour
             RightFoot.enabled = true;
             RightUpLeg.enabled = true;
             RightLeg.enabled = true;
+
+            // 通常キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
+            baseAtk = GetAttackPower(AttackType.Kick);
+            UpdateAtkByGauge();
         }
     }
 
@@ -780,7 +936,7 @@ public class Player : MonoBehaviour
             DLog("投げ成功");
             enemyPlayer.transform.Translate(0f, 0f, -0.0025f);      // 敵を少し引き寄せる
             enemyPlayer.animator.SetTrigger("Thrown");              // 敵に投げられアニメーションを再生させる
-            enemyPlayer.damege(5);                                  // 敵に固定ダメージ5を与える
+            enemyPlayer.damege(throwAtk);                           // 敵に投げのダメージ（Inspector設定値）を与える
             canThrow = false;                                       // 一度成功したら再度投げが発動しないようにする
         }
 
@@ -792,8 +948,67 @@ public class Player : MonoBehaviour
             DLog("投げ成功");
             enemyPlayer.transform.Translate(0f, 0f, -0.0025f);     // 敵を少し引き寄せる
             enemyPlayer.animator.SetTrigger("Thrown");             // 敵に投げられアニメーションを再生させる
-            enemyPlayer.damege(5);                                 // 敵に固定ダメージ5を与える
+            enemyPlayer.damege(throwAtk);                          // 敵に投げのダメージ（Inspector設定値）を与える
             canThrow = false;                                // 一度成功したら再度投げが発動しないようにする
+        }
+    }
+
+    // 現在の漢気ゲージで必殺技を発動できるかどうか
+    bool CanUseSpecial()
+    {
+        return kankiGauge >= specialRequiredGauge;
+    }
+
+    // 必殺技発動処理。相手の現在HPをspecialDamageRatioの割合だけ削り、
+    // 自分の漢気ゲージをspecialGaugeCost分消費する（ガード不可・必中）。
+    void EnterSpecial()
+    {
+        currentState = PlayerState.Special;
+        stateTimer = specialDuration;
+
+        // ★Animator Controller側に"Special"という名前のTriggerパラメータを追加しておくこと
+        animator.SetTrigger("Special");
+
+        if (se != null && specialSe != null)
+        {
+            se.PlayOneShot(specialSe);
+        }
+
+        if (specialEffectPrefab != null)
+        {
+            ParticleSystem fx = Instantiate(
+                specialEffectPrefab,
+                transform.position + specialEffectOffset,
+                Quaternion.Euler(-90f, 0f, 0f));
+            fx.Play();
+            Destroy(fx.gameObject, specialEffectLifetime);
+        }
+
+        ApplySpecialDamage();
+
+        // 自分の漢気ゲージを消費する
+        ReduceKankiGauge(specialGaugeCost);
+
+        DLog($"[{PlayerName}] 必殺技発動！（消費ゲージ={specialGaugeCost}）");
+    }
+
+    // 必殺技のダメージを対戦相手（対人：enemyPlayer／対CPU：enemy）へ適用する。
+    // ガード等の判定を一切通さない必中・固定割合ダメージ。
+    void ApplySpecialDamage()
+    {
+        if (enemyPlayer != null)
+        {
+            int dmg = Mathf.RoundToInt(enemyPlayer.HP * specialDamageRatio);
+            enemyPlayer.damege(dmg); // Player型なのでdamege()経由でHP減算＋UI更新
+            DLog($"[{PlayerName}] 必殺技命中：{enemyPlayer.PlayerName}に{dmg}ダメージ");
+        }
+        else if (enemy != null)
+        {
+            int dmg = Mathf.RoundToInt(enemy.HP * specialDamageRatio);
+            enemy.HP -= dmg;
+            if (enemy.HP < 0) enemy.HP = 0;
+            if (gameMNG != null) gameMNG.Enemy_ReduceHP(enemy.HP);
+            DLog($"[{PlayerName}] 必殺技命中：Enemy(CPU)に{dmg}ダメージ");
         }
     }
 
@@ -955,10 +1170,17 @@ public class Player : MonoBehaviour
         if (isGuarding)
         {
             // 仁王立ち（ガード）中に被弾した場合の処理
-            atk += attackerAtk;                  // ガード成功で自分の攻撃力に敵の攻撃力を上乗せする（次の自分の攻撃が当たるまで持続）
+            // ガード成功で「相手の攻撃力 × guardAtkBonusMultiplier」を自分の攻撃力に上乗せする
+            // （次の自分の攻撃が当たるまで持続。倍率はInspectorの「ガード成功時の攻撃力上昇設定」で調整可能）
+            int guardAtkBonus = Mathf.RoundToInt(attackerAtk * guardAtkBonusMultiplier);
+            atk += guardAtkBonus;
+            DLog($"[{PlayerName}] ガード成功による攻撃力上昇 +{guardAtkBonus}（相手攻撃力{attackerAtk} × 倍率{guardAtkBonusMultiplier}）");
             DLog("漢!!");
             se.PlayOneShot(MenBlock_se);       // ガード成功の効果音を再生
             HP -= attackerAtk / 2;                // ガード中はダメージを半減させる
+
+            // ガードに成功したので、自分の漢気ゲージを増やす
+            AddKankiGauge(gaugeGainOnGuard);
 
             // 攻撃力上昇中であることを示すエフェクトを出し続ける（次に自分の攻撃が当たるまで）
             isGuardBuffed = true;
@@ -1049,8 +1271,11 @@ public class Player : MonoBehaviour
         }
 
         //攻撃力を初期値に戻す（一度使ったらリセット）
-        if (isEnemyPlayerAttack) enemyPlayer.atk = 10;
-        else enemy.atk = 10;
+        // ★修正：以前は "= 10" で固定値に戻しており、攻撃の種類ごとの攻撃力や
+        //   漢気ゲージによる補正まで消えてしまっていた。ここではガード上昇分だけを
+        //   取り消し、ゲージ補正込みの本来の攻撃力に戻す。
+        if (isEnemyPlayerAttack) enemyPlayer.ResetAtkAfterHit();
+        else if (enemy != null) enemy.atk = 10; // ※Enemy側は未対応。同様の仕組みが必要なら要相談。
 
         if (HP < 0) HP = 0;
 
@@ -1104,39 +1329,50 @@ public class Player : MonoBehaviour
     //==============================================
     // ---- 漢気ゲージ操作 ----
     //==============================================
-    //プレイヤーに攻撃(パンチ・キック等)が当たった時にPlayer側から呼び出す想定の公開メソッド。
-    //※注意: 現在はUpdate()内でプレイヤーHPの減少を自動検知してゲージを増やしているため、
-    //   このメソッドを別途呼び出すと二重加算になります。Player.cs側から明示的に呼ぶ場合は、
-    //   Update()内のHP減少検知処理を削除するかコメントアウトしてください。
-    public void NotifyAttackLandedOnPlayer()
-    {
-        AddKankiGauge(gaugeGainOnHit);
-    }
+    // ★増減のタイミングまとめ：
+    //   増加：NotifyAttackLanded()（攻撃命中時） / OnTriggerEnterのガード成功時
+    //   減少：ApplyGaugeLossIfRetreating()（相手から離れる方向へ移動中、1秒あたり） / 必殺技発動時
 
     //漢気ゲージを増やす(上限は1本分の合計値でクランプ)
     public void AddKankiGauge(float amount)
     {
         float max = kankiGaugePerBar * kankiGaugeBarCount;
+        float before = kankiGauge;
         kankiGauge = Mathf.Clamp(kankiGauge + amount, 0f, max);
         UpdateAtkByGauge();
 
-        //ゲージUI(2本分のSlider)を更新
+        GaugeDLog($"[{PlayerName}] 漢気ゲージ増加：+{amount:F1}（{before:F1} → {kankiGauge:F1} / 上限{max:F1}）");
+
+        //ゲージUIを更新（このPlayerインスタンス自身のゲージ表示を更新する）
         if (gameMNG != null)
         {
             gameMNG.Player_UpdateKankiGauge();
+        }
+        else
+        {
+            GaugeDLog($"[{PlayerName}] gameMNGがnullのため漢気ゲージUIを更新できません。");
         }
     }
 
     //漢気ゲージを減らす(0未満にはならない)
     public void ReduceKankiGauge(float amount)
     {
+        float before = kankiGauge;
         kankiGauge = Mathf.Clamp(kankiGauge - amount, 0f, kankiGaugePerBar * kankiGaugeBarCount);
         UpdateAtkByGauge();
 
-        //ゲージUI(2本分のSlider)を更新
+        GaugeDLog($"[{PlayerName}] 漢気ゲージ減少：-{amount:F1}（{before:F1} → {kankiGauge:F1}）");
+
+        //ゲージUIを更新（このPlayerインスタンス自身のゲージ表示を更新する）
+        // ★修正：以前はEnemy(CPU)用のUI更新メソッドを誤って呼んでおり、
+        //   Player(P1/P2)の減少がゲージUIに反映されていなかった。
         if (gameMNG != null)
         {
-            gameMNG.Enemy_UpdateKankiGauge();
+            gameMNG.Player_UpdateKankiGauge();
+        }
+        else
+        {
+            GaugeDLog($"[{PlayerName}] gameMNGがnullのため漢気ゲージUIを更新できません。");
         }
     }
 
@@ -1145,6 +1381,14 @@ public class Player : MonoBehaviour
     {
         int filledBars = Mathf.FloorToInt(kankiGauge / kankiGaugePerBar);
         atk = Mathf.RoundToInt(baseAtk * (1f + atkPowerPerBar * filledBars));
+    }
+
+    // ★追加：ガード成功による一時的な攻撃力上昇分をクリアし、
+    //   漢気ゲージ補正だけを反映した本来の攻撃力に戻す。
+    //   自分の攻撃が相手に命中した直後（被弾側のOnTriggerEnterから）呼び出される想定。
+    public void ResetAtkAfterHit()
+    {
+        UpdateAtkByGauge();
     }
 
     //UI(Sliderなど)から参照するための、指定した本数目のゲージの充填率(0〜1)を返す

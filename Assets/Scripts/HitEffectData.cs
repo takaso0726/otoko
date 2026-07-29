@@ -39,4 +39,15 @@ public class HitEffectData : ScriptableObject
     [Header("軸")]
     [Tooltip("2D格闘ゲームならZ軸回転、3Dで奥行きを使うならY軸回転を使う")]
     public bool use2DRotation = true;
+
+    [Header("重複表示の制御")]
+    [Tooltip("ONの場合、この演出は同時に何個でも重ねて表示できる（従来通り）。" +
+             "OFFにすると、この演出データにつき同時に1個までしか表示されなくなる。")]
+    public bool allowOverlap = true;
+
+    [Tooltip("allowOverlapがOFFのときに使用。既存の演出が消えるまで残り何秒になったら、" +
+             "次の演出を出してよいかを指定する。0なら完全に消えきってから次を出す。" +
+             "例：lifeTimeが0.6秒でこの値が0.2秒なら、表示から0.4秒経過した時点で次を出せる。")]
+    [Min(0f)]
+    public float overlapAllowedBeforeEnd = 0f;
 }
