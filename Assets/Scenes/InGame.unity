@@ -219,23 +219,23 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.10533638
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.10533638
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.10533638
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -29.7
+      value: 4.4
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 0.8
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
       propertyPath: m_LocalPosition.z
@@ -269,10 +269,46 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -7382885020666045655, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d0b3df3d20b7ef44192bdcf2f2a78424, type: 2}
+    - target: {fileID: -7309971416397688805, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d0b3df3d20b7ef44192bdcf2f2a78424, type: 2}
+    - target: {fileID: -7030073410563601598, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d0b3df3d20b7ef44192bdcf2f2a78424, type: 2}
+    - target: {fileID: -6428265746574512492, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d0b3df3d20b7ef44192bdcf2f2a78424, type: 2}
+    - target: {fileID: -6011311773841583793, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d0b3df3d20b7ef44192bdcf2f2a78424, type: 2}
+    - target: {fileID: -2952593758778150944, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d0b3df3d20b7ef44192bdcf2f2a78424, type: 2}
     - target: {fileID: 919132149155446097, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
       propertyPath: m_Name
       value: kabukityou
       objectReference: {fileID: 0}
+    - target: {fileID: 2019535025941391448, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d0b3df3d20b7ef44192bdcf2f2a78424, type: 2}
+    - target: {fileID: 2804778959876268166, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d0b3df3d20b7ef44192bdcf2f2a78424, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects:
     - {fileID: 65702495048144492, guid: e400ca760e9c10e4c93404692579ae1b, type: 3}
@@ -903,6 +939,8 @@ MonoBehaviour:
   targets:
   - {fileID: 648027778}
   - {fileID: 1593231836}
+  centerHeightRatio: 0
+  characterHeightEstimate: 1.8
   followSmoothTime: 0.25
   baseOffset: {x: 10, y: 3, z: 0}
   minZoomDistance: 6
@@ -916,8 +954,9 @@ MonoBehaviour:
   guardImpactDistance: 3
   guardImpactCamHeight: 0.4
   guardImpactHorizontalAngle: -30
-  guardImpactFilmFromFront: 0
+  guardImpactCameraSide: 0
   guardImpactLookAtHeight: 1.9
+  guardImpactLookAtSideOffset: 0.3
   guardImpactMoveInSmoothTime: 0.08
   guardImpactHoldDuration: 0.6
   shakeBaseAmplitude: 0.1
@@ -6260,6 +6299,9 @@ MonoBehaviour:
   EnemyTransform: {fileID: 1593231836}
   cameraController: {fileID: 330585548}
   BGM: {fileID: 8300000, guid: 78215c0163ae6f14e9dbae9023719665, type: 3}
+  gameOverSceneName: GameOver
+  gameClearSceneName: GameClear
+  inGame1v1ResultSceneName: Judgment
   gameOverTime: 2
 --- !u!4 &1702718112
 Transform:
