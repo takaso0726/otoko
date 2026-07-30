@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -5,6 +6,12 @@ using UnityEngine.UI;
 
 public class GameMNG : MonoBehaviour
 {
+    // ★追加：プレイヤーのHPが減った（＝攻撃が当たった）瞬間に、外部（観客スクリプト等）へ
+    //   通知するイベント。引数は「被弾したプレイヤーのPlayerName」「減少後のHP」。
+    //   ガード成功時もPlayer_ReduceHP経由でここを通るため、呼び出し側でガード反応と
+    //   同一フレームかどうかを見て使い分けることを想定している。
+    public event Action<string, int> OnPlayerHpReduced;
+
     //=======================================================================
     //【Character】プレイヤー・エネミー
     //=======================================================================
@@ -19,14 +26,10 @@ public class GameMNG : MonoBehaviour
     public Slider P_HPbar;          // 1人目のHPゲージ
     public Slider E_HPbar;          // 2人目/敵のHPゲージ
 
-    [Header("漢気ゲージ表示(プレイヤー側・2本分)")]
-    [Tooltip("Sliderのmin=0, max=1で設定してください(GetGaugeFillRatioが0〜1を返すため)")]
-    public Slider P1_KankiGaugeBar;  // player1の漢気ゲージ1本目
-    public Slider P1_KankiGaugeBar2; // player1の漢気ゲージ2本目
-    public Slider P2_KankiGaugeBar;  // player2の漢気ゲージ1本目
-    public Slider P2_KankiGaugeBar2; // player2の漢気ゲージ2本目
-
     [Header("漢気ゲージ表示(敵側・2本分)")]
+    [Tooltip("Sliderのmin=0, max=1で設定してください(GetGaugeFillRatioが0〜1を返すため)")]
+    public Slider P1_KankiGaugeBar; // player1の漢気ゲージ1本目
+    public Slider P2_KankiGaugeBar; // player2の漢気ゲージ1本目
     public Slider E_KankiGaugeBar1; // 敵の漢気ゲージ1本目
     public Slider E_KankiGaugeBar2; // 敵の漢気ゲージ2本目
 
@@ -211,6 +214,9 @@ public class GameMNG : MonoBehaviour
     // プレイヤーのHPを表示
     public void Player_ReduceHP(int hp, string PlayerName)
     {
+        // ★追加：外部へ「攻撃が当たってHPが減った」ことを通知
+        OnPlayerHpReduced?.Invoke(PlayerName, hp);
+
         if (PlayerName == "P1") P1_ReduceHP(hp);
         if (PlayerName == "P2") P2_ReduceHP(hp);
     }
@@ -278,18 +284,13 @@ public class GameMNG : MonoBehaviour
     // （Enemy_UpdateKankiGauge()と同じ設計）。
     public void Player_UpdateKankiGauge()
     {
-        // p1側：1本目・2本目それぞれの充填率(0〜1)をSliderへ反映
-        if (p1 != null)
+        if (p1 != null && P1_KankiGaugeBar != null)
         {
-            if (P1_KankiGaugeBar != null) P1_KankiGaugeBar.value = p1.GetGaugeFillRatio(0);
-            if (P1_KankiGaugeBar2 != null) P1_KankiGaugeBar2.value = p1.GetGaugeFillRatio(1);
+            P1_KankiGaugeBar.value = p1.GetGaugeFillRatio(0);
         }
-
-        // p2側：1本目・2本目それぞれの充填率(0〜1)をSliderへ反映
-        if (p2 != null)
+        if (p2 != null && P2_KankiGaugeBar != null)
         {
-            if (P2_KankiGaugeBar != null) P2_KankiGaugeBar.value = p2.GetGaugeFillRatio(0);
-            if (P2_KankiGaugeBar2 != null) P2_KankiGaugeBar2.value = p2.GetGaugeFillRatio(1);
+            P2_KankiGaugeBar.value = p2.GetGaugeFillRatio(0);
         }
     }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering; // 被写界深度(背景ボケ)用のVolume制御に使用
@@ -20,6 +21,11 @@ public enum GuardImpactCameraSide
 
 public class FightingCameraController : MonoBehaviour
 {
+    // ★追加：仁王立ちで攻撃を受け止めた瞬間に発火するイベント。
+    //   引数は「受け止めたキャラのTransform」「連続ガード成功回数」。
+    //   観客スクリプト等、カメラ以外のスクリプトからこの瞬間を購読したい場合に使う。
+    public event Action<Transform, int> OnGuardImpactStart;
+
     [Header("追従対象")]
     [Tooltip("現在出場中のキャラクターのTransformリスト。動的に増減してOK")]
     public List<Transform> targets = new List<Transform>();
@@ -366,6 +372,10 @@ public class FightingCameraController : MonoBehaviour
     public void OnGuardImpact(Transform target, int comboCount)
     {
         if (target == null) return;
+
+        // ★追加：観客スクリプト等、外部へ「仁王立ちで受け止めた瞬間」を通知するイベント。
+        //   comboCountを渡すので、連続で耐えるほど盛り上がりを強くする、といった演出に使える。
+        OnGuardImpactStart?.Invoke(target, Mathf.Max(1, comboCount));
 
         _isGuardImpactMode = true;
         _guardImpactTarget = target;
