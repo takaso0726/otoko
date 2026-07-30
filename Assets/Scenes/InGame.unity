@@ -661,6 +661,33 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 2559285840627121667, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
   m_PrefabInstance: {fileID: 1190802857}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &227527645 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 326522464027483504, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+  m_PrefabInstance: {fileID: 1580052266}
+  m_PrefabAsset: {fileID: 0}
+--- !u!95 &227527646
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227527645}
+  m_Enabled: 1
+  m_Avatar: {fileID: 9000000, guid: ac44c3df7a3078348be7f530c2375983, type: 3}
+  m_Controller: {fileID: 9100000, guid: ab82da0fab045d742bba52774ae802f3, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!4 &235499299 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2559285840627121667, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
@@ -2724,6 +2751,12 @@ MonoBehaviour:
   downKickDuration: 0.5
   guardDuration: 0.15
   throwDuration: 1.5
+  punchAtk: 10
+  kickAtk: 10
+  upKickAtk: 10
+  downKickAtk: 10
+  throwAtk: 5
+  guardAtkBonusMultiplier: 1
   rebornTimeLimit: 5
   rebornHp: 30
   mashThresholdBase: 11
@@ -2754,8 +2787,17 @@ MonoBehaviour:
   kankiGaugePerBar: 100
   kankiGaugeBarCount: 2
   gaugeGainOnHit: 15
+  gaugeGainOnGuard: 10
   gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
+  specialRequiredGauge: 200
+  specialGaugeCost: 200
+  specialDamageRatio: 0.5
+  specialDuration: 1
+  specialSe: {fileID: 0}
+  specialEffectPrefab: {fileID: 0}
+  specialEffectOffset: {x: 0, y: 1, z: 0}
+  specialEffectLifetime: 1.5
   enemy: {fileID: 1593231832}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 648027774}
@@ -4628,6 +4670,12 @@ MonoBehaviour:
   downKickDuration: 0.5
   guardDuration: 0.5
   throwDuration: 1.5
+  punchAtk: 10
+  kickAtk: 10
+  upKickAtk: 10
+  downKickAtk: 10
+  throwAtk: 5
+  guardAtkBonusMultiplier: 1
   rebornTimeLimit: 5
   rebornHp: 30
   mashThresholdBase: 11
@@ -4658,8 +4706,17 @@ MonoBehaviour:
   kankiGaugePerBar: 100
   kankiGaugeBarCount: 2
   gaugeGainOnHit: 15
+  gaugeGainOnGuard: 10
   gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
+  specialRequiredGauge: 200
+  specialGaugeCost: 200
+  specialDamageRatio: 0.5
+  specialDuration: 1
+  specialSe: {fileID: 0}
+  specialEffectPrefab: {fileID: 0}
+  specialEffectOffset: {x: 0, y: 1, z: 0}
+  specialEffectLifetime: 1.5
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
@@ -4699,6 +4756,80 @@ MonoBehaviour:
   m_DefaultActionMap: 
   m_SplitScreenIndex: -1
   m_Camera: {fileID: 0}
+--- !u!1 &1206727500
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1206727502}
+  - component: {fileID: 1206727501}
+  m_Layer: 0
+  m_Name: AudienceController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1206727501
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1206727500}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 59dde38889e5eee47ba8388a8bd1060e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AudienceController
+  gameMNG: {fileID: 1702718111}
+  targetPlayers:
+  - {fileID: 648027777}
+  audienceAnimator: {fileID: 227527646}
+  cameraController: {fileID: 330585548}
+  bigCheerComboThreshold: 3
+  reactions:
+  - situation: 0
+    clipReactions: 03000000
+  - situation: 1
+    clipReactions: 01000000
+  - situation: 2
+    clipReactions: 03000000
+  - situation: 3
+    clipReactions: 02000000
+  - situation: 4
+    clipReactions: 02000000
+  - situation: 5
+    clipReactions: 03000000
+  - situation: 6
+    clipReactions: 020000000000000003000000
+  isChangebleParamName: isChangeble
+  goClapParamName: goClap
+  goCoolParamName: goCool
+  goCallParamName: goCall
+  idleStateName: Idle
+  enableIdleVariations: 1
+  idleVariationIntervalRange: {x: 1, y: 5}
+  reactionSafetyTimeout: 10
+  enableDebugLog: 0
+--- !u!4 &1206727502
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1206727500}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -5.64233, y: 3.22901, z: -4.16254}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1226959107
 GameObject:
   m_ObjectHideFlags: 0
@@ -5469,6 +5600,12 @@ MonoBehaviour:
   downKickDuration: 0.5
   guardDuration: 0.5
   throwDuration: 1.5
+  punchAtk: 10
+  kickAtk: 10
+  upKickAtk: 10
+  downKickAtk: 10
+  throwAtk: 5
+  guardAtkBonusMultiplier: 1
   rebornTimeLimit: 5
   rebornHp: 30
   mashThresholdBase: 11
@@ -5499,8 +5636,17 @@ MonoBehaviour:
   kankiGaugePerBar: 100
   kankiGaugeBarCount: 2
   gaugeGainOnHit: 15
+  gaugeGainOnGuard: 10
   gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
+  specialRequiredGauge: 200
+  specialGaugeCost: 200
+  specialDamageRatio: 0.5
+  specialDuration: 1
+  specialSe: {fileID: 0}
+  specialEffectPrefab: {fileID: 0}
+  specialEffectOffset: {x: 0, y: 1, z: 0}
+  specialEffectLifetime: 1.5
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
@@ -5595,6 +5741,82 @@ CapsuleCollider:
   m_Height: 1
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1001 &1580052266
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 326522464027483504, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_Name
+      value: AnimationIdle
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -5.6
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.28
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -4.22
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.85600525
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.51696706
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 62.258
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 326522464027483504, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 227527646}
+  m_SourcePrefab: {fileID: 100100000, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
 --- !u!1 &1593231831 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
@@ -7377,3 +7599,5 @@ SceneRoots:
   - {fileID: 477244466}
   - {fileID: 1436067440}
   - {fileID: 1702718112}
+  - {fileID: 1580052266}
+  - {fileID: 1206727502}
