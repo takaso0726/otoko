@@ -1720,7 +1720,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -261.5, y: 166.8}
+  m_AnchoredPosition: {x: -260.5, y: 166.8}
   m_SizeDelta: {x: 450, y: 80}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &423841882
@@ -2005,7 +2005,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 660082963}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.544424, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -2013,7 +2013,7 @@ RectTransform:
   - {fileID: 1138431687}
   - {fileID: 1813918561}
   m_Father: {fileID: 1846907281}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 200, y: 200}
@@ -3076,6 +3076,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
   enableDebugLog: 1
+  enableF2DebugKey: 1
+  enableF4DebugKey: 1
+  enableF5DebugKey: 1
+  enableF6DebugKey: 0
   PlayerName: P1
   PLayerTagName: 
   moveSpeed: 5
@@ -3083,6 +3087,9 @@ MonoBehaviour:
   moveInputThreshold: 0.03
   crouchInputThreshold: -0.43
   upKickInputThreshold: 0.25
+  minMoveAnimSpeed: 0.6
+  maxMoveAnimSpeed: 1.4
+  minMoveSpeedRatio: 0.4
   force: {x: 0, y: 300, z: 0}
   Jumpflag: 0
   HP: 1000
@@ -3145,6 +3152,10 @@ MonoBehaviour:
   enemyPlayer: {fileID: 1873253615}
   animator: {fileID: 956537541}
   fightingCamera: {fileID: 330585548}
+  showMashPrompt: 1
+  mashPromptText: "B\u30DC\u30BF\u30F3\u3092\u9023\u6253\u3057\u308D\uFF01"
+  mashPromptFontSize: 64
+  mashPromptColor: {r: 0.8773585, g: 0.80975777, b: 0.028969401, a: 1}
 --- !u!54 &956537539
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -4613,6 +4624,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
   enableDebugLog: 1
+  enableF2DebugKey: 1
+  enableF4DebugKey: 0
+  enableF5DebugKey: 0
+  enableF6DebugKey: 0
   PlayerName: 
   PLayerTagName: 
   moveSpeed: 0.015
@@ -4620,6 +4635,9 @@ MonoBehaviour:
   moveInputThreshold: 0.03
   crouchInputThreshold: -0.43
   upKickInputThreshold: 0.25
+  minMoveAnimSpeed: 0.6
+  maxMoveAnimSpeed: 1.4
+  minMoveSpeedRatio: 0.4
   force: {x: 0, y: 300, z: 0}
   Jumpflag: 0
   HP: 0
@@ -4682,6 +4700,10 @@ MonoBehaviour:
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
   fightingCamera: {fileID: 0}
+  showMashPrompt: 1
+  mashPromptText: "B\u30DC\u30BF\u30F3\u3092\u9023\u6253\u3057\u308D\uFF01"
+  mashPromptFontSize: 64
+  mashPromptColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!4 &1202966597 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 3ee547485a232eb408aeca940bb7724b, type: 3}
@@ -5634,6 +5656,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
   enableDebugLog: 1
+  enableF2DebugKey: 1
+  enableF4DebugKey: 0
+  enableF5DebugKey: 0
+  enableF6DebugKey: 0
   PlayerName: 
   PLayerTagName: 
   moveSpeed: 0.015
@@ -5641,6 +5667,9 @@ MonoBehaviour:
   moveInputThreshold: 0.03
   crouchInputThreshold: -0.43
   upKickInputThreshold: 0.25
+  minMoveAnimSpeed: 0.6
+  maxMoveAnimSpeed: 1.4
+  minMoveSpeedRatio: 0.4
   force: {x: 0, y: 300, z: 0}
   Jumpflag: 0
   HP: 0
@@ -5703,6 +5732,10 @@ MonoBehaviour:
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
   fightingCamera: {fileID: 0}
+  showMashPrompt: 1
+  mashPromptText: "B\u30DC\u30BF\u30F3\u3092\u9023\u6253\u3057\u308D\uFF01"
+  mashPromptFontSize: 64
+  mashPromptColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!114 &1475408694
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6808,7 +6841,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -139, y: 166.8}
+  m_AnchoredPosition: {x: -138.6, y: 166.8}
   m_SizeDelta: {x: 450, y: 80}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1704149225
@@ -7711,7 +7744,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1764476238}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.27052027, y: 0.40562442, z: 1}
   m_ConstrainProportionsScale: 0
@@ -7719,10 +7752,10 @@ RectTransform:
   - {fileID: 1487192488}
   - {fileID: 1532762761}
   m_Father: {fileID: 1846907281}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 261.2, y: 166.80003}
+  m_AnchoredPosition: {x: 261.1, y: 166.80003}
   m_SizeDelta: {x: 450, y: 80}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1764476240
@@ -8327,6 +8360,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
   enableDebugLog: 1
+  enableF2DebugKey: 0
+  enableF4DebugKey: 0
+  enableF5DebugKey: 0
+  enableF6DebugKey: 1
   PlayerName: P2
   PLayerTagName: 
   moveSpeed: 5
@@ -8334,6 +8371,9 @@ MonoBehaviour:
   moveInputThreshold: 0.03
   crouchInputThreshold: -0.43
   upKickInputThreshold: 0.25
+  minMoveAnimSpeed: 0.6
+  maxMoveAnimSpeed: 1.4
+  minMoveSpeedRatio: 0.4
   force: {x: 0, y: 300, z: 0}
   Jumpflag: 0
   HP: 1000
@@ -8396,6 +8436,10 @@ MonoBehaviour:
   enemyPlayer: {fileID: 956537537}
   animator: {fileID: 1873253612}
   fightingCamera: {fileID: 330585548}
+  showMashPrompt: 1
+  mashPromptText: "B\u30DC\u30BF\u30F3\u3092\u9023\u6253\u3057\u308D\uFF01"
+  mashPromptFontSize: 64
+  mashPromptColor: {r: 0.8773585, g: 0.80975777, b: 0.028969401, a: 1}
 --- !u!4 &1873253616 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
@@ -8725,7 +8769,7 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2037207750}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.27052027, y: 0.40562442, z: 1}
   m_ConstrainProportionsScale: 0
@@ -8733,10 +8777,10 @@ RectTransform:
   - {fileID: 746999762}
   - {fileID: 815543625}
   m_Father: {fileID: 1846907281}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 139, y: 166.80003}
+  m_AnchoredPosition: {x: 138.8, y: 166.80003}
   m_SizeDelta: {x: 450, y: 80}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2037207752

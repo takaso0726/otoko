@@ -52,6 +52,19 @@ public class Player : MonoBehaviour
     [Header("デバッグ設定")]
     [SerializeField] bool enableDebugLog = true; // trueの間だけ本スクリプト内のDebug.Logを出力する（Debug.LogErrorは不具合検知のため常時出力）
 
+    // ★変更：F2/F4/F5/F6の各デバッグキーを、キャラクターごとにInspectorでON/OFF選択できるようにする。
+    //   以前はF4/F5がPlayerName=="P1"固定、F6は専用のisAlwaysGuardDebugTargetという別名の変数だったが、
+    //   命名を統一し、4つとも同じ仕組み（チェックボックスON＝そのキーの対象）で扱う。
+    [Header("デバッグキー 有効設定（キャラクターごとに選択可能）")]
+    [Tooltip("ONにすると、このキャラクターでF2キー（漢気ゲージデバッグログのON/OFF切替）が使えます。")]
+    [SerializeField] bool enableF2DebugKey = true;
+    [Tooltip("ONにすると、このキャラクターでF4キー（ダウン中／Dead中からの強制復活）が使えます。")]
+    [SerializeField] bool enableF4DebugKey = false;
+    [Tooltip("ONにすると、このキャラクターでF5キー（HPを強制的に0にする）が使えます。")]
+    [SerializeField] bool enableF5DebugKey = false;
+    [Tooltip("ONにすると、このキャラクターでF6キー（常時仁王立ちデバッグモード）が使えます。")]
+    [SerializeField] bool enableF6DebugKey = false;
+
     // 本スクリプト内のDebug.Log呼び出しはすべてこのメソッド経由にする。
     // enableDebugLogをfalseにすればインスペクターから一括でログ出力を止められる。
     void DLog(string message)
@@ -84,6 +97,19 @@ public class Player : MonoBehaviour
     [SerializeField] float moveInputThreshold = 0.03f;    // 左右移動と判定するスティックの入力量
     [SerializeField] float crouchInputThreshold = -0.43f; // しゃがみ／下キックと判定するスティックの下入力量
     [SerializeField] float upKickInputThreshold = 0.25f;  // 上キックと判定するスティックの上入力量
+
+    // ★追加：前進／後退アニメーション（frontMove / BackMove）の再生速度を、
+    //   スティックの倒し具合（moveInput.xの絶対値）に応じて変化させるための範囲設定。
+    //   Animator側で"MoveSpeedMultiplier"という名前のFloatパラメータを作成し、
+    //   frontMove/BackMoveステートのSpeedにこのパラメータを乗算設定しておくこと（設定方法は後述）。
+    [Header("移動アニメーション速度設定")]
+    [SerializeField] float minMoveAnimSpeed = 0.6f;  // スティックを少しだけ倒した時の再生速度倍率
+    [SerializeField] float maxMoveAnimSpeed = 1.4f;  // スティックを最大まで倒した時の再生速度倍率
+
+    // ★追加：実際の移動速度（moveSpeed）もアナログ入力量に応じて可変にするための倍率設定。
+    //   スティックを軽く倒した時にmoveSpeedが0近くまで下がってしまうと「動いていないように見える」ため、
+    //   最低でもmoveSpeedのminMoveSpeedRatio倍は出るようにし、最大までいくとmoveSpeedそのまま(=1.0倍)にする。
+    [SerializeField] [Range(0f, 1f)] float minMoveSpeedRatio = 0.4f; // 入力が最小(閾値ギリギリ)の時のmoveSpeedに対する割合
 
     //=====================================================
     // ★ジャンプ
@@ -277,7 +303,18 @@ public class Player : MonoBehaviour
     bool wantSpecial;   // L1（必殺技ボタン）
 
     bool isGuarding;                 // 仁王立ち中かどうか（被弾処理の分岐に使う）
+
+    // ★追加：しゃがみの見た目（コライダー・アニメーター）をスティック下入力に直結させて追跡するフラグ。
+    //   currentState（状態機械）とは独立して管理する。詳細はSyncCrouchVisual()のコメントを参照。
+    bool isCrouchVisual;
+
+    // ★追加：frontMove/BackMoveのTriggerを「移動を開始した瞬間・方向が切り替わった瞬間」だけ
+    //   発火させるための直近の移動方向記録。毎フレームSetTriggerすると同じアニメが再生し直され続けてしまう。
+    enum MoveDirection { None, Forward, Backward }
+    MoveDirection lastMoveDir = MoveDirection.None;
     int guardComboCount;             // 仁王立ちで連続して耐えた回数
+    // ★追加：F6キーでON/OFFする、常時仁王立ちデバッグモードの現在の状態
+    private bool debugAlwaysGuard = false;
     bool rebornCamStarted;           // 根性復活のクローズアップカメラを開始済みか
     bool canThrow = true;            // 投げの多重発生を防ぐフラグ
 
@@ -533,11 +570,80 @@ public class Player : MonoBehaviour
     // そうでなければ現在の状態に応じて「拘束中のタイマー消化」か「新しい行動の受付」を行う。
     void Update()
     {
-        // F2キーで漢気ゲージ専用デバッグログのON/OFFを切り替える
+        // ★修正：しゃがみの見た目（コライダー・アニメーター）は、
+        //   currentState（状態機械）を経由せず、毎フレーム「スティック下入力の有無」だけで直接同期する。
+        //   以前はEnterCrouch()内でcurrentStateとコライダー/アニメーターを同時に変更していたため、
+        //   しゃがみ中にキック等のボタン入力でcurrentStateがCrouch以外へ上書きされると、
+        //   その後スティックを離してもExitCrouch()が呼ばれず、しゃがみ見た目だけが残り続ける不具合があった。
+        //   ダウン中／Dead中はコライダー変更で見た目が破綻するので対象外にする。
+        if (currentState != PlayerState.KnockedDown && currentState != PlayerState.Dead)
+        {
+            SyncCrouchVisual(moveInput.y <= crouchInputThreshold);
+        }
+
+        // F2キーで漢気ゲージ専用デバッグログのON/OFFを切り替える（対象キャラクターはenableF2DebugKeyで選択）
         if (Keyboard.current != null && Keyboard.current.f2Key.wasPressedThisFrame)
         {
-            kankiGaugeDebugLogEnabled = !kankiGaugeDebugLogEnabled;
-            Debug.Log($"[{PlayerName}] 漢気ゲージデバッグログ: {(kankiGaugeDebugLogEnabled ? "ON" : "OFF")}");
+            if (enableF2DebugKey)
+            {
+                kankiGaugeDebugLogEnabled = !kankiGaugeDebugLogEnabled;
+                Debug.Log($"[{PlayerName}] 漢気ゲージデバッグログ: {(kankiGaugeDebugLogEnabled ? "ON" : "OFF")}");
+            }
+            else
+            {
+                DLog($"[{PlayerName}] F2キーを検知しましたが、enableF2DebugKeyがOFFのため無視します。");
+            }
+        }
+
+        // ★デバッグ：F5キーでHPを強制的に0にする
+        //   F4の強制復活をテストする際、わざわざ相手の攻撃を受けてダウンさせる手間を省くためのキー。
+        //   対象キャラクターはInspectorのenableF5DebugKeyで選択する。
+        if (Keyboard.current != null && Keyboard.current.f5Key.wasPressedThisFrame)
+        {
+            if (enableF5DebugKey)
+            {
+                HP = 0;
+                Debug.Log($"[{PlayerName}] [デバッグ]F5キーによりHPを強制的に0にしました");
+
+                //UIにHPを反映させるように指示
+                if (gameMNG != null)
+                {
+                    gameMNG.Player_ReduceHP(HP, PlayerName);
+                }
+            }
+            else
+            {
+                // 対象外のPlayerインスタンスでもF5押下自体は検知されるため、
+                // 意図的に無視していることが分かるようログを残す。
+                DLog($"[{PlayerName}] F5キーを検知しましたが、enableF5DebugKeyがOFFのため無視します。");
+            }
+        }
+
+        // ★F6キーで常時仁王立ち（ガード）デバッグモードをON/OFFする
+        //   対象キャラクターはInspectorのenableF6DebugKeyチェックボックスで選択する。
+        if (Keyboard.current != null && Keyboard.current.f6Key.wasPressedThisFrame)
+        {
+            if (enableF6DebugKey)
+            {
+                debugAlwaysGuard = !debugAlwaysGuard;
+                Debug.Log($"[{PlayerName}] [デバッグ]常時仁王立ちモード: {(debugAlwaysGuard ? "ON" : "OFF")}");
+
+                if (!debugAlwaysGuard)
+                {
+                    // OFFにした瞬間、通常状態へきちんと戻す（TickBusyStateの終了処理と同じ内容）
+                    DisableAllHitboxes();
+                    isGuarding = false;
+                    canThrow = true;
+                    currentState = PlayerState.Idle;
+                    stateTimer = 0f;
+                }
+            }
+            else
+            {
+                // 対象外のPlayerインスタンスでもF6押下自体は検知されるため、
+                // 意図的に無視していることが分かるようログを残す。
+                DLog($"[{PlayerName}] F6キーを検知しましたが、enableF6DebugKeyがOFFのため無視します。");
+            }
         }
 
         // ヒットストップ処理を最優先で消化する。動けない間は他の入力・状態処理を一切行わない。
@@ -555,6 +661,26 @@ public class Player : MonoBehaviour
         // HP判定・死亡処理は、コントローラーの有無に関係なく常に実行する
         if (HP <= 0)
         {
+            // ★デバッグ：F4キーでダウン中／Dead中のキャラクターを強制的に復活させる
+            //   対象キャラクターはInspectorのenableF4DebugKeyで選択する。
+            //   ※以前はcurrentState != Dead を条件にしていたが、復活チャレンジの制限時間切れで
+            //     Dead状態に入った後はF4を押しても一切反応しなくなっていたため、その条件を撤廃した。
+            if (Keyboard.current != null && Keyboard.current.f4Key.wasPressedThisFrame)
+            {
+                if (enableF4DebugKey)
+                {
+                    ForceRebornDebug();
+                    ClearInputIntents();
+                    return;
+                }
+                else
+                {
+                    // 対象外のPlayerインスタンスでもF4押下自体は検知されるため、
+                    // 意図的に無視していることが分かるようログを残す。
+                    DLog($"[{PlayerName}] F4キーを検知しましたが、enableF4DebugKeyがOFFのため無視します。");
+                }
+            }
+
             if (currentState != PlayerState.Dead)
             {
                 HandleKnockedDown();
@@ -565,6 +691,15 @@ public class Player : MonoBehaviour
         // ここから下は「操作入力の受付」なので、コントローラー未割り当てなら止める
         if (playerInput != null && !playerInput.enabled)
         {
+            ClearInputIntents();
+            return;
+        }
+
+        // ★追加：F6デバッグモードがONの間は、通常の入力処理を行わず毎フレーム強制的に仁王立ち状態を維持する
+        if (debugAlwaysGuard)
+        {
+            currentState = PlayerState.Guard;
+            isGuarding = true;
             ClearInputIntents();
             return;
         }
@@ -593,6 +728,54 @@ public class Player : MonoBehaviour
         wantGuard = false;
         wantThrow = false;
         wantSpecial = false;
+    }
+
+    //-----------------------------------------------------
+    // ダウン中の連打プロンプト表示
+    //-----------------------------------------------------
+    // ダウン（根性復活チャレンジ）中だけ、画面に大きく連打を促すメッセージを表示する。
+    // ※OnGUIによる簡易実装のため、split-screen等で複数Playerが同時に描画される構成の場合は
+    //   表示位置が重なる可能性がある。その場合はCanvas+UI Textでの実装に置き換えること。
+    [Header("復活連打メッセージ設定")]
+    [SerializeField] bool showMashPrompt = true;               // ダウン中に連打メッセージを表示するか
+    [SerializeField] string mashPromptText = "Bボタンを連打しろ！"; // 表示する文言
+    [SerializeField] int mashPromptFontSize = 64;               // 文字サイズ
+    [SerializeField] Color mashPromptColor = Color.yellow;      // 文字色
+
+    void OnGUI()
+    {
+        if (!showMashPrompt) return;
+        if (currentState != PlayerState.KnockedDown) return;
+
+        // 明滅させて視認性・緊張感を出す
+        float blink = 0.6f + 0.4f * Mathf.Sin(Time.time * 10f);
+
+        GUIStyle style = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = mashPromptFontSize,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter,
+        };
+
+        Color baseColor = mashPromptColor;
+        style.normal.textColor = new Color(baseColor.r, baseColor.g, baseColor.b, blink);
+
+        float width = 800f;
+        float height = 120f;
+        Rect rect = new Rect((Screen.width - width) / 2f, Screen.height * 0.15f, width, height);
+
+        // 縁取り（黒）を少しずらして重ね描きし、背景が明るくても読めるようにする
+        GUIStyle outlineStyle = new GUIStyle(style)
+        {
+            normal = { textColor = new Color(0f, 0f, 0f, blink) }
+        };
+        Vector2[] offsets = { new Vector2(-2, -2), new Vector2(2, -2), new Vector2(-2, 2), new Vector2(2, 2) };
+        foreach (var offset in offsets)
+        {
+            GUI.Label(new Rect(rect.x + offset.x, rect.y + offset.y, rect.width, rect.height), mashPromptText, outlineStyle);
+        }
+
+        GUI.Label(rect, mashPromptText, style);
     }
 
     //-----------------------------------------------------
@@ -687,7 +870,7 @@ public class Player : MonoBehaviour
     {
         bool isCrouchInput = moveInput.y <= crouchInputThreshold;
 
-        // --- しゃがみの見た目切り替え（アナログ値なので毎フレーム判定）---
+        // --- しゃがみの状態遷移（見た目の同期は毎フレームUpdate冒頭のSyncCrouchVisual()が別途担当）---
         if (isCrouchInput && currentState != PlayerState.Crouch)
         {
             EnterCrouch();
@@ -747,16 +930,57 @@ public class Player : MonoBehaviour
             else if (currentState == PlayerState.Move)
             {
                 currentState = PlayerState.Idle;
+                lastMoveDir = MoveDirection.None; // 次に動き出した時、必ずTriggerが再発火するようにリセット
             }
         }
+        //動いていないときはアニメーターをMoveをfalseにする
+        if(PlayerState.Idle == currentState)
+        {
+            animator.SetBool("Move", false);
+        }
+    }
+
+    // ★追加：アクション（パンチ・キック・ガード・投げ・必殺技・ジャンプ）へ遷移する際に、
+    //   Animatorの"Move"boolをOFFにするための共通処理。
+    //   これを呼ばないと、移動中にアクションボタンを押した瞬間、状態(currentState)側は
+    //   正しくアクションへ切り替わっているのに、Animator側だけ"Move"=trueが残り続け、
+    //   移動アニメーションが優先されているように見えてしまう。
+    //   合わせてlastMoveDirもリセットし、アクション終了後に再度動き出した時、
+    //   Move()側のTrigger発火判定（currentState != Moveの分岐）が正しく効くようにする。
+    void StopMoveAnimation()
+    {
+        animator.SetBool("Move", false);
+        lastMoveDir = MoveDirection.None;
     }
 
     // プレイヤーを指定方向へ移動させ、その方向を向かせる
     void Move(Vector3 worldDirection)
     {
+        bool isForward = worldDirection == Vector3.forward;
+        MoveDirection newDir = isForward ? MoveDirection.Forward : MoveDirection.Backward;
+
+        // ★追加：移動を開始した瞬間、または移動方向が切り替わった瞬間だけTriggerを発火する
+        //   （毎フレーム発火させると同じアニメーションが再生し直され続けてカクつくため）
+        if (currentState != PlayerState.Move || newDir != lastMoveDir)
+        {
+            animator.SetBool("Move", true);
+            lastMoveDir = newDir;
+        }
+
+        // ★追加：スティックの倒し具合（0〜1）に応じて、移動アニメーションの再生速度を変化させる
+        //   moveInput.xの絶対値をそのまま「移動量」として扱い、minMoveAnimSpeed〜maxMoveAnimSpeedの範囲へ変換する
+        float inputMagnitude = Mathf.Clamp01(Mathf.Abs(moveInput.x));
+        float animSpeed = Mathf.Lerp(minMoveAnimSpeed, maxMoveAnimSpeed, inputMagnitude);
+        animator.SetFloat("MoveSpeedMultiplier", animSpeed);
+
+        // ★追加：実際の移動速度（moveSpeed）も同じinputMagnitudeを使って可変にする。
+        //   入力が閾値ギリギリ（0扱い）でもminMoveSpeedRatio分は必ず動き、最大まで倒すとmoveSpeedそのまま出る。
+        float speedRatio = Mathf.Lerp(minMoveSpeedRatio, 1f, inputMagnitude);
+        float actualMoveSpeed = moveSpeed * speedRatio;
+
         currentState = PlayerState.Move;
         // ※Space.Worldを指定し、向きが変わっても常に世界座標の指定方向へ移動するようにする
-        transform.Translate(worldDirection * moveSpeed * Time.deltaTime, Space.World);
+        transform.Translate(worldDirection * actualMoveSpeed * Time.deltaTime, Space.World);
         FaceDirection(worldDirection);
 
         // 漢気ゲージ：相手から離れる方向へ移動している間は減らす
@@ -804,27 +1028,51 @@ public class Player : MonoBehaviour
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, turnSpeed * Time.deltaTime);
     }
 
-    // しゃがみ開始処理。コライダーを低くし、しゃがみアニメーションを再生する
-    void EnterCrouch()
+    // ★追加：しゃがみの見た目（コライダー・アニメーター）を、スティック下入力の有無だけで同期する。
+    //   currentStateが何であっても（攻撃中・ガード中等でも）この判定だけで見た目が決まるため、
+    //   「入力を離したのにしゃがみっぱなしになる」不具合が起きなくなる。
+    void SyncCrouchVisual(bool isCrouchInput)
     {
-        currentState = PlayerState.Crouch;
-        Player_Collider.height = crouchHeight;
-        Player_Collider.center = crouchCenter;
-        animator.SetBool("Crouch", true);
+        if (isCrouchInput == isCrouchVisual) return; // 前フレームから変化なし
+
+        if (isCrouchInput)
+        {
+            Player_Collider.height = crouchHeight;
+            Player_Collider.center = crouchCenter;
+        }
+        else
+        {
+            Player_Collider.height = standHeight;
+            Player_Collider.center = standCenter;
+        }
+        animator.SetBool("Crouch", isCrouchInput);
+        isCrouchVisual = isCrouchInput;
     }
 
-    // しゃがみ終了処理。コライダーを立ち姿勢に戻す
+    // しゃがみ開始処理（状態機械のcurrentStateのみ管理。見た目はSyncCrouchVisual()が別途担当）
+    void EnterCrouch()
+    {
+        // ★修正：左右移動入力が入ったままスティックを下に倒してしゃがみへ遷移した際、
+        //   Moveアニメーション(bool)がONのまま残り、しゃがみアニメーションが正しく
+        //   表示されない（＝しゃがめないように見える）不具合を解消する。
+        StopMoveAnimation();
+
+        currentState = PlayerState.Crouch;
+    }
+
+    // しゃがみ終了処理（状態機械のcurrentStateのみ管理。見た目はSyncCrouchVisual()が別途担当）
     void ExitCrouch()
     {
-        Player_Collider.height = standHeight;
-        Player_Collider.center = standCenter;
-        animator.SetBool("Crouch", false);
         currentState = PlayerState.Idle;
     }
 
     // ジャンプ処理。アニメーション再生とRigidbodyへの力の付与を行う
     void DoJump()
     {
+        // ★修正：移動中にジャンプへ遷移した際、Moveアニメーション(bool)がONのまま残り、
+        //   ジャンプよりも移動が優先されているように見えてしまう不具合を解消する。
+        StopMoveAnimation();
+
         animator.SetTrigger("Jump");
         rb.AddForce(force);
         Jumpflag = false; // 空中に出たので再度ジャンプできないようにする
@@ -837,6 +1085,10 @@ public class Player : MonoBehaviour
     // パンチ（弱攻撃）処理。地上か空中かでアニメーションと当たり判定を切り替える
     void EnterPunch()
     {
+        // ★修正：移動中にパンチへ遷移した際、Moveアニメーション(bool)がONのまま残り、
+        //   パンチよりも移動が優先されているように見えてしまう不具合を解消する。
+        StopMoveAnimation();
+
         ResetAttackTriggers();
         currentState = PlayerState.Punch;
         stateTimer = punchDuration;
@@ -865,6 +1117,10 @@ public class Player : MonoBehaviour
     // キック処理。スティックの上下入力で通常／上／下キックに分岐する
     void EnterKick(bool isCrouchInput)
     {
+        // ★修正：移動中にキックへ遷移した際、Moveアニメーション(bool)がONのまま残り、
+        //   キックよりも移動が優先されているように見えてしまう不具合を解消する。
+        StopMoveAnimation();
+
         ResetAttackTriggers();
         attackLandedThisAttack = false; // 空振り判定用にリセット
 
@@ -910,6 +1166,10 @@ public class Player : MonoBehaviour
     // 仁王立ち（ガード）処理。ガードフラグを立て、演出用パーティクルを再生する
     void EnterGuard()
     {
+        // ★修正：移動中にガードへ遷移した際、Moveアニメーション(bool)がONのまま残り、
+        //   ガードよりも移動が優先されているように見えてしまう不具合を解消する。
+        StopMoveAnimation();
+
         currentState = PlayerState.Guard;
         stateTimer = guardDuration;
         isGuarding = true;
@@ -925,6 +1185,10 @@ public class Player : MonoBehaviour
     // 投げ（掴み）処理。敵との距離・状態を判定し、条件を満たせば投げを成立させる
     void EnterThrow()
     {
+        // ★修正：移動中に投げへ遷移した際、Moveアニメーション(bool)がONのまま残り、
+        //   投げよりも移動が優先されているように見えてしまう不具合を解消する。
+        StopMoveAnimation();
+
         currentState = PlayerState.Throw;
         stateTimer = throwDuration;
         animator.SetTrigger("Throw-start");
@@ -963,6 +1227,10 @@ public class Player : MonoBehaviour
     // 自分の漢気ゲージをspecialGaugeCost分消費する（ガード不可・必中）。
     void EnterSpecial()
     {
+        // ★修正：移動中に必殺技へ遷移した際、Moveアニメーション(bool)がONのまま残り、
+        //   必殺技よりも移動が優先されているように見えてしまう不具合を解消する。
+        StopMoveAnimation();
+
         currentState = PlayerState.Special;
         stateTimer = specialDuration;
 
@@ -1116,6 +1384,31 @@ public class Player : MonoBehaviour
             }
             rebornCamStarted = false;
         }
+    }
+
+    // ★デバッグ用の強制復活処理（F4キー・対象はenableF4DebugKeyで選択）
+    //   連打数や制限時間を無視して、通常の復活成功時と同じ処理を即座に実行する。
+    void ForceRebornDebug()
+    {
+        HP = rebornHp;
+        rebornCount++;
+        mashCount = 0;
+        rebornTimer = 0f;
+        currentState = PlayerState.Idle;
+        Player_status = Status.Live;
+
+        //UIにHPを反映させるように指示
+        if (gameMNG != null) gameMNG.Player_ReduceHP(HP, PlayerName);
+        if (gameMNG != null) gameMNG.SettestStatus(PlayerName, Status.Live);
+
+        if (fightingCamera != null)
+        {
+            fightingCamera.SetRebornLevel(fightingCamera.rebornMaxLevel);
+            fightingCamera.TriggerRebornStandUpOrbit(transform);
+        }
+        rebornCamStarted = false; //次回のダウンに備えてリセット
+
+        Debug.Log($"[{PlayerName}] [デバッグ]F4キーにより強制復活しました");
     }
 
     //-----------------------------------------------------
