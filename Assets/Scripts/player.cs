@@ -103,13 +103,24 @@ public class Player : MonoBehaviour
     //   Animator側で"MoveSpeedMultiplier"という名前のFloatパラメータを作成し、
     //   frontMove/BackMoveステートのSpeedにこのパラメータを乗算設定しておくこと（設定方法は後述）。
     [Header("移動アニメーション速度設定")]
-    [SerializeField] float minMoveAnimSpeed = 0.6f;  // スティックを少しだけ倒した時の再生速度倍率
+    [SerializeField] float minMoveAnimSpeed = 0.4f;  // スティックを少しだけ倒した時の再生速度倍率
     [SerializeField] float maxMoveAnimSpeed = 1.4f;  // スティックを最大まで倒した時の再生速度倍率
 
     // ★追加：実際の移動速度（moveSpeed）もアナログ入力量に応じて可変にするための倍率設定。
     //   スティックを軽く倒した時にmoveSpeedが0近くまで下がってしまうと「動いていないように見える」ため、
     //   最低でもmoveSpeedのminMoveSpeedRatio倍は出るようにし、最大までいくとmoveSpeedそのまま(=1.0倍)にする。
     [SerializeField] [Range(0f, 1f)] float minMoveSpeedRatio = 0.4f; // 入力が最小(閾値ギリギリ)の時のmoveSpeedに対する割合
+
+    //=====================================================
+    // ★移動範囲制限（ワールド座標）
+    //   ステージ外に出ないよう、X/Y/Z各軸ごとにワールド座標の移動可能範囲を制限する。
+    //   通常の移動(Move)だけでなく、ジャンプ等でRigidbodyが動かした結果もLateUpdateで一括して制限する。
+    //=====================================================
+    [Header("移動範囲制限設定（ワールド座標）")]
+    [Tooltip("ワールド座標の各軸の最小値（左端・下端・奥側の限界）")]
+    [SerializeField] Vector3 minPosition = new Vector3(-10f, -10f, -10f);
+    [Tooltip("ワールド座標の各軸の最大値（右端・上端・手前側の限界）")]
+    [SerializeField] Vector3 maxPosition = new Vector3(10f, 10f, 10f);
 
     //=====================================================
     // ★ジャンプ
@@ -717,6 +728,24 @@ public class Player : MonoBehaviour
         }
 
         ClearInputIntents();
+    }
+
+    // LateUpdate: Update内の移動処理やRigidbodyによる物理移動（ジャンプ等）がすべて反映された後に、
+    //   最終的なワールド座標をminPosition〜maxPositionの範囲内へ強制的に収める。
+    //   Updateの最後ではなくLateUpdateで行うことで、物理演算(FixedUpdate)による移動分も確実に制限できる。
+    void LateUpdate()
+    {
+        ClampPositionWithinBounds();
+    }
+
+    // ワールド座標のX/Y/Zをそれぞれ設定した範囲内にクランプする
+    void ClampPositionWithinBounds()
+    {
+        Vector3 pos = transform.position;
+        pos.x = Mathf.Clamp(pos.x, minPosition.x, maxPosition.x);
+        pos.y = Mathf.Clamp(pos.y, minPosition.y, maxPosition.y);
+        pos.z = Mathf.Clamp(pos.z, minPosition.z, maxPosition.z);
+        transform.position = pos;
     }
 
     // 1フレームで消費しなかった意図フラグを毎フレーム末尾でクリアする
