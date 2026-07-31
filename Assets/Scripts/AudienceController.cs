@@ -28,19 +28,31 @@ using UnityEngine;
 //   Inspector側では、状況(situation)ごとに「Clap/Cool/Callのどれを再生するか」を
 //   選ぶだけで済むようにしてあります（複数選ぶとランダムでどれか1つが再生される）。
 //
+// ★複数の観客キャラクターに対応（観客Animatorは配列で複数登録可能）。
+//   同じ状況(situation)が発生した時、登録した観客全員が反応するのではなく、
+//   Reaction Participation Ratio で指定した割合の観客だけがランダムに選ばれて反応する。
+//   さらに、実際に反応する各観客は「それぞれ個別に」Reactionsリストから
+//   ランダム抽選するため、同じ状況でもClap/Cool/Callがバラけて見える。
+//   （例：AttackHit発生時、10体中6体だけが反応し、その6体もCall/Cool混在で反応する）
+//   ある観客が反応中でも他の観客の反応には影響しない＝観客ごとに独立して
+//   「再生中フラグ」「Idle待機ループ」を持つように内部を分離してある。
+//
 // 使い方：
-//   1. 観客キャラクター（Animator付き。PeopleAnimControllerをセットしたもの）に
-//      このスクリプトをアタッチする。もしくは管理用の空オブジェクトにアタッチし、
-//      Audience Animator に観客キャラのAnimatorを参照させる。
-//   2-a. GameMNGがシーンにあるなら、Inspectorの Game MNG にドラッグするだけでOK。
+//   1. 観客キャラクター（Animator付き。PeopleAnimControllerをセットしたもの）を
+//      シーンに必要な数だけ配置する。
+//   2. 管理用の空オブジェクトにこのスクリプトをアタッチし、
+//      Audience Animators に、反応させたい観客のAnimatorを人数分ドラッグ＆ドロップする。
+//   3-a. GameMNGがシーンにあるなら、Inspectorの Game MNG にドラッグするだけでOK。
 //        p1・p2を自動的に監視対象へ登録する（Target Playersは空のままでよい）。
-//   2-b. GameMNGを使わない場合は、Target Players に直接Playerを登録する。
-//   3. Camera Controller に、シーン上のFightingCameraControllerをセットする
+//   3-b. GameMNGを使わない場合は、Target Players に直接Playerを登録する。
+//   4. Camera Controller に、シーン上のFightingCameraControllerをセットする
 //      （これが「仁王立ちで実際に攻撃を受け止めた瞬間」の反応に必要）。
-//   4. Reactions リストで、状況ごとに再生したい反応(Clap/Cool/Call/待機（Idle）)を選ぶ。
+//   5. Reactions リストで、状況ごとに再生したい反応(Clap/Cool/Call/待機（Idle）)を選ぶ。
 //      Waiting（仁王立ち・ダメージ等、他の状況が何も起きていない待機時間）も
 //      他の状況と同じ形式で登録できる。実際に発火する間隔は
-//      Enable Idle Variations / Idle Variation Interval Range で設定する。
+//      Enable Idle Variations / Idle Variation Interval Range で設定する（観客ごとに個別のタイミングで発火）。
+//   6. Reaction Participation Ratio で、1回の状況発生につき観客の何割が反応するかを設定する
+//      （1なら登録した観客全員が反応、0.5なら約半数がランダムに選ばれて反応する）。
 //
 // 注意：
 //   ・仁王立ちの「構えに入った瞬間」自体はPlayer.cs内部のprivateな状態
@@ -100,9 +112,9 @@ public class AudienceController : MonoBehaviour
     [Tooltip("GameMNGを使わない場合はここに直接登録する（1人でも複数でも可）")]
     public Player[] targetPlayers;
 
-    [Header("観客アニメーター")]
-    [Tooltip("観客側のAnimatorコンポーネント（PeopleAnimControllerをセットしたもの）")]
-    public Animator audienceAnimator;
+    [Header("観客アニメーター（複数登録可）")]
+    [Tooltip("観客側のAnimatorコンポーネント（PeopleAnimControllerをセットしたもの）を、観客の人数分ここに登録する")]
+    public Animator[] audienceAnimators;
 
     [Header("カメラ連携（仁王立ち反応に必須）")]
     [Tooltip("仁王立ちで実際に攻撃を受け止めた瞬間(ガードインパクト)を検知するために使う")]
@@ -110,6 +122,11 @@ public class AudienceController : MonoBehaviour
 
     [Tooltip("この連続ガード成功回数(comboCount)以上でGuardBlockBig状況として扱う")]
     public int bigCheerComboThreshold = 3;
+
+    [Header("複数観客のランダム反応設定")]
+    [Range(0f, 1f)]
+    [Tooltip("1回の状況発生につき、登録した観客のうち何割がランダムに選ばれて反応するか。1なら全員反応、0.5なら約半数がランダムに反応する。実際に反応する観客は、それぞれ個別にReactionsリストから反応をランダム抽選するため、同じ状況でも観客ごとにClap/Cool/Callがバラける")]
+    public float reactionParticipationRatio = 1f;
 
     [Header("状況ごとの反応設定")]
     [Tooltip("状況(situation)ごとに、再生したい反応(Clap/Cool/Call/待機（Idle）)を選ぶ。複数選ぶとランダム再生")]
@@ -148,15 +165,24 @@ public class AudienceController : MonoBehaviour
     [Tooltip("反応の発火状況をConsoleに出力する（原因調査用）")]
     public bool enableDebugLog = false;
 
+    // 観客1体分の実行時状態（Animator本体＋そのAnimator専用の再生中コルーチン）。
+    // Inspectorには出さず、Start時にaudienceAnimatorsから自動的に構築する。
+    // 観客ごとにこれを個別に持たせることで、ある観客が反応中でも
+    // 他の観客の反応には一切影響しないようにしている。
+    private class AudienceMember
+    {
+        public Animator animator;
+        public Coroutine reactionCoroutine; // このAnimatorで現在再生中の反応（多重再生防止用）
+    }
+
+    private AudienceMember[] members;
+
     // reactionsリストを毎回線形探索しないよう、起動時に辞書化しておく
     private Dictionary<AudienceSituation, AudienceClipReaction[]> reactionMap;
 
     // 各プレイヤーの「直前フレームでのステータス」を覚えておくための配列。
     // これと現在の値を比較することで、「変化した瞬間」だけを検知する。
     private Player.Status[] previousStatus;
-
-    // 現在再生中の反応コルーチン（多重に暴発させないための管理用）
-    private Coroutine currentReactionCoroutine;
 
     // 直近でガードインパクト(仁王立ちブロック)が発生したフレーム番号。
     // GameMNG.OnPlayerHpReduced由来のダメージイベントが同じフレームで来た場合、
@@ -200,11 +226,24 @@ public class AudienceController : MonoBehaviour
             }
         }
 
+        // audienceAnimators（Inspectorで登録した観客Animator配列）から、
+        // 観客ごとの実行時状態(AudienceMember)を構築する。null要素は無視する。
+        var memberList = new List<AudienceMember>();
+        if (audienceAnimators != null)
+        {
+            foreach (var a in audienceAnimators)
+            {
+                if (a == null) continue;
+                memberList.Add(new AudienceMember { animator = a });
+            }
+        }
+        members = memberList.ToArray();
+
         // ★追加：主要な参照が未設定だと「エラーは出ないが何も反応しない」状態になり
         //   原因調査がしづらいので、起動時にConsoleへ警告を出しておく。
-        if (audienceAnimator == null)
+        if (members.Length == 0)
         {
-            Debug.LogWarning($"[AudienceController] Audience Animatorが未設定です。({gameObject.name}) 反応アニメーションは一切再生されません。");
+            Debug.LogWarning($"[AudienceController] Audience Animatorsが1体も設定されていません。({gameObject.name}) 反応アニメーションは一切再生されません。");
         }
         if (gameMNG == null)
         {
@@ -219,8 +258,13 @@ public class AudienceController : MonoBehaviour
             Debug.LogWarning($"[AudienceController] 監視対象のPlayerが1体も登録されていません。({gameObject.name}) KnockDown/Dead/Revive状況が発火しません。");
         }
 
-        // 待機中（Waiting）演出のループを開始（enableIdleVariationsは実行時にトグル可能）
-        StartCoroutine(IdleVariationLoop());
+        // 待機中（Waiting）演出のループを、観客ごとに個別のコルーチンとして開始する。
+        // 観客ごとに独立してランダムな間隔で発火させるため、1体につき1ループを回す。
+        // （enableIdleVariationsは実行時にトグル可能）
+        foreach (var member in members)
+        {
+            StartCoroutine(IdleVariationLoop(member));
+        }
     }
 
     void OnEnable()
@@ -338,7 +382,10 @@ public class AudienceController : MonoBehaviour
     }
 
     // ★外部からも呼べる公開メソッド。
-    //   指定した状況(situation)に登録されている反応の中からランダムで1つ再生する。
+    //   指定した状況(situation)が発生したことを、登録済みの観客(members)へ通知する。
+    //   Reaction Participation Ratio に従ってランダムに選ばれた観客だけが反応し、
+    //   反応する観客はそれぞれ個別にReactionsリストから反応をランダム抽選する
+    //  （＝同じ状況でも観客ごとにClap/Cool/Callがバラける）。
     //   他のスクリプトからも audienceController.PlayReaction(AudienceSituation.XXX) で呼び出せる。
     public void PlayReaction(AudienceSituation situation)
     {
@@ -351,17 +398,60 @@ public class AudienceController : MonoBehaviour
             return;
         }
 
-        var chosen = clips[UnityEngine.Random.Range(0, clips.Length)];
-        PlayClipReaction(chosen);
+        if (members == null) return;
+
+        foreach (var member in members)
+        {
+            if (!ShouldParticipate()) continue;
+
+            // 反応する観客ごとに個別でランダム抽選する（他の観客と同じ結果である必要はない）
+            var chosen = clips[UnityEngine.Random.Range(0, clips.Length)];
+            PlayClipReactionOnMember(member, chosen);
+        }
     }
 
-    // ★こちらも外部から直接呼べる：状況を経由せず、反応そのもの(Clap/Cool/Call)を直接指定して再生したい場合用
+    // ★こちらも外部から直接呼べる：状況を経由せず、反応そのもの(Clap/Cool/Call)を直接指定して再生したい場合用。
+    //   Reaction Participation Ratio に従ってランダムに選ばれた観客が、指定した同じ反応を再生する。
     public void PlayClipReaction(AudienceClipReaction clip)
+    {
+        if (clip == AudienceClipReaction.None) return;
+        if (members == null) return;
+
+        foreach (var member in members)
+        {
+            if (!ShouldParticipate()) continue;
+            PlayClipReactionOnMember(member, clip);
+        }
+    }
+
+    // 1体の観客(member)に対して、状況(situation)に登録された反応からランダムで1つ選んで再生する。
+    // IdleVariationLoop（観客ごとの待機中演出）から、その観客1体だけを反応させたい時に使う。
+    void PlayReactionOnMember(AudienceMember member, AudienceSituation situation)
+    {
+        if (reactionMap == null) BuildReactionMap();
+
+        if (!reactionMap.TryGetValue(situation, out var clips) || clips.Length == 0) return;
+
+        var chosen = clips[UnityEngine.Random.Range(0, clips.Length)];
+        PlayClipReactionOnMember(member, chosen);
+    }
+
+    // 1体の観客(member)に対して、反応そのもの(Clap/Cool/Call)を直接指定して再生する内部処理
+    void PlayClipReactionOnMember(AudienceMember member, AudienceClipReaction clip)
     {
         if (clip == AudienceClipReaction.None) return;
 
         string goParam = GetGoParamName(clip);
-        TryPlayGoParam(goParam, clip.ToString());
+        TryPlayGoParam(member, goParam, clip.ToString());
+    }
+
+    // Reaction Participation Ratio に基づき、この観客が今回の反応に参加するかどうかを抽選する。
+    // 1以上なら常に参加、0以下なら常に不参加。
+    bool ShouldParticipate()
+    {
+        if (reactionParticipationRatio >= 1f) return true;
+        if (reactionParticipationRatio <= 0f) return false;
+        return UnityEngine.Random.value <= reactionParticipationRatio;
     }
 
     //-----------------------------------------------------------------------
@@ -375,7 +465,16 @@ public class AudienceController : MonoBehaviour
     //   （＝GuardBlockやAttackHit等、他の状況の反応中とは自動的に重複しない）
     // ・実際に何を再生するかは、Reactionsリストの Waiting 状況に登録した
     //   反応(Clap/Cool/Call/待機（Idle）)からランダムで選ばれる（他の状況と同じ仕組み）
-    IEnumerator IdleVariationLoop()
+    // 観客1体(member)ごとに独立して回す待機演出ループ。
+    // ランダムな間隔でAudienceSituation.Waitingの反応をこの観客だけに再生し続ける。
+    // ・enableIdleVariationsがfalseの間は何もしない（Inspectorで実行時にON/OFF可）
+    // ・現在Idle状態でない、またはこの観客が他の反応(Clap/Cool/Call)再生中の場合はスキップする
+    //   （＝GuardBlockやAttackHit等、他の状況の反応中とは自動的に重複しない）
+    // ・実際に何を再生するかは、Reactionsリストの Waiting 状況に登録した
+    //   反応(Clap/Cool/Call/待機（Idle）)からランダムで選ばれる（他の状況と同じ仕組み）
+    // ・観客ごとに別々のコルーチンとしてStart()から呼ばれるため、
+    //   各観客はバラバラのタイミングで待機演出が発火する
+    IEnumerator IdleVariationLoop(AudienceMember member)
     {
         while (true)
         {
@@ -385,35 +484,35 @@ public class AudienceController : MonoBehaviour
             yield return new WaitForSeconds(wait);
 
             if (!enableIdleVariations) continue;
-            if (audienceAnimator == null) continue;
-            if (currentReactionCoroutine != null) continue; // 他の反応(Clap/Cool/Call)再生中は割り込ませない
-            if (!IsInIdleState()) continue; // Idle中のみ発火
+            if (member.animator == null) continue;
+            if (member.reactionCoroutine != null) continue; // この観客が他の反応(Clap/Cool/Call)再生中は割り込ませない
+            if (!IsInIdleState(member.animator)) continue; // Idle中のみ発火
 
-            DLog("[AudienceController] Waiting状況の反応を抽選します");
-            PlayReaction(AudienceSituation.Waiting);
+            DLog($"[AudienceController] Waiting状況の反応を抽選します ({member.animator.name})");
+            PlayReactionOnMember(member, AudienceSituation.Waiting);
         }
     }
 
-    // goParam（Boolパラメータ名）を指定して反応コルーチンを開始する共通処理。
+    // goParam（Boolパラメータ名）を指定して、指定した観客(member)の反応コルーチンを開始する共通処理。
     // Clap/Cool/CallとIdleバリエーションの両方から利用する。
-    void TryPlayGoParam(string goParam, string debugLabel)
+    void TryPlayGoParam(AudienceMember member, string goParam, string debugLabel)
     {
         if (string.IsNullOrEmpty(goParam)) return;
 
-        if (audienceAnimator == null)
+        if (member.animator == null)
         {
             Debug.LogWarning($"[AudienceController] Audience Animatorが未設定のため、反応({debugLabel})を再生できません。");
             return;
         }
 
-        // 既に別の反応を再生中の場合は割り込ませない（Bool制御なので同時発火させると崩れるため）
-        if (currentReactionCoroutine != null)
+        // この観客が既に別の反応を再生中の場合は割り込ませない（Bool制御なので同時発火させると崩れるため）
+        if (member.reactionCoroutine != null)
         {
-            DLog($"[AudienceController] 反応({debugLabel})は前の反応がまだ再生中のためスキップしました。");
+            DLog($"[AudienceController] {member.animator.name}: 反応({debugLabel})は前の反応がまだ再生中のためスキップしました。");
             return;
         }
 
-        currentReactionCoroutine = StartCoroutine(PlayGoParamRoutine(goParam, debugLabel));
+        member.reactionCoroutine = StartCoroutine(PlayGoParamRoutine(member, goParam, debugLabel));
     }
 
     // デバッグログ出力（enableDebugLogがtrueの時だけConsoleに出す）
@@ -428,12 +527,15 @@ public class AudienceController : MonoBehaviour
     // （goXとisChangebleを同時にtrueにすると、start→main側の遷移条件が
     //   同フレームで即成立し、一瞬で反応が終わってしまうため順序を分けている）
     // Clap/Cool/Call・Idleバリエーションのどちらもこのコルーチンで共通に処理する。
-    IEnumerator PlayGoParamRoutine(string goParam, string debugLabel)
+    // 対象は引数で渡されたmember（＝観客1体）のAnimatorのみで、他の観客には影響しない。
+    IEnumerator PlayGoParamRoutine(AudienceMember member, string goParam, string debugLabel)
     {
-        DLog($"[AudienceController] 反応再生開始: {debugLabel} (Bool: {goParam} -> true)");
+        var animator = member.animator;
+
+        DLog($"[AudienceController] 反応再生開始: {debugLabel} ({animator.name}, Bool: {goParam} -> true)");
 
         // Idle → start（該当の反応へ入る）
-        audienceAnimator.SetBool(goParam, true);
+        animator.SetBool(goParam, true);
 
         // ★修正：goParamとisChangebleを同時にtrueにすると、Idle→startの遷移が
         //   成立した瞬間にはisChangebleも既にtrueになっており、start→main側の
@@ -444,7 +546,7 @@ public class AudienceController : MonoBehaviour
         //   そのため、実際にIdleを抜けてstartステートへ遷移したことを
         //   確認してから、isChangebleをtrueにする。
         float enterElapsed = 0f;
-        while (IsInIdleState() && enterElapsed < reactionSafetyTimeout)
+        while (IsInIdleState(animator) && enterElapsed < reactionSafetyTimeout)
         {
             enterElapsed += Time.deltaTime;
             yield return null;
@@ -454,22 +556,22 @@ public class AudienceController : MonoBehaviour
         {
             // Idleから抜け出せていない＝goParamに対応するAnimator側の遷移が
             // 想定通りに組まれていない可能性が高い
-            Debug.LogWarning($"[AudienceController] 反応({debugLabel})を開始しましたが、{reactionSafetyTimeout}秒経ってもIdle State Name(\"{idleStateName}\")から遷移しませんでした。Animator ControllerのIdle→{goParam}側の遷移条件を確認してください。");
-            audienceAnimator.SetBool(goParam, false);
-            currentReactionCoroutine = null;
+            Debug.LogWarning($"[AudienceController] 反応({debugLabel}, {animator.name})を開始しましたが、{reactionSafetyTimeout}秒経ってもIdle State Name(\"{idleStateName}\")から遷移しませんでした。Animator ControllerのIdle→{goParam}側の遷移条件を確認してください。");
+            animator.SetBool(goParam, false);
+            member.reactionCoroutine = null;
             yield break;
         }
 
-        DLog($"[AudienceController] {debugLabel}: startステートへ遷移を確認。isChangeble -> true");
+        DLog($"[AudienceController] {debugLabel} ({animator.name}): startステートへ遷移を確認。isChangeble -> true");
 
         // start → main → over → Idle と、ループの節目ごとに自動で進めていく
-        audienceAnimator.SetBool(isChangebleParamName, true);
+        animator.SetBool(isChangebleParamName, true);
 
         // パラメータ変更がAnimatorに反映されるのを1フレーム待つ
         yield return null;
 
         float elapsed = 0f;
-        while (!IsInIdleState() && elapsed < reactionSafetyTimeout)
+        while (!IsInIdleState(animator) && elapsed < reactionSafetyTimeout)
         {
             elapsed += Time.deltaTime;
             yield return null;
@@ -479,22 +581,22 @@ public class AudienceController : MonoBehaviour
         {
             // ここに来る場合、Idle State Nameが実際のステート名と一致していないか、
             // Animator Controller側の遷移条件（isChangeble等）が想定と違っている可能性が高い
-            Debug.LogWarning($"[AudienceController] 反応({debugLabel})後、{reactionSafetyTimeout}秒経ってもIdle State Name(\"{idleStateName}\")に戻ったことを検知できませんでした。ステート名の綴りや、Animator Controller側の遷移条件を確認してください。");
+            Debug.LogWarning($"[AudienceController] 反応({debugLabel}, {animator.name})後、{reactionSafetyTimeout}秒経ってもIdle State Name(\"{idleStateName}\")に戻ったことを検知できませんでした。ステート名の綴りや、Animator Controller側の遷移条件を確認してください。");
         }
 
         // 次回のためにパラメータを元に戻しておく
-        audienceAnimator.SetBool(goParam, false);
-        audienceAnimator.SetBool(isChangebleParamName, false);
+        animator.SetBool(goParam, false);
+        animator.SetBool(isChangebleParamName, false);
 
-        DLog($"[AudienceController] 反応再生終了: {debugLabel}");
+        DLog($"[AudienceController] 反応再生終了: {debugLabel} ({animator.name})");
 
-        currentReactionCoroutine = null;
+        member.reactionCoroutine = null;
     }
 
-    // 現在Animatorが（ベースレイヤーの）Idle状態にいるかどうか
-    bool IsInIdleState()
+    // 指定したAnimatorが（ベースレイヤーの）Idle状態にいるかどうか
+    bool IsInIdleState(Animator animator)
     {
-        var info = audienceAnimator.GetCurrentAnimatorStateInfo(0);
+        var info = animator.GetCurrentAnimatorStateInfo(0);
         return info.IsName(idleStateName);
     }
 
