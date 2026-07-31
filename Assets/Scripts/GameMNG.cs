@@ -26,12 +26,32 @@ public class GameMNG : MonoBehaviour
     public Slider P_HPbar;          // 1人目のHPゲージ
     public Slider E_HPbar;          // 2人目/敵のHPゲージ
 
-    [Header("漢気ゲージ表示(敵側・2本分)")]
+    // ★変更：バー式Sliderから円形ゲージ(KankiGaugeCircle)へ変更。
+    //   各フィールドにはHierarchy上のKankiGaugeCircle_XXXオブジェクト（FrameImage/ArcImage/MaxImageを
+    //   持つGameObject）をアサインすること。値の受け渡しは.value=ではなく.SetRatio()経由になる。
+    // ★修正：P1/P2も漢気ゲージは2本分あるため、Enemyと同様に1本目・2本目の両方を用意する。
+    [Header("漢気ゲージ表示(円形・P1/P2/敵、いずれも2本分)")]
+    public KankiGaugeCircle P1_KankiGaugeCircle1; // player1の漢気ゲージ1本目
+    public KankiGaugeCircle P1_KankiGaugeCircle2; // player1の漢気ゲージ2本目
+    public KankiGaugeCircle P2_KankiGaugeCircle1; // player2の漢気ゲージ1本目
+    public KankiGaugeCircle P2_KankiGaugeCircle2; // player2の漢気ゲージ2本目
+    public KankiGaugeCircle E_KankiGaugeCircle1;  // 敵の漢気ゲージ1本目
+    public KankiGaugeCircle E_KankiGaugeCircle2;  // 敵の漢気ゲージ2本目
+
+    // ★追加：旧バー式（Slider）ゲージとの互換用。
+    //   円形ゲージへ移行済みだが、デバッグ比較や旧UIを残したいシーン用に、
+    //   Inspectorのスイッチ(enableLegacyKankiGaugeBar)をONにするとこちらも同時に更新される。
+    //   Sliderをアサインしていない・スイッチOFFの場合は何もしない（エラーにはならない）。
+    [Header("旧バー式ゲージ（互換用・下のスイッチでON/OFF切替）")]
+    [Tooltip("ONにすると、円形ゲージに加えて下のSlider（旧バー式ゲージ）も同時に更新します。未使用ならOFFのままでOKです。")]
+    public bool enableLegacyKankiGaugeBar = false;
     [Tooltip("Sliderのmin=0, max=1で設定してください(GetGaugeFillRatioが0〜1を返すため)")]
-    public Slider P1_KankiGaugeBar; // player1の漢気ゲージ1本目
-    public Slider P2_KankiGaugeBar; // player2の漢気ゲージ1本目
-    public Slider E_KankiGaugeBar1; // 敵の漢気ゲージ1本目
-    public Slider E_KankiGaugeBar2; // 敵の漢気ゲージ2本目
+    public Slider P1_KankiGaugeBar1; // player1の漢気ゲージ1本目（旧）
+    public Slider P1_KankiGaugeBar2; // player1の漢気ゲージ2本目（旧）
+    public Slider P2_KankiGaugeBar1; // player2の漢気ゲージ1本目（旧）
+    public Slider P2_KankiGaugeBar2; // player2の漢気ゲージ2本目（旧）
+    public Slider E_KankiGaugeBar1;  // 敵の漢気ゲージ1本目（旧）
+    public Slider E_KankiGaugeBar2;  // 敵の漢気ゲージ2本目（旧）
 
     //=======================================================================
     // カメラ
@@ -268,29 +288,55 @@ public class GameMNG : MonoBehaviour
             Debug.LogError("GameMNGのe1（Enemy）がInspectorで未設定です。Enemyオブジェクトをアサインしてください。");
             return;
         }
-        if (E_KankiGaugeBar1 == null || E_KankiGaugeBar2 == null)
+        if (E_KankiGaugeCircle1 == null || E_KankiGaugeCircle2 == null)
         {
-            Debug.LogError("GameMNGのE_KankiGaugeBar1またはE_KankiGaugeBar2がInspectorで未設定です。漢気ゲージ用のSliderをアサインしてください。");
+            Debug.LogError("GameMNGのE_KankiGaugeCircle1またはE_KankiGaugeCircle2がInspectorで未設定です。漢気ゲージ用のKankiGaugeCircleをアサインしてください。");
             return;
         }
-        // 1本目・2本目それぞれの充填率(0〜1)をSliderへ反映
-        E_KankiGaugeBar1.value = e1.GetGaugeFillRatio(0);
-        E_KankiGaugeBar2.value = e1.GetGaugeFillRatio(1);
+        // 1本目・2本目それぞれの充填率(0〜1)を円形ゲージへ反映
+        E_KankiGaugeCircle1.SetRatio(e1.GetGaugeFillRatio(0));
+        E_KankiGaugeCircle2.SetRatio(e1.GetGaugeFillRatio(1));
+
+        // ★追加：Inspectorのスイッチ(enableLegacyKankiGaugeBar)がONの時だけ、
+        //   旧バー式ゲージ(Slider)も同時に更新する。Sliderが未アサインでもエラーにはせずスキップする。
+        if (enableLegacyKankiGaugeBar)
+        {
+            if (E_KankiGaugeBar1 != null) E_KankiGaugeBar1.value = e1.GetGaugeFillRatio(0);
+            if (E_KankiGaugeBar2 != null) E_KankiGaugeBar2.value = e1.GetGaugeFillRatio(1);
+        }
     }
 
-    // プレイヤー側(1P・2P)の漢気ゲージ(1本分ずつ)を表示更新する
+    // プレイヤー側(1P・2P)の漢気ゲージ(2本分ずつ)を表示更新する
     // Player.csのAddKankiGauge/ReduceKankiGaugeが呼ばれた際に呼び出される想定。
-    // p1・p2のどちらが呼び出した場合でも、両方のバーをまとめて最新値に更新する
+    // p1・p2のどちらが呼び出した場合でも、両方のゲージをまとめて最新値に更新する
     // （Enemy_UpdateKankiGauge()と同じ設計）。
     public void Player_UpdateKankiGauge()
     {
-        if (p1 != null && P1_KankiGaugeBar != null)
+        if (p1 != null)
         {
-            P1_KankiGaugeBar.value = p1.GetGaugeFillRatio(0);
+            if (P1_KankiGaugeCircle1 != null) P1_KankiGaugeCircle1.SetRatio(p1.GetGaugeFillRatio(0));
+            if (P1_KankiGaugeCircle2 != null) P1_KankiGaugeCircle2.SetRatio(p1.GetGaugeFillRatio(1));
         }
-        if (p2 != null && P2_KankiGaugeBar != null)
+        if (p2 != null)
         {
-            P2_KankiGaugeBar.value = p2.GetGaugeFillRatio(0);
+            if (P2_KankiGaugeCircle1 != null) P2_KankiGaugeCircle1.SetRatio(p2.GetGaugeFillRatio(0));
+            if (P2_KankiGaugeCircle2 != null) P2_KankiGaugeCircle2.SetRatio(p2.GetGaugeFillRatio(1));
+        }
+
+        // ★追加：Inspectorのスイッチ(enableLegacyKankiGaugeBar)がONの時だけ、
+        //   旧バー式ゲージ(Slider)も同時に更新する。Sliderが未アサインでもエラーにはせずスキップする。
+        if (enableLegacyKankiGaugeBar)
+        {
+            if (p1 != null)
+            {
+                if (P1_KankiGaugeBar1 != null) P1_KankiGaugeBar1.value = p1.GetGaugeFillRatio(0);
+                if (P1_KankiGaugeBar2 != null) P1_KankiGaugeBar2.value = p1.GetGaugeFillRatio(1);
+            }
+            if (p2 != null)
+            {
+                if (P2_KankiGaugeBar1 != null) P2_KankiGaugeBar1.value = p2.GetGaugeFillRatio(0);
+                if (P2_KankiGaugeBar2 != null) P2_KankiGaugeBar2.value = p2.GetGaugeFillRatio(1);
+            }
         }
     }
 
