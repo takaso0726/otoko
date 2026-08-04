@@ -1080,12 +1080,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CharacterSelectController
   characters:
-  - characterName: 
+  - characterName: KAKASHI
     anchor: {fileID: 600528348}
-    portrait: {fileID: -1625191474, guid: c6140128f69e12b438ec490ebe3d5e1a, type: 3}
-  - characterName: 
-    anchor: {fileID: 1327453297}
     portrait: {fileID: -384170307, guid: 923e50cc6d7d1ef4da03467bde3ed3b3, type: 3}
+  - characterName: KAKASHI
+    anchor: {fileID: 1327453297}
+    portrait: {fileID: -1625191474, guid: c6140128f69e12b438ec490ebe3d5e1a, type: 3}
   - characterName: 
     anchor: {fileID: 255906182}
     portrait: {fileID: 21300000, guid: 79c2f451664104740be4aeb93612206d, type: 3}
@@ -1093,16 +1093,16 @@ MonoBehaviour:
     anchor: {fileID: 1048584094}
     portrait: {fileID: 21300000, guid: d9a242a14c14d834998ec507ada17906, type: 3}
   player1:
-    playerName: player1
-    cursor: {fileID: 228133206}
+    playerName: Player1
+    cursor: {fileID: 1324281603}
     readyMark: {fileID: 0}
     portraitImage: {fileID: 772569941}
     currentIndex: 0
     decided: 0
     allowedIndices: 
   player2:
-    playerName: player2
-    cursor: {fileID: 1324281603}
+    playerName: Player2
+    cursor: {fileID: 228133206}
     readyMark: {fileID: 0}
     portraitImage: {fileID: 693411935}
     currentIndex: 0

@@ -3356,11 +3356,11 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 8300000, guid: 5d106a811a3323b4983f83ce78615744, type: 3}
+  m_Resource: {fileID: 8300000, guid: 12deeaa7452c5a0439251136c3a42257, type: 3}
   m_PlayOnAwake: 1
   m_Volume: 1
-  m_Pitch: 1
-  Loop: 1
+  m_Pitch: 3
+  Loop: 0
   Mute: 0
   Spatialize: 0
   SpatializePostEffects: 0
@@ -3566,7 +3566,7 @@ MonoBehaviour:
   minMoveAnimSpeed: 0.6
   maxMoveAnimSpeed: 1.4
   minMoveSpeedRatio: 0.4
-  minPosition: {x: -10, y: -10, z: -10}
+  minPosition: {x: -10, y: -0.8, z: -10}
   maxPosition: {x: 10, y: 10, z: 10}
   force: {x: 0, y: 400, z: 0}
   Jumpflag: 0
@@ -5175,6 +5175,37 @@ MonoBehaviour:
   maxImage: {fileID: 1997720378}
   smoothFill: 1
   fillLerpSpeed: 2.5
+--- !u!1 &1195980006
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1195980007}
+  m_Layer: 0
+  m_Name: P2_Spawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1195980007
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1195980006}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.22, z: 7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1238327488
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -6322,6 +6353,37 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 1353086076}
   m_SourcePrefab: {fileID: 100100000, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
+--- !u!1 &1435874236
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1435874237}
+  m_Layer: 0
+  m_Name: P1_Spawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1435874237
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1435874236}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 2.22, z: -7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1448599051
 GameObject:
   m_ObjectHideFlags: 0
@@ -9358,7 +9420,7 @@ MonoBehaviour:
   minMoveAnimSpeed: 0.6
   maxMoveAnimSpeed: 1.4
   minMoveSpeedRatio: 0.4
-  minPosition: {x: -10, y: -10, z: -10}
+  minPosition: {x: -10, y: -0.8, z: -10}
   maxPosition: {x: 10, y: 10, z: 10}
   force: {x: 0, y: 400, z: 0}
   Jumpflag: 0
@@ -9978,6 +10040,58 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1997720376}
   m_CullTransparentMesh: 1
+--- !u!1 &2006462093
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2006462095}
+  - component: {fileID: 2006462094}
+  m_Layer: 0
+  m_Name: PlayerCharacterSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2006462094
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2006462093}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4820ad3b40eab34a91997194203552c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerCharacterSpawner
+  characterPrefabs:
+  - characterName: Player1
+    prefab: {fileID: 956537536}
+  - characterName: Player2
+    prefab: {fileID: 1873253608}
+  player1SpawnPoint: {fileID: 1435874237}
+  player2SpawnPoint: {fileID: 1195980007}
+  fallbackPrefab: {fileID: 0}
+--- !u!4 &2006462095
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2006462093}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 5.82138, y: 5.20398, z: 1.15365}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &2010192535
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -10542,3 +10656,6 @@ SceneRoots:
   - {fileID: 1892936214}
   - {fileID: 450604259}
   - {fileID: 1846907281}
+  - {fileID: 2006462095}
+  - {fileID: 1435874237}
+  - {fileID: 1195980007}

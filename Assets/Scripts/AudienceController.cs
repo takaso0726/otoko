@@ -143,7 +143,8 @@ public class AudienceController : MonoBehaviour
 
     [Header("SE設定")]
     [Tooltip("状況ごとのSE(効果音)を再生するためのAudioSource。ここに1つセットする。" +
-             "PlayOneShotで再生するため、複数の状況のSEがほぼ同時に鳴っても互いに途切れさせずに再生できる。")]
+             "常に1本だけ再生する仕様で、新しいSEが発生すると再生中の前のSEを打ち切って差し替える" +
+             "（どんな状況でもSEが重ねて鳴ることはない。BGMは別のAudioSourceで管理すること）。")]
     public AudioSource seAudioSource;
 
     [Range(0f, 1f)]
@@ -220,11 +221,21 @@ public class AudienceController : MonoBehaviour
     // prioritySituations(Inspector設定)を高速判定用にHashSet化したもの
     private HashSet<AudienceSituation> prioritySituationSet;
 
+    // SE再生用AudioSourceに元々設定されているVolume。
+    // seVolumeは「このAudioSource自体のVolumeとは別に、SEだけをまとめて音量調整したい場合に使う」
+    // スケール値なので、Play()に切り替えた後も同じ意味を保てるよう起動時の値を控えておく。
+    private float seAudioSourceBaseVolume = 1f;
+
     void Awake()
     {
         BuildReactionMap();
         BuildSeMap();
         BuildPrioritySituationSet();
+
+        if (seAudioSource != null)
+        {
+            seAudioSourceBaseVolume = seAudioSource.volume;
+        }
     }
 
     // reactionsリスト(Inspector設定)からDictionaryを構築する
@@ -454,6 +465,9 @@ public class AudienceController : MonoBehaviour
     //   SE自体は状況が発生するたびに毎回再生される（客席の歓声・どよめきに相当するため）。
     // ・候補が複数ある場合はランダムで1つ再生する。候補にNone(未設定)を混ぜておくと、
     //   その抽選の回だけ「あえてSEを鳴らさない」という結果にもできる。
+    // ・SEはどんな状況でも重ねて再生しない：seAudioSourceは常に1本のクリップしか鳴らさず、
+    //   新しいSEが発生した場合は再生中の前のSEを打ち切って即座に差し替える
+    //   （BGMは別のAudioSourceで管理する想定のため、このルールの対象外）。
     void PlaySituationSE(AudienceSituation situation)
     {
         if (seMap == null) BuildSeMap();
@@ -468,7 +482,14 @@ public class AudienceController : MonoBehaviour
             return;
         }
 
-        seAudioSource.PlayOneShot(chosen, seVolume);
+        // PlayOneShotだと複数のSEが同時に重なって再生されてしまうため、
+        // 単一クリップの再生に切り替えて重複を防ぐ。
+        // 既にSEが再生中でも一旦止めて、新しい方をすぐ再生する（後勝ち・割り込み方式）。
+        seAudioSource.Stop();
+        seAudioSource.volume = seAudioSourceBaseVolume * seVolume;
+        seAudioSource.clip = chosen;
+        seAudioSource.Play();
+
         DLog($"[AudienceController] SE再生: {situation} -> {chosen.name}");
     }
 
