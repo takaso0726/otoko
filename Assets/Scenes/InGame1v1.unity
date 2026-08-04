@@ -2127,8 +2127,8 @@ Transform:
   m_GameObject: {fileID: 592280096}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 57, y: -6.3, z: -9.7776}
-  m_LocalScale: {x: 1.8826747, y: 1.8826747, z: 1.8826747}
+  m_LocalPosition: {x: 24, y: -43.2, z: -8.2722}
+  m_LocalScale: {x: 1.5831412, y: 1.5831412, z: 1.5831412}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1515650359}
@@ -3574,7 +3574,7 @@ MonoBehaviour:
   maxHP: 1000
   atk: 10
   Player_status: 0
-  punchDuration: 0.15
+  punchDuration: 0.2
   kickDuration: 0.3
   upKickDuration: 0.5
   downKickDuration: 0.5
@@ -5149,8 +5149,8 @@ Transform:
   m_GameObject: {fileID: 1175973538}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0.9999998, z: -0, w: -0.0006013226}
-  m_LocalPosition: {x: -37.7, y: 92.6, z: 12.9}
-  m_LocalScale: {x: 2.6728375, y: 2.6728375, z: 2.6728375}
+  m_LocalPosition: {x: 6, y: 39.5, z: 11}
+  m_LocalScale: {x: 2.247589, y: 2.247589, z: 2.247589}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1997720377}
@@ -6365,8 +6365,8 @@ Transform:
   m_GameObject: {fileID: 1448599051}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 39.6, y: 93.5, z: -13.78}
-  m_LocalScale: {x: 2.6728375, y: 2.6728375, z: 2.6728375}
+  m_LocalPosition: {x: -5, y: 39.3, z: -11.638}
+  m_LocalScale: {x: 2.247589, y: 2.247589, z: 2.247589}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 397119980}
@@ -8967,8 +8967,8 @@ Transform:
   m_GameObject: {fileID: 1821091815}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0.9999998, z: -0, w: -0.0006013226}
-  m_LocalPosition: {x: -48.7, y: -6.300012, z: 9.1}
-  m_LocalScale: {x: 1.8826747, y: 1.8826747, z: 1.8826747}
+  m_LocalPosition: {x: -23, y: -43.3, z: 8}
+  m_LocalScale: {x: 1.5831412, y: 1.5831412, z: 1.5831412}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 180733620}
@@ -9366,7 +9366,7 @@ MonoBehaviour:
   maxHP: 1000
   atk: 10
   Player_status: 0
-  punchDuration: 0.15
+  punchDuration: 0.2
   kickDuration: 0.3
   upKickDuration: 0.5
   downKickDuration: 0.5
