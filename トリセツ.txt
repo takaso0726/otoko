@@ -6,3 +6,13 @@ https://github.com/takaso0726/otoko
 
 実行ファイルはBuild、build以外でファイルに残さないこと
 そうしないとgitが検知してしまう
+
+キー	機能	有効化フラグ	補足
+F2	漢気ゲージ専用デバッグログのON/OFF切替	enableF2DebugKey（初期値ON）	押すたびにトグル。ONの間だけ GaugeDLog の出力が有効になる
+
+
+F4	ダウン中／Dead中のキャラクターを強制復活	enableF4DebugKey	連打数・制限時間を無視。HPはmaxHP × rebornHpRatioまで回復し、通常の根性復活成功と同じ演出（カメラ・状態遷移）が入る
+F5	HPを強制的に0にする	enableF5DebugKey	F4の復活テストをする際、わざわざ攻撃を受けてダウンさせる手間を省くためのキー
+F6	常時仁王立ち（ガード）デバッグモードのON/OFF	enableF6DebugKey	ONの間は毎フレーム強制的にガード状態を維持。OFFにした瞬間、通常状態へ復帰
+F7	漢気ゲージを満タンにする	enableF7DebugKey	必殺技の動作確認用。ゲージが貯まるのを待たずに即座に満タンにできる
+F8	HPを最大値まで回復。ダウン中／Dead中なら生存状態まで強制復活	enableF8DebugKey	生存中に押した場合はHPを回復するだけ（状態は変えない）。ダウン中／Dead中に押した場合はF4と同じ強制復活処理（maxHPまで全回復）が実行される

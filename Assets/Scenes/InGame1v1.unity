@@ -425,7 +425,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 6104a4ac582e74c41bac7728dcd96cee, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 1152ad1b145cb8241bf11bb117b01b6a, type: 3}
   m_Type: 3
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -2907,8 +2907,8 @@ Transform:
   m_GameObject: {fileID: 809242204}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.64, y: -0.65000004, z: 0.1851852}
-  m_LocalScale: {x: 5, y: 0.020545, z: 22.493336}
+  m_LocalPosition: {x: 1.64, y: -0.689, z: 0.1851852}
+  m_LocalScale: {x: 5, y: 0.10271248, z: 22.493336}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1661291248}
@@ -3555,6 +3555,7 @@ MonoBehaviour:
   enableF5DebugKey: 0
   enableF6DebugKey: 1
   enableF7DebugKey: 0
+  enableF8DebugKey: 1
   PlayerName: P1
   PLayerTagName: 
   moveSpeed: 5
@@ -3570,6 +3571,7 @@ MonoBehaviour:
   force: {x: 0, y: 400, z: 0}
   Jumpflag: 0
   HP: 1000
+  maxHP: 1000
   atk: 10
   Player_status: 0
   punchDuration: 0.15
@@ -3585,7 +3587,7 @@ MonoBehaviour:
   throwAtk: 5
   guardAtkBonusMultiplier: 10.5
   rebornTimeLimit: 5
-  rebornHp: 30
+  rebornHpRatio: 0.3
   mashThresholdBase: 11
   mashThresholdStep: 3
   standHeight: 1.93
@@ -3619,7 +3621,7 @@ MonoBehaviour:
   atkPowerPerBar: 0.25
   specialRequiredGauge: 100
   specialGaugeCost: 100
-  specialAtk: 202
+  specialAtk: 172
   specialDuration: 2.25
   specialSe: {fileID: 0}
   specialEffectPrefab: {fileID: 4575220094214949160, guid: 2b606bf4bbf80c64585e8eed7a58d48d, type: 3}
@@ -3644,6 +3646,7 @@ MonoBehaviour:
   specialMultiHit:
     allowMultiHit: 1
     maxHitCount: 5
+  specialHitCooldown: 0.1
   enablePlayerPush: 1
   pushSkinWidth: 0.02
   maxPushSpeed: 1.29
@@ -4166,7 +4169,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 6104a4ac582e74c41bac7728dcd96cee, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 1152ad1b145cb8241bf11bb117b01b6a, type: 3}
   m_Type: 3
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -6520,7 +6523,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 6104a4ac582e74c41bac7728dcd96cee, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 1152ad1b145cb8241bf11bb117b01b6a, type: 3}
   m_Type: 3
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -6997,7 +7000,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 6104a4ac582e74c41bac7728dcd96cee, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 1152ad1b145cb8241bf11bb117b01b6a, type: 3}
   m_Type: 3
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -9339,11 +9342,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::test
   enableDebugLog: 1
-  enableF2DebugKey: 1
+  enableF2DebugKey: 0
   enableF4DebugKey: 0
-  enableF5DebugKey: 0
-  enableF6DebugKey: 0
+  enableF5DebugKey: 1
+  enableF6DebugKey: 1
   enableF7DebugKey: 1
+  enableF8DebugKey: 1
   PlayerName: P2
   PLayerTagName: 
   moveSpeed: 5
@@ -9359,6 +9363,7 @@ MonoBehaviour:
   force: {x: 0, y: 400, z: 0}
   Jumpflag: 0
   HP: 1000
+  maxHP: 1000
   atk: 10
   Player_status: 0
   punchDuration: 0.15
@@ -9374,7 +9379,7 @@ MonoBehaviour:
   throwAtk: 5
   guardAtkBonusMultiplier: 10.5
   rebornTimeLimit: 5
-  rebornHp: 30
+  rebornHpRatio: 0.3
   mashThresholdBase: 11
   mashThresholdStep: 3
   standHeight: 1.93
@@ -9408,7 +9413,7 @@ MonoBehaviour:
   atkPowerPerBar: 0.25
   specialRequiredGauge: 100
   specialGaugeCost: 100
-  specialAtk: 202
+  specialAtk: 172
   specialDuration: 2.25
   specialSe: {fileID: 0}
   specialEffectPrefab: {fileID: 4575220094214949160, guid: 2b606bf4bbf80c64585e8eed7a58d48d, type: 3}
@@ -9433,6 +9438,7 @@ MonoBehaviour:
   specialMultiHit:
     allowMultiHit: 1
     maxHitCount: 5
+  specialHitCooldown: 0.1
   enablePlayerPush: 1
   pushSkinWidth: 0.02
   maxPushSpeed: 1.29
@@ -9649,87 +9655,6 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 1165408657}
   m_SourcePrefab: {fileID: 100100000, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
---- !u!1001 &1923107075
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 17.664156
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 17.664156
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 17.664156
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -1.68
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0.25
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -19.35
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.7686
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0.6397297
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 79.543
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: -1946842447919950405, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -0.119
-      objectReference: {fileID: 0}
-    - target: {fileID: -1946842447919950405, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0.303
-      objectReference: {fileID: 0}
-    - target: {fileID: -96093901687634021, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -0.161
-      objectReference: {fileID: 0}
-    - target: {fileID: 919132149155446097, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
-      propertyPath: m_Name
-      value: ryuuniumi
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: cc4a83b28becb614686f6c23adfd5b1f, type: 3}
 --- !u!4 &1944934835 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -3432401550182100168, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
@@ -10611,7 +10536,6 @@ SceneRoots:
   - {fileID: 561820318}
   - {fileID: 1762534572}
   - {fileID: 1170805463}
-  - {fileID: 1923107075}
   - {fileID: 1569311133}
   - {fileID: 1272488100}
   - {fileID: 837789836}

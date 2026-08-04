@@ -66,6 +66,8 @@ public class Player : MonoBehaviour
     [SerializeField] bool enableF6DebugKey = false;
     [Tooltip("ONにすると、このキャラクターでF7キー（漢気ゲージを満タンにする）が使えます。")]
     [SerializeField] bool enableF7DebugKey = false;
+    [Tooltip("ONにすると、このキャラクターでF8キー（HPを最大値まで回復する）が使えます。")]
+    [SerializeField] bool enableF8DebugKey = false;
 
     // 本スクリプト内のDebug.Log呼び出しはすべてこのメソッド経由にする。
     // enableDebugLogをfalseにすればインスペクターから一括でログ出力を止められる。
@@ -137,7 +139,8 @@ public class Player : MonoBehaviour
     // ★体力・攻撃力・状態
     //=====================================================
     [Header("ステータス")]
-    public int HP = 100;                     // 体力
+    public int HP = 100;                     // 体力（現在値）
+    public int maxHP = 100;                  // 体力の最大値（F8での全回復・復活時の回復割合の基準になる）
     public int atk = 10;                     // 現在の攻撃力（直近に出した攻撃の種類・漢気ゲージ・ガード成功で自動計算される。Inspectorの値は初期表示用）
     public Player.Status Player_status;        // 外部から参照される、プレイヤーの現在の大まかな状態
 
@@ -177,7 +180,8 @@ public class Player : MonoBehaviour
     //=====================================================
     [Header("復活（根性）設定")]
     [SerializeField] float rebornTimeLimit = 5.0f;  // 復活チャレンジの制限時間
-    [SerializeField] int rebornHp = 30;             // 復活成功時に回復するHP
+    [Range(0f, 1f)]
+    [SerializeField] float rebornHpRatio = 0.3f;    // 復活成功時に回復するHPの割合（maxHPに対する割合。0.3なら最大HPの3割まで回復）
     [SerializeField] int mashThresholdBase = 11;    // 必要連打数の基準値
     [SerializeField] int mashThresholdStep = 3;     // 復活回数が増えるごとに必要連打数が増える量
 
@@ -435,14 +439,21 @@ public class Player : MonoBehaviour
     [SerializeField] MultiHitSetting downKickMultiHit = new MultiHitSetting();
     [Tooltip("必殺技（waza／左足攻撃）の多段ヒット設定。既定でON（3秒間で最大5回まで命中可能）。")]
     [SerializeField] MultiHitSetting specialMultiHit = new MultiHitSetting { allowMultiHit = true, maxHitCount = 5 };
+    [Tooltip("必殺技が命中してから、次のヒットが有効になるまでのクールタイム（秒）。多段ヒットの連続ヒット間隔を制御する。")]
+    [SerializeField] float specialHitCooldown = 0.1f;
 
     // 現在の攻撃で、既に何回ヒットが確定したか。EnterPunch/EnterKick等、新しい攻撃の開始時に0へリセットする。
     private int hitCountThisAttack = 0;
+
+    // 必殺技が最後にヒットを確定した時刻（Time.time）。specialHitCooldownの間隔判定に使用する。
+    // 新しい攻撃の開始時（ResetMultiHitCount）に十分過去の値へリセットし、前回の攻撃のクールタイムを引きずらないようにする。
+    private float lastSpecialHitTime = -999f;
 
     // 攻撃の開始時（EnterPunch/EnterKick等）に呼び出し、多段ヒットのカウントをリセットする。
     void ResetMultiHitCount()
     {
         hitCountThisAttack = 0;
+        lastSpecialHitTime = -999f;
     }
 
     // 攻撃の種類（AttackType）に応じた多段ヒット設定を返す。
@@ -479,7 +490,16 @@ public class Player : MonoBehaviour
             return false;
         }
 
+        // ★追加：必殺技は、命中してから次のヒットが有効になるまでspecialHitCooldown秒のクールタイムを設ける。
+        //   多段ヒット許可中でも、同一フレーム／連続フレームでの連続ヒットを防ぐための時間的な間引き。
+        if (isSpecial && Time.time - lastSpecialHitTime < specialHitCooldown)
+        {
+            GaugeDLog($"[{PlayerName}] 必殺技クールタイム中により今回の接触は無効（前回ヒットから{Time.time - lastSpecialHitTime:F3}秒 / クールタイム{specialHitCooldown:F2}秒）");
+            return false;
+        }
+
         hitCountThisAttack++;
+        if (isSpecial) lastSpecialHitTime = Time.time;
         return true;
     }
 
@@ -762,6 +782,39 @@ public class Player : MonoBehaviour
                 // 対象外のPlayerインスタンスでもF7押下自体は検知されるため、
                 // 意図的に無視していることが分かるようログを残す。
                 DLog($"[{PlayerName}] F7キーを検知しましたが、enableF7DebugKeyがOFFのため無視します。");
+            }
+        }
+
+        // ★デバッグ：F8キーでHPを最大値まで回復する
+        //   被弾テストやダウン・復活テストを何度も繰り返す際、いちいち他の手段でHPを戻す手間を省くためのキー。
+        //   対象キャラクターはInspectorのenableF8DebugKeyで選択する。
+        //   ★追加：押した時点で根性復活チャレンジ中（KnockedDown）またはDead状態だった場合は、
+        //     HPを回復するだけでなく、F4の強制復活と同様に生存状態まで復活させる。
+        if (Keyboard.current != null && Keyboard.current.f8Key.wasPressedThisFrame)
+        {
+            if (enableF8DebugKey)
+            {
+                if (currentState == PlayerState.KnockedDown || currentState == PlayerState.Dead)
+                {
+                    ForceRevive(maxHP, "F8");
+                }
+                else
+                {
+                    HP = maxHP;
+                    Debug.Log($"[{PlayerName}] [デバッグ]F8キーによりHPを最大値（{maxHP}）まで回復しました");
+
+                    //UIにHPを反映させるように指示
+                    if (gameMNG != null)
+                    {
+                        gameMNG.Player_ReduceHP(HP, PlayerName);
+                    }
+                }
+            }
+            else
+            {
+                // 対象外のPlayerインスタンスでもF8押下自体は検知されるため、
+                // 意図的に無視していることが分かるようログを残す。
+                DLog($"[{PlayerName}] F8キーを検知しましたが、enableF8DebugKeyがOFFのため無視します。");
             }
         }
 
@@ -1606,8 +1659,8 @@ public class Player : MonoBehaviour
             }
             else
             {
-                //復活成功
-                HP = rebornHp;
+                //復活成功（最大HPのrebornHpRatio割合まで回復）
+                HP = Mathf.RoundToInt(maxHP * rebornHpRatio);
                 rebornCount++;
                 mashCount = 0;
                 rebornTimer = 0f;
@@ -1644,7 +1697,16 @@ public class Player : MonoBehaviour
     //   連打数や制限時間を無視して、通常の復活成功時と同じ処理を即座に実行する。
     void ForceRebornDebug()
     {
-        HP = rebornHp;
+        //最大HPのrebornHpRatio割合まで回復（通常の復活成功時と同じ割合）
+        ForceRevive(Mathf.RoundToInt(maxHP * rebornHpRatio), "F4");
+    }
+
+    // ★追加：デバッグキー共通の強制復活処理。
+    //   指定したHPまで回復させつつ、根性復活成功時と同じ状態リセット・カメラ演出・UI更新を行う。
+    //   hp: 復活後のHP　debugKeyName: ログ表示用のキー名（例："F4","F8"）
+    void ForceRevive(int hp, string debugKeyName)
+    {
+        HP = hp;
         rebornCount++;
         mashCount = 0;
         rebornTimer = 0f;
@@ -1662,7 +1724,7 @@ public class Player : MonoBehaviour
         }
         rebornCamStarted = false; //次回のダウンに備えてリセット
 
-        Debug.Log($"[{PlayerName}] [デバッグ]F4キーにより強制復活しました");
+        Debug.Log($"[{PlayerName}] [デバッグ]{debugKeyName}キーにより強制復活しました（HP={HP}）");
     }
 
     //-----------------------------------------------------
