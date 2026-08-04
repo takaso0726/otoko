@@ -64,6 +64,8 @@ public class Player : MonoBehaviour
     [SerializeField] bool enableF5DebugKey = false;
     [Tooltip("ONにすると、このキャラクターでF6キー（常時仁王立ちデバッグモード）が使えます。")]
     [SerializeField] bool enableF6DebugKey = false;
+    [Tooltip("ONにすると、このキャラクターでF7キー（漢気ゲージを満タンにする）が使えます。")]
+    [SerializeField] bool enableF7DebugKey = false;
 
     // 本スクリプト内のDebug.Log呼び出しはすべてこのメソッド経由にする。
     // enableDebugLogをfalseにすればインスペクターから一括でログ出力を止められる。
@@ -269,12 +271,15 @@ public class Player : MonoBehaviour
     [Tooltip("必殺技発動で消費する漢気ゲージ量。")]
     public float specialGaugeCost = 200f;
 
-    [Tooltip("必殺技命中時に、相手の【現在HP】から何割(0〜1)減らすか。0.5なら現在HPの半分を削る。")]
-    [Range(0f, 1f)]
-    public float specialDamageRatio = 0.5f;
+    [Tooltip("必殺技（左足の攻撃判定）が相手に命中した時のダメージ量。パンチ・キック等と同じ仕組みで、" +
+             "漢気ゲージによる攻撃力補正（atkPowerPerBar）もこの値を基準に上乗せされる。")]
+    [SerializeField] int specialAtk = 20;
 
-    [Tooltip("必殺技発動中の拘束時間(秒)")]
-    [SerializeField] float specialDuration = 1.0f;
+    [Tooltip("必殺技発動中の拘束時間(秒)。既定値は3秒。\n" +
+             "この間は攻撃・ガード・投げ・ジャンプ・必殺技の再発動は一切できず、移動のみ可能。\n" +
+             "また、この間は相手からの攻撃を一切受け付けない（無敵）。\n" +
+             "「waza」トリガーで再生される必殺技アニメーションの長さと同じ秒数に合わせること。")]
+    [SerializeField] float specialDuration = 3.0f;
 
     [Header("必殺技演出（任意設定）")]
     [Tooltip("必殺技発動時に鳴らす効果音（未設定なら鳴らさない）")]
@@ -400,6 +405,83 @@ public class Player : MonoBehaviour
     // ★追加：空振り演出用。攻撃を出した瞬間にfalseにし、相手にヒットした瞬間trueにする。
     //   攻撃モーション終了時にまだfalseなら「空振り」とみなす。
     private bool attackLandedThisAttack = false;
+
+    //=====================================================
+    // ★多段ヒット設定（攻撃の種類ごと）
+    //   1回の攻撃（パンチ・通常キック・上キック・下キック）で、相手に何回まで
+    //   ダメージを与えられるかを、技ごとに個別にInspectorから設定できるようにする。
+    //   ・allowMultiHit = false（既定）：1回の攻撃につき1ヒットのみ（多段ヒット防止）
+    //   ・allowMultiHit = true：maxHitCountで指定した回数までヒットを許可
+    //=====================================================
+    [System.Serializable]
+    public class MultiHitSetting
+    {
+        [Tooltip("OFF（既定）：この技は1回の攻撃で相手に当たるのは1回だけになります（多段ヒット防止）。\n" +
+                 "ON：この技は1回の攻撃で複数回ヒットを許可します（多段ヒット可能）。回数は下のmaxHitCountで設定します。")]
+        public bool allowMultiHit = false;
+        [Tooltip("多段ヒットを許可する場合、1回の攻撃で最大何回までヒット判定を有効にするか。\n" +
+                 "allowMultiHitがOFFの間はこの値に関わらず常に1回として扱われます。")]
+        [Min(1)] public int maxHitCount = 1;
+    }
+
+    [Header("多段ヒット設定（攻撃の種類ごと）")]
+    [Tooltip("パンチ（空中攻撃含む）の多段ヒット設定")]
+    [SerializeField] MultiHitSetting punchMultiHit = new MultiHitSetting();
+    [Tooltip("通常キックの多段ヒット設定")]
+    [SerializeField] MultiHitSetting kickMultiHit = new MultiHitSetting();
+    [Tooltip("上キックの多段ヒット設定")]
+    [SerializeField] MultiHitSetting upKickMultiHit = new MultiHitSetting();
+    [Tooltip("下キックの多段ヒット設定")]
+    [SerializeField] MultiHitSetting downKickMultiHit = new MultiHitSetting();
+    [Tooltip("必殺技（waza／左足攻撃）の多段ヒット設定。既定でON（3秒間で最大5回まで命中可能）。")]
+    [SerializeField] MultiHitSetting specialMultiHit = new MultiHitSetting { allowMultiHit = true, maxHitCount = 5 };
+
+    // 現在の攻撃で、既に何回ヒットが確定したか。EnterPunch/EnterKick等、新しい攻撃の開始時に0へリセットする。
+    private int hitCountThisAttack = 0;
+
+    // 攻撃の開始時（EnterPunch/EnterKick等）に呼び出し、多段ヒットのカウントをリセットする。
+    void ResetMultiHitCount()
+    {
+        hitCountThisAttack = 0;
+    }
+
+    // 攻撃の種類（AttackType）に応じた多段ヒット設定を返す。
+    // 新しい技を追加した場合は、対応するMultiHitSettingフィールドを増やし、ここにもケースを追加すること。
+    MultiHitSetting GetMultiHitSetting(AttackType type)
+    {
+        switch (type)
+        {
+            case AttackType.Punch: return punchMultiHit;
+            case AttackType.Kick: return kickMultiHit;
+            case AttackType.UpKick: return upKickMultiHit;
+            case AttackType.DownKick: return downKickMultiHit;
+            default: return punchMultiHit; // 想定外の場合のフォールバック
+        }
+    }
+
+    // ★追加：被弾した相手側（OnTriggerEnter）から、「今回の接触を有効なヒットとして扱ってよいか」を
+    //   攻撃側（自分＝このPlayerインスタンス）に問い合わせるための公開メソッド。
+    //   現在出している技ごとのMultiHitSettingを参照して判定する。
+    //   ・必殺技(Special)中はspecialMultiHitを参照する（CurrentAttackTypeには含まれないため専用に分岐）。
+    //   ・それ以外はCurrentAttackType（パンチ/キック等）に応じたMultiHitSettingを参照する。
+    //   ・多段ヒット無効時：1回目の呼び出しのみtrueを返し、以降は同じ攻撃の間ずっとfalseを返す。
+    //   ・多段ヒット有効時：maxHitCountで設定した回数までtrueを返す。
+    //   trueを返した場合のみ、呼び出し側（被弾した相手）はダメージ処理を実行すること。
+    public bool TryRegisterHit()
+    {
+        bool isSpecial = currentState == PlayerState.Special;
+        MultiHitSetting setting = isSpecial ? specialMultiHit : GetMultiHitSetting(CurrentAttackType);
+        int limit = setting.allowMultiHit ? Mathf.Max(1, setting.maxHitCount) : 1;
+
+        if (hitCountThisAttack >= limit)
+        {
+            GaugeDLog($"[{PlayerName}] 多段ヒット制限により今回の接触は無効（技={(isSpecial ? "Special" : CurrentAttackType.ToString())} / 既に{hitCountThisAttack}回ヒット済み / 上限{limit}回）");
+            return false;
+        }
+
+        hitCountThisAttack++;
+        return true;
+    }
 
     // ★追加：被弾した相手側から「あなたの攻撃、当たりましたよ」と通知してもらうための公開メソッド。
     public void NotifyAttackLanded()
@@ -657,6 +739,32 @@ public class Player : MonoBehaviour
             }
         }
 
+        // ★デバッグ：F7キーで漢気ゲージを満タンにする
+        //   必殺技の動作確認等、ゲージが貯まるまで待たずにすぐ試したい時のためのキー。
+        //   対象キャラクターはInspectorのenableF7DebugKeyで選択する。
+        if (Keyboard.current != null && Keyboard.current.f7Key.wasPressedThisFrame)
+        {
+            if (enableF7DebugKey)
+            {
+                float max = kankiGaugePerBar * kankiGaugeBarCount;
+                kankiGauge = max;
+                UpdateAtkByGauge();
+                Debug.Log($"[{PlayerName}] [デバッグ]F7キーにより漢気ゲージを満タン（{max:F1}）にしました");
+
+                //ゲージUIを更新
+                if (gameMNG != null)
+                {
+                    gameMNG.Player_UpdateKankiGauge();
+                }
+            }
+            else
+            {
+                // 対象外のPlayerインスタンスでもF7押下自体は検知されるため、
+                // 意図的に無視していることが分かるようログを残す。
+                DLog($"[{PlayerName}] F7キーを検知しましたが、enableF7DebugKeyがOFFのため無視します。");
+            }
+        }
+
         // ヒットストップ処理を最優先で消化する。動けない間は他の入力・状態処理を一切行わない。
         if (hitStopTimer > 0f)
         {
@@ -731,11 +839,87 @@ public class Player : MonoBehaviour
     }
 
     // LateUpdate: Update内の移動処理やRigidbodyによる物理移動（ジャンプ等）がすべて反映された後に、
-    //   最終的なワールド座標をminPosition〜maxPositionの範囲内へ強制的に収める。
+    //   ①P1・P2同士が重なっていたら押しのけ合い（ResolvePlayerOverlap）、
+    //   ②最終的なワールド座標をminPosition〜maxPositionの範囲内へ強制的に収める（ClampPositionWithinBounds）。
     //   Updateの最後ではなくLateUpdateで行うことで、物理演算(FixedUpdate)による移動分も確実に制限できる。
     void LateUpdate()
     {
+        ResolvePlayerOverlap();
         ClampPositionWithinBounds();
+    }
+
+    //=====================================================
+    // ★プレイヤー同士の押しのけ合い設定
+    //   P1・P2の胴体コライダー(Player_Collider)同士が重なった時に、
+    //   物理エンジン任せにせず自前で押しのけ合う処理。
+    //   移動(Move)がRigidbody物理ではなくtransform.Translateで直接位置を動かしているため、
+    //   Unity標準の衝突応答だけでは正しく押し返されず、すり抜けたり上に乗れてしまったりする。
+    //   この処理は「XZ平面上の水平距離」だけを見て押し合うため、
+    //   相手の真上に乗った状態でも横方向へ押し出され続け、結果的に滑り落ちるようになる。
+    //=====================================================
+    [Header("プレイヤー同士の押しのけ合い設定")]
+    [Tooltip("ONにすると、P1・P2の胴体コライダーが重なった時にお互いを押しのけ合います。")]
+    [SerializeField] bool enablePlayerPush = true;
+    [Tooltip("押しのけ判定に使う、コライダー同士の間に余分に確保する隙間（大きいほど早めに反発し始める）")]
+    [SerializeField] float pushSkinWidth = 0.02f;
+    [Tooltip("1秒間に押しのけられる最大距離。大きいほど瞬時に離れ、小さいほどじわっと押し出される")]
+    [SerializeField] float maxPushSpeed = 20f;
+
+    // P1・P2の胴体コライダー(Player_Collider)が重なっている時に、水平方向(XZ平面)へお互いを押し出す。
+    // 相手の真上に乗ってしまった場合でも、この水平方向の押し出しにより支え切れずに横へずれ落ち、
+    // 重力で自然に滑り落ちる（＝上に乗ったまま静止できなくなる）。
+    void ResolvePlayerOverlap()
+    {
+        if (!enablePlayerPush) return;
+        if (enemyPlayer == null) return; // 対人戦(P1/P2)専用。CPU戦(enemy)は対象外
+        if (Player_Collider == null || enemyPlayer.Player_Collider == null) return;
+
+        // ダウン中・死亡中のプレイヤーは押しのけ合いの対象から外す
+        if (Player_status == Status.Dead || enemyPlayer.Player_status == Status.Dead) return;
+
+        CapsuleCollider myCol = Player_Collider;
+        CapsuleCollider otherCol = enemyPlayer.Player_Collider;
+
+        // 半径はワールドスケールを考慮する（通常は1のはずだが、念のためlossyScaleを反映）
+        float myRadius = myCol.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z);
+        float otherRadius = otherCol.radius * Mathf.Max(enemyPlayer.transform.lossyScale.x, enemyPlayer.transform.lossyScale.z);
+        float minDistance = myRadius + otherRadius + pushSkinWidth;
+
+        // --- 垂直方向(Y)の重なりチェック ---
+        // お互いの高さ範囲が重なっていない（例：ジャンプで相手の頭上を飛び越えている最中）場合は、
+        // 実際には接触していないので押しのけを行わない。
+        float myBottom = transform.position.y + myCol.center.y - myCol.height * 0.5f;
+        float myTop = transform.position.y + myCol.center.y + myCol.height * 0.5f;
+        float otherBottom = enemyPlayer.transform.position.y + otherCol.center.y - otherCol.height * 0.5f;
+        float otherTop = enemyPlayer.transform.position.y + otherCol.center.y + otherCol.height * 0.5f;
+
+        bool verticalOverlap = myBottom < otherTop && otherBottom < myTop;
+        if (!verticalOverlap) return;
+
+        // --- 水平方向(Z軸。P1/P2の間合いはZ軸のみで変化する仕様のため)の重なりチェック ---
+        float deltaZ = transform.position.z - enemyPlayer.transform.position.z;
+        float distance = Mathf.Abs(deltaZ);
+
+        if (distance >= minDistance) return; // 十分離れているので何もしない
+
+        float overlap = minDistance - distance;
+        // 自分の分だけ半分押し出す（相手も同じ処理を自分自身に対して行うため、結果的に均等に離れる）
+        float halfPush = overlap * 0.5f;
+        float pushThisFrame = Mathf.Min(halfPush, maxPushSpeed * Time.deltaTime);
+
+        float pushDir;
+        if (distance > 0.0001f)
+        {
+            pushDir = Mathf.Sign(deltaZ);
+        }
+        else
+        {
+            // 完全に同じZ座標で重なっている（例：真上に乗った瞬間）等、符号が決まらない場合は、
+            // InstanceIDで押す方向を固定し、お互い矛盾なく逆方向へ分かれるようにする
+            pushDir = GetInstanceID() < enemyPlayer.GetInstanceID() ? -1f : 1f;
+        }
+
+        transform.position += new Vector3(0f, 0f, pushDir * pushThisFrame);
     }
 
     // ワールド座標のX/Y/Zをそれぞれ設定した範囲内にクランプする
@@ -1122,6 +1306,7 @@ public class Player : MonoBehaviour
         currentState = PlayerState.Punch;
         stateTimer = punchDuration;
         attackLandedThisAttack = false; // 空振り判定用にリセット
+        ResetMultiHitCount();           // 多段ヒットカウントを新しい攻撃用にリセット
 
         // パンチの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映して攻撃力を確定する
         baseAtk = GetAttackPower(AttackType.Punch);
@@ -1152,6 +1337,7 @@ public class Player : MonoBehaviour
 
         ResetAttackTriggers();
         attackLandedThisAttack = false; // 空振り判定用にリセット
+        ResetMultiHitCount();           // 多段ヒットカウントを新しい攻撃用にリセット
 
         if (isCrouchInput)
         {
@@ -1252,8 +1438,11 @@ public class Player : MonoBehaviour
         return kankiGauge >= specialRequiredGauge;
     }
 
-    // 必殺技発動処理。相手の現在HPをspecialDamageRatioの割合だけ削り、
-    // 自分の漢気ゲージをspecialGaugeCost分消費する（ガード不可・必中）。
+    // 必殺技発動処理。左足（LeftFoot/LeftUpLeg/LeftLeg）の当たり判定をONにして、
+    // その状態で3秒間（specialDuration）だけ攻撃を行う。
+    // この間は移動のみ可能（攻撃・ガード・投げ・ジャンプ・必殺技の再発動は不可）で、
+    // かつ相手からの攻撃を一切受けない（無敵。OnTriggerEnter側で判定）。
+    // 相手に左足の判定が当たった場合のみ、specialAtk（Inspector設定）のダメージを与える。
     void EnterSpecial()
     {
         // ★修正：移動中に必殺技へ遷移した際、Moveアニメーション(bool)がONのまま残り、
@@ -1262,9 +1451,25 @@ public class Player : MonoBehaviour
 
         currentState = PlayerState.Special;
         stateTimer = specialDuration;
+        attackLandedThisAttack = false; // 空振り判定用にリセット
+        ResetMultiHitCount();           // 多段ヒットカウントを新しい攻撃用にリセット
 
-        // ★Animator Controller側に"Special"という名前のTriggerパラメータを追加しておくこと
-        animator.SetTrigger("Special");
+        // ★Animator Controller側に"waza"という名前のTriggerパラメータを追加しておくこと。
+        //   currentState=Specialの間、移動以外の入力(攻撃・ガード・投げ・ジャンプ・必殺技)は
+        //   TickBusyState()側で受け付けないため、stateTimer(=specialDuration)が0になって
+        //   PlayerState.Idleへ戻るまで次の技は出せない（＝アニメーションが終わるまで次の技を出せない）。
+        //   specialDurationは"waza"アニメーションの実際の長さと一致させること。
+        animator.SetTrigger("waza");
+
+        // 左足（3箇所）の攻撃用当たり判定をON。オフに戻す処理はTickBusyState()の
+        // 拘束時間終了処理（DisableAllHitboxes）で他の技と共通して行われる。
+        LeftFoot.enabled = true;
+        LeftUpLeg.enabled = true;
+        LeftLeg.enabled = true;
+
+        // 必殺技の攻撃力（Inspector設定値=specialAtk）を基準に、漢気ゲージ補正を反映して攻撃力を確定する
+        baseAtk = specialAtk;
+        UpdateAtkByGauge();
 
         if (se != null && specialSe != null)
         {
@@ -1273,40 +1478,24 @@ public class Player : MonoBehaviour
 
         if (specialEffectPrefab != null)
         {
+            // ★修正：プレイヤーの子オブジェクトとして生成することで、必殺技中プレイヤーが移動しても
+            //   エフェクトが追従し続けるようにする（親を指定しないと生成位置に固定されたままになる）。
+            //   guardBuffEffectPrefabと同じ仕組み：生成後にlocalPositionを明示設定し、
+            //   生成時のプレイヤーの向きに関わらずオフセットがズレないようにする。
             ParticleSystem fx = Instantiate(
                 specialEffectPrefab,
                 transform.position + specialEffectOffset,
-                Quaternion.Euler(-90f, 0f, 0f));
+                Quaternion.Euler(-90f, 0f, 0f),
+                transform);
+            fx.transform.localPosition = specialEffectOffset;
             fx.Play();
             Destroy(fx.gameObject, specialEffectLifetime);
         }
 
-        ApplySpecialDamage();
-
         // 自分の漢気ゲージを消費する
         ReduceKankiGauge(specialGaugeCost);
 
-        DLog($"[{PlayerName}] 必殺技発動！（消費ゲージ={specialGaugeCost}）");
-    }
-
-    // 必殺技のダメージを対戦相手（対人：enemyPlayer／対CPU：enemy）へ適用する。
-    // ガード等の判定を一切通さない必中・固定割合ダメージ。
-    void ApplySpecialDamage()
-    {
-        if (enemyPlayer != null)
-        {
-            int dmg = Mathf.RoundToInt(enemyPlayer.HP * specialDamageRatio);
-            enemyPlayer.damege(dmg); // Player型なのでdamege()経由でHP減算＋UI更新
-            DLog($"[{PlayerName}] 必殺技命中：{enemyPlayer.PlayerName}に{dmg}ダメージ");
-        }
-        else if (enemy != null)
-        {
-            int dmg = Mathf.RoundToInt(enemy.HP * specialDamageRatio);
-            enemy.HP -= dmg;
-            if (enemy.HP < 0) enemy.HP = 0;
-            if (gameMNG != null) gameMNG.Enemy_ReduceHP(enemy.HP);
-            DLog($"[{PlayerName}] 必殺技命中：Enemy(CPU)に{dmg}ダメージ");
-        }
+        DLog($"[{PlayerName}] 必殺技発動！（消費ゲージ={specialGaugeCost} / 攻撃力={atk} / 拘束時間={specialDuration}秒 / 無敵）");
     }
 
     // 攻撃系トリガーの予約をすべてクリアする（前の攻撃予約が残って誤発火するのを防ぐ）
@@ -1318,9 +1507,45 @@ public class Player : MonoBehaviour
         animator.ResetTrigger("Jump");
     }
 
-    // 拘束中の行動（攻撃・ガード・投げ）のタイマーを進め、時間切れになったらIdleへ戻す
+    // ★追加：必殺技(Special)中だけ許可される移動処理。
+    //   通常のMove()はcurrentStateをPlayerState.Moveへ書き換えてしまい、それをやると
+    //   「isFree扱い」になってTickBusyState()ではなくHandleFreeInput()側に処理が移ってしまい、
+    //   必殺技の拘束時間・当たり判定・無敵状態が途中で解除されてしまう。
+    //   そのためcurrentStateやアニメーターの"Move"パラメータには一切触れず、
+    //   スティック入力に応じて位置と向きだけを更新する。
+    void MoveDuringSpecial()
+    {
+        Vector3 worldDirection;
+        if (moveInput.x >= moveInputThreshold)
+        {
+            worldDirection = Vector3.forward;
+        }
+        else if (moveInput.x <= -moveInputThreshold)
+        {
+            worldDirection = Vector3.back;
+        }
+        else
+        {
+            return; // 入力なし：移動しない
+        }
+
+        float inputMagnitude = Mathf.Clamp01(Mathf.Abs(moveInput.x));
+        float speedRatio = Mathf.Lerp(minMoveSpeedRatio, 1f, inputMagnitude);
+        float actualMoveSpeed = moveSpeed * speedRatio;
+
+        transform.Translate(worldDirection * actualMoveSpeed * Time.deltaTime, Space.World);
+        FaceDirection(worldDirection);
+    }
+
+    // 拘束中の行動（攻撃・ガード・投げ・必殺技）のタイマーを進め、時間切れになったらIdleへ戻す。
+    // ただし必殺技(Special)中に限り、タイマー消化と並行して移動だけは受け付ける。
     void TickBusyState()
     {
+        if (currentState == PlayerState.Special)
+        {
+            MoveDuringSpecial();
+        }
+
         stateTimer -= Time.deltaTime;
         if (stateTimer > 0f) return;
 
@@ -1467,6 +1692,10 @@ public class Player : MonoBehaviour
         //自分自身のタグ、またはすでに倒れている場合は無視
         if (collision.gameObject.tag == this.PLayerTagName || HP <= 0) return;
 
+        // ★追加：必殺技(waza)発動中は無敵。相手の攻撃用当たり判定が触れても一切反応しない
+        //  （ダメージ・ヒットストップ・ガード演出等、何も発生させない）。
+        if (currentState == PlayerState.Special) return;
+
         // ★修正：相手が「対人戦のPlayer(enemyPlayer)」か「対CPU戦のEnemy(enemy)」かを
         //   それぞれ判定する。以前はenemyPlayerしか見ておらず、enemy(CPU)の攻撃が
         //   一切ヒット判定されずHPが減らないバグの原因になっていた。
@@ -1483,6 +1712,20 @@ public class Player : MonoBehaviour
         if (!isEnemyPlayerAttack && !isEnemyAttack)
         {
             return;
+        }
+
+        // ★追加：多段ヒット防止／許可の判定。
+        //   同じ攻撃（1回のパンチ・キック等）に対して、今回の接触を有効なヒットとして扱ってよいかを
+        //   攻撃側（相手）のInspector設定（多段ヒット設定）に基づいて問い合わせる。
+        //   falseが返った場合は、既に規定回数ヒット済みなのでこの接触は完全に無視する（ダメージ・演出も一切発生させない）。
+        if (isEnemyPlayerAttack)
+        {
+            if (!enemyPlayer.TryRegisterHit()) return;
+        }
+        else if (isEnemyAttack)
+        {
+            // ※CPU(Enemy)側は現状、多段ヒット制御に未対応です。
+            //   Enemy.csにも同様のTryRegisterHit()を実装すればCPU戦にも適用できます。
         }
 
         //今回被弾させてきた相手の攻撃力を取得（対人戦かCPU戦かで参照先を切り替える）
