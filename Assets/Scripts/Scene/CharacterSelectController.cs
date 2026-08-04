@@ -16,6 +16,39 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public class CharacterSelectController : MonoBehaviour
 {
+    /// <summary>
+    /// セレクト画面で確定した「どちらのプレイヤーが・どのキャラクターを選んだか」を
+    /// シーン遷移後も参照できるように保持しておく置き場。
+    ///
+    /// 重要: Player1 / Player2 を配列やListのインデックス(0番目・1番目)で管理すると、
+    /// 次シーン側の取得順（生成順・検索順など）次第で1Pと2Pの中身が入れ替わってしまう。
+    /// それを避けるため、必ず名前で区別された別々のフィールドとして持つこと。
+    ///
+    /// 次シーン側では、必ず下記のように「名前で明示的に」参照すること。
+    ///   int p1 = CharacterSelectionResult.Player1CharacterIndex;
+    ///   int p2 = CharacterSelectionResult.Player2CharacterIndex;
+    /// （foreachやインデックス0/1でPlayerSelectorを列挙して割り当てる、といった
+    ///   順序依存の実装は絶対に行わないこと。1Pと2Pの入れ替わりバグの原因になる。）
+    /// </summary>
+    public static class CharacterSelectionResult
+    {
+        public static int Player1CharacterIndex = -1;
+        public static int Player2CharacterIndex = -1;
+        public static string Player1CharacterName;
+        public static string Player2CharacterName;
+
+        public static bool IsValid =>
+            Player1CharacterIndex >= 0 && Player2CharacterIndex >= 0;
+
+        public static void Clear()
+        {
+            Player1CharacterIndex = -1;
+            Player2CharacterIndex = -1;
+            Player1CharacterName = null;
+            Player2CharacterName = null;
+        }
+    }
+
     [System.Serializable]
     public class CharacterEntry
     {
@@ -93,6 +126,10 @@ public class CharacterSelectController : MonoBehaviour
             Debug.LogWarning("[CharacterSelectController] characters が設定されていません。", this);
             return;
         }
+
+        // 新しいセレクトセッションの開始時点で、前回分の選択結果が残ったまま
+        // 次シーンへ持ち越されてしまわないようにクリアしておく。
+        CharacterSelectionResult.Clear();
 
         BuildSideGroups();
         groupsBuilt = true;
@@ -319,11 +356,37 @@ public class CharacterSelectController : MonoBehaviour
     {
         isTransitioning = true;
 
+        // 1P・2Pそれぞれの選択結果を、プレイヤー名で明示的に紐付けて保存する。
+        // ここで player1 の結果は必ず Player1CharacterIndex/Name に、
+        // player2 の結果は必ず Player2CharacterIndex/Name に入れること。
+        // （配列やコレクションにまとめてから0番目/1番目で振り分ける、といった
+        //   実装に変更すると、また入れ替わりバグが再発するので注意）
+        SaveSelectionResult();
+
         PlaySE(bothReadySE);
 
         yield return new WaitForSeconds(transitionDelay);
 
         SceneManager.LoadScene(nextSceneName);
+    }
+
+    // 各プレイヤーが最終的にカーソルを合わせていたキャラクターを、
+    // プレイヤーごとに明示的に区別してCharacterSelectionResultへ書き込む。
+    void SaveSelectionResult()
+    {
+        if (player1.allowedIndices != null && player1.allowedIndices.Length > 0)
+        {
+            int p1GlobalIndex = player1.allowedIndices[player1.currentIndex];
+            CharacterSelectionResult.Player1CharacterIndex = p1GlobalIndex;
+            CharacterSelectionResult.Player1CharacterName = characters[p1GlobalIndex].characterName;
+        }
+
+        if (player2.allowedIndices != null && player2.allowedIndices.Length > 0)
+        {
+            int p2GlobalIndex = player2.allowedIndices[player2.currentIndex];
+            CharacterSelectionResult.Player2CharacterIndex = p2GlobalIndex;
+            CharacterSelectionResult.Player2CharacterName = characters[p2GlobalIndex].characterName;
+        }
     }
 
     // ---- 入力読み取り ----

@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -25,6 +26,14 @@ public class DualPlayerDeviceAssigner : MonoBehaviour
     [Header("Input Actionsで定義したゲームパッド用Control Scheme名")]
     [SerializeField] string gamepadSchemeName = "Gamepad";
 
+    // 現在P1・P2それぞれに割り当てられているデバイスを覚えておく。
+    // 「Gamepad.all[0]/[1]」のようにその場の並び順から毎回引き直すと、
+    // 抜き差しでリストの並びが変わった時に持ち主が入れ替わってしまうため、
+    // 一度割り当てたデバイスは、そのデバイス自体が完全に取り外されるまで
+    // 同じプレイヤーに固定し続ける。
+    Gamepad p1Device;
+    Gamepad p2Device;
+
     void Start()
     {
         // PlayerInput側の内部初期化(InputUserの生成)がAwakeで行われるため、
@@ -44,14 +53,28 @@ public class DualPlayerDeviceAssigner : MonoBehaviour
 
     void OnDeviceChange(InputDevice device, InputDeviceChange change)
     {
-        // ゲームパッドの抜き差しがあったら割り当てを更新する
-        if (device is Gamepad &&
-            (change == InputDeviceChange.Added
-             || change == InputDeviceChange.Removed
-             || change == InputDeviceChange.Disconnected
-             || change == InputDeviceChange.Reconnected))
+        if (!(device is Gamepad pad)) return;
+
+        switch (change)
         {
-            AssignDevices();
+            case InputDeviceChange.Removed:
+                // 完全に取り外された場合のみ、そのプレイヤーのスロットを空ける。
+                // （Disconnected/Reconnectedでは持ち主を変えない）
+                if (pad == p1Device) p1Device = null;
+                if (pad == p2Device) p2Device = null;
+                AssignDevices();
+                break;
+
+            case InputDeviceChange.Added:
+                AssignDevices();
+                break;
+
+            case InputDeviceChange.Disconnected:
+            case InputDeviceChange.Reconnected:
+                // 同じデバイスの抜き差しでは、そのデバイスがどちらのプレイヤーに
+                // 属していたかは変えず、ペアリング状態だけ更新する。
+                RefreshPairing();
+                break;
         }
     }
 
@@ -59,9 +82,39 @@ public class DualPlayerDeviceAssigner : MonoBehaviour
     {
         var gamepads = Gamepad.all;
 
-        ConfigureSlot(p1Input, gamepads.Count >= 1 ? gamepads[0] : null);
-        ConfigureSlot(p2Input, gamepads.Count >= 2 ? gamepads[1] : null);
+        // 既に割り当て済みのデバイスが本当に居なくなっていないか確認
+        if (p1Device != null && !gamepads.Contains(p1Device)) p1Device = null;
+        if (p2Device != null && !gamepads.Contains(p2Device)) p2Device = null;
+
+        // まだどちらにも割り当てられていないゲームパッドを、空いているスロットへ
+        // 検出順に詰めていく（＝どちらかが既に確保しているデバイスの奪い合いは起きない）
+        foreach (var pad in gamepads)
+        {
+            if (pad == p1Device || pad == p2Device) continue;
+
+            if (p1Device == null) { p1Device = pad; continue; }
+            if (p2Device == null) { p2Device = pad; continue; }
+
+            // 3台目以降は今回は未対応（1P/2P固定の2人プレイのため）
+            break;
+        }
+
+        RefreshPairing();
     }
+
+    // p1Device/p2Deviceの「持ち主」は変えずに、現在の状態をPlayerInputへ反映するだけの処理
+    void RefreshPairing()
+    {
+        ConfigureSlot(p1Input, p1Device);
+        ConfigureSlot(p2Input, p2Device);
+    }
+
+    // 直前にConfigureSlotへ渡したデバイスを覚えておき、変化が無ければ何もしない
+    // （AssignDevices/RefreshPairingは片方のプレイヤーに無関係な抜き差しでも
+    //   毎回両方呼ばれるため、無変化な側まで毎回ペアリングし直すと
+    //   一瞬入力が途切れるなどの余計な副作用が出てしまう）
+    readonly System.Collections.Generic.Dictionary<PlayerInput, InputDevice> lastConfiguredDevice =
+        new System.Collections.Generic.Dictionary<PlayerInput, InputDevice>();
 
     // 指定したPlayerInputに対して、割り当てるデバイスがあればペアリングして有効化し、
     // 無ければ「PlayerInputコンポーネント自体を無効化」して一切入力を受け取らないようにする。
@@ -69,6 +122,12 @@ public class DualPlayerDeviceAssigner : MonoBehaviour
     // Player側に残ったまま動き続けてしまうため、コンポーネントごと無効化して確実に止める。
     void ConfigureSlot(PlayerInput input, InputDevice device)
     {
+        if (lastConfiguredDevice.TryGetValue(input, out var previous) && previous == device)
+        {
+            return; // 前回と同じ割り当てなら何もしない
+        }
+        lastConfiguredDevice[input] = device;
+
         if (input.user.valid) input.user.UnpairDevices();
 
         if (device == null)
