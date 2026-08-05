@@ -16,6 +16,21 @@ using UnityEngine;
 //     ・GameMNG.OnPlayerHpReduced
 //       （GameMNG.cs側にのみ追加したイベント。Player_ReduceHP(hp, PlayerName)は
 //        Player.cs側が元々呼んでいた既存メソッドで、そちらは変更していません）
+//     ・Player.transform.position / Player.enemyPlayer / Player.enemy
+//       （すべてPlayer.cs既存のpublicメンバー。変更なし）
+//
+// ★「後ろに下がり続けている（Retreat）」の検知について：
+//   Player.cs内部には元々、相手から離れる方向へ移動中かどうかを判定するロジック
+//   （移動方向ベクトルと「相手への方向」の内積が負なら後退、というもの）がありますが、
+//   これはprivateメソッド(ApplyGaugeLossIfRetreating)内に閉じており、外部からは
+//   直接呼び出せません。Player.cs非変更の制約上イベント化もできないため、
+//   本スクリプトでは同じ考え方を、Player.cs既存のpublicメンバーだけを使って
+//   このスクリプト側で毎フレーム独自に再計算しています：
+//     1. targetPlayers[i].transform.position の前フレームからの差分で「今の移動方向」を求める
+//     2. targetPlayers[i].enemyPlayer（対人戦）または .enemy（対CPU戦）のtransform.positionから
+//        「相手への方向」を求める
+//     3. 両者の内積が負＝後退中とみなし、retreatDetectionDuration秒以上連続したら
+//        AudienceSituation.Retreatを発火する
 //
 // ★アニメーション制御は PeopleAnimController.controller の実際の構成に合わせています。
 //   このコントローラーは Trigger ではなく "Bool" パラメータで動く作りです：
@@ -51,6 +66,9 @@ using UnityEngine;
 //      （こちらもキャラごとに独立した間隔でランダム発火する）。
 //   5. Priority Situations で、他の反応中でも取りこぼしたくない状況
 //      （仁王立ち成功＝GuardBlock/GuardBlockBig、攻撃ヒット＝AttackHit）を登録する。
+//   6. Retreat（後ろに下がり続け）の検知は、対戦相手（enemyPlayer/enemy）が
+//      設定されていれば自動的に動作する。発火までの連続後退秒数は
+//      Retreat Detection Duration、ノイズ除去用の最低速度はRetreat Min Speedで調整できる。
 //
 // 注意：
 //   ・仁王立ちの「構えに入った瞬間」自体はPlayer.cs内部のprivateな状態
@@ -72,6 +90,7 @@ public enum AudienceSituation
     Dead,             // 復活失敗・決着
     Revive,           // 根性復活に成功
     Waiting,          // 仁王立ち・ダメージ等、他の状況が何も起きていない待機時間（一定間隔で発火）
+    Retreat,          // プレイヤーが一定時間、相手から離れる方向へ移動し続けた（消極的な展開への野次）
 }
 
 // PeopleAnimController.controller が実際に持っているアニメーション反応。
@@ -83,9 +102,20 @@ public enum AudienceClipReaction
 {
     [InspectorName("待機（Idle）")]
     None,
-    Clap,   // 拍手
-    Cool,   // クール系の反応（やれやれ、感心 等）
-    Call,   // 声援・コール
+    Clap,      // 拍手
+    Cool,      // クール系の反応（やれやれ、感心 等）
+    Call,      // 声援・コール
+
+    // ↓PeopleAnimController.controllerに新しく追加されたBoolパラメータに対応
+    [InspectorName("がっかり待機（Sad Idle）")]
+    SadIdle,   // goSad_Idle
+    Rage,      // goRage        怒り・激高
+    Nervous,   // goNervous     動揺・不安
+    [InspectorName("悪い予感（Bad Sign）")]
+    BadSign,   // goBad_Sign
+    Angry,     // goAngry       怒り
+    Sadness,   // goSadness     悲しみ・落胆
+    Cheers,    // goCheers      歓声・大盛り上がり
 }
 
 // 1つの状況に対して、再生候補の反応(Clap/Cool/Call/待機)を複数登録できる設定。
@@ -139,6 +169,7 @@ public class AudienceController : MonoBehaviour
         new SituationReaction { situation = AudienceSituation.Dead,         clipReactions = new[] { AudienceClipReaction.Cool } },
         new SituationReaction { situation = AudienceSituation.Revive,       clipReactions = new[] { AudienceClipReaction.Call } },
         new SituationReaction { situation = AudienceSituation.Waiting,     clipReactions = new[] { AudienceClipReaction.Cool, AudienceClipReaction.None } },
+        new SituationReaction { situation = AudienceSituation.Retreat,     clipReactions = new[] { AudienceClipReaction.BadSign, AudienceClipReaction.Sadness } },
     };
 
     [Header("SE設定")]
@@ -172,8 +203,27 @@ public class AudienceController : MonoBehaviour
     public string goCoolParamName = "goCool";
     public string goCallParamName = "goCall";
 
+    [Tooltip("PeopleAnimController.controllerに新しく追加されたBoolパラメータ名（実際のパラメータ名と完全一致させること）")]
+    public string goSadIdleParamName = "goSad_Idle";
+    public string goRageParamName = "goRage";
+    public string goNervousParamName = "goNervous";
+    public string goBadSignParamName = "goBad_Sign";
+    public string goAngryParamName = "goAngry";
+    public string goSadnessParamName = "goSadness";
+    public string goCheersParamName = "goCheers";
+
     [Tooltip("Idle状態の名前（Animator上のステート名と合わせる）")]
     public string idleStateName = "Idle";
+
+    [Header("後退（下がり続け）検知設定")]
+    [Tooltip("この秒数以上、相手から離れる方向へ移動し続けたらRetreat状況を発生させる")]
+    public float retreatDetectionDuration = 2.5f;
+
+    [Tooltip("これ未満の移動速度(m/秒)はノイズとして無視し、後退判定に含めない")]
+    public float retreatMinSpeed = 0.05f;
+
+    [Tooltip("Retreat状況を再発火させるまでのクールダウン(秒)。0にすると、条件を満たすたびdetectionDuration分の連続後退のみで即座に再発火する")]
+    public float retreatRetriggerCooldown = 0f;
 
     [Header("待機中（Waiting）演出の間隔設定")]
     [Tooltip("何も状況が起きていない待機中に、AudienceSituation.Waitingの反応をランダム再生する機能を有効にするか")]
@@ -212,6 +262,13 @@ public class AudienceController : MonoBehaviour
     // 各プレイヤーの「直前フレームでのステータス」を覚えておくための配列。
     // これと現在の値を比較することで、「変化した瞬間」だけを検知する。
     private Player.Status[] previousStatus;
+
+    // targetPlayers[i]ごとの「後退（相手から離れる方向への移動）」検知用の内部状態。
+    // Player.csは変更していないため、transform.position等の既存public情報から
+    // このスクリプト側で毎フレーム独自に追跡している。
+    private Vector3[] previousPlayerPositions;
+    private float[] retreatTimers;
+    private float[] retreatCooldownTimers;
 
     // 直近でガードインパクト(仁王立ちブロック)が発生したフレーム番号。
     // GameMNG.OnPlayerHpReduced由来のダメージイベントが同じフレームで来た場合、
@@ -279,11 +336,15 @@ public class AudienceController : MonoBehaviour
         }
 
         previousStatus = new Player.Status[targetPlayers.Length];
+        previousPlayerPositions = new Vector3[targetPlayers.Length];
+        retreatTimers = new float[targetPlayers.Length];
+        retreatCooldownTimers = new float[targetPlayers.Length];
         for (int i = 0; i < targetPlayers.Length; i++)
         {
             if (targetPlayers[i] != null)
             {
                 previousStatus[i] = targetPlayers[i].Player_status;
+                previousPlayerPositions[i] = targetPlayers[i].transform.position;
             }
         }
 
@@ -370,7 +431,93 @@ public class AudienceController : MonoBehaviour
                 HandleStatusChanged(prev, current);
                 previousStatus[i] = current;
             }
+
+            UpdateRetreatDetection(i, p);
         }
+    }
+
+    //-----------------------------------------------------------------------
+    // 後退（下がり続け）の検知 → Retreat反応
+    //-----------------------------------------------------------------------
+
+    // targetPlayers[i]（プレイヤーp）が、対戦相手から離れる方向へ
+    // retreatDetectionDuration秒以上連続で移動し続けたかどうかを毎フレーム判定し、
+    // 満たしたらAudienceSituation.Retreatを発火する。
+    // Player.csは変更していないため、判定はすべてtransform.position等の
+    // 既存public情報からこのスクリプト側で独自に再計算している。
+    void UpdateRetreatDetection(int index, Player p)
+    {
+        Vector3 currentPos = p.transform.position;
+        Vector3 delta = currentPos - previousPlayerPositions[index];
+        previousPlayerPositions[index] = currentPos;
+
+        // クールダウン中は時間を消化するだけで、判定・発火はスキップする
+        if (retreatCooldownTimers[index] > 0f)
+        {
+            retreatCooldownTimers[index] -= Time.deltaTime;
+        }
+
+        // 決着後・ダウン中などは後退判定の対象外（動いていても野次らない）
+        if (p.Player_status != Player.Status.Live)
+        {
+            retreatTimers[index] = 0f;
+            return;
+        }
+
+        Transform opponentTf = GetOpponentTransform(p);
+        if (opponentTf == null)
+        {
+            retreatTimers[index] = 0f;
+            return;
+        }
+
+        delta.y = 0f;
+        float dt = Mathf.Max(Time.deltaTime, 0.0001f);
+        float speed = delta.magnitude / dt;
+
+        bool isRetreatingThisFrame = false;
+        if (speed >= retreatMinSpeed)
+        {
+            Vector3 toOpponent = opponentTf.position - currentPos;
+            toOpponent.y = 0f;
+            if (toOpponent.sqrMagnitude > 0.0001f)
+            {
+                // 移動方向と「相手への方向」の内積が負＝相手から離れる方向へ動いている
+                // （Player.cs内部のApplyGaugeLossIfRetreatingと同じ考え方）
+                float dot = Vector3.Dot(delta.normalized, toOpponent.normalized);
+                isRetreatingThisFrame = dot < 0f;
+            }
+        }
+
+        if (!isRetreatingThisFrame)
+        {
+            // 前進・停止・横移動などに切り替わったら、連続後退時間はリセットする
+            retreatTimers[index] = 0f;
+            return;
+        }
+
+        retreatTimers[index] += Time.deltaTime;
+        if (retreatTimers[index] < retreatDetectionDuration) return;
+        if (retreatCooldownTimers[index] > 0f) return; // クールダウン中は再発火しない
+
+        DLog($"[AudienceController] [{p.PlayerName}] {retreatDetectionDuration}秒以上、相手から離れる方向へ移動し続けたためRetreat状況を発生させます");
+        PlayReaction(AudienceSituation.Retreat);
+
+        // 後退が続いていれば一定間隔ごとに繰り返し発火させたいので、時間だけリセットする
+        // （retreatRetriggerCooldownを0より大きくすると、そのぶん再発火の間隔が空く）
+        retreatTimers[index] = 0f;
+        retreatCooldownTimers[index] = retreatRetriggerCooldown;
+    }
+
+    // 対人戦(enemyPlayer)／対CPU戦(enemy)どちらの場合でも、相手のTransformを取得する。
+    // Player.cs側にある同名ロジック(private)と同じ考え方だが、
+    // enemyPlayer/enemyはどちらもPlayer.cs既存のpublicフィールドなので、
+    // Player.csを変更せずこのスクリプト側だけで参照できる。
+    Transform GetOpponentTransform(Player p)
+    {
+        if (p.enemyPlayer != null) return p.enemyPlayer.transform;
+        if (p.enemy != null) return p.enemy.transform;
+        return null;
     }
 
     // ステータスの変化内容を、対応する状況(AudienceSituation)に変換して反応させる
@@ -741,6 +888,13 @@ public class AudienceController : MonoBehaviour
             case AudienceClipReaction.Clap: return goClapParamName;
             case AudienceClipReaction.Cool: return goCoolParamName;
             case AudienceClipReaction.Call: return goCallParamName;
+            case AudienceClipReaction.SadIdle: return goSadIdleParamName;
+            case AudienceClipReaction.Rage: return goRageParamName;
+            case AudienceClipReaction.Nervous: return goNervousParamName;
+            case AudienceClipReaction.BadSign: return goBadSignParamName;
+            case AudienceClipReaction.Angry: return goAngryParamName;
+            case AudienceClipReaction.Sadness: return goSadnessParamName;
+            case AudienceClipReaction.Cheers: return goCheersParamName;
             default: return null;
         }
     }

@@ -7228,7 +7228,7 @@ MonoBehaviour:
     clipReactions: 01000000
     seClips: []
   - situation: 4
-    clipReactions: 02000000
+    clipReactions: 0a00000009000000
     seClips:
     - {fileID: 8300000, guid: aed08a397486c8f4ba6e09fe028445b8, type: 3}
   - situation: 5
@@ -7238,6 +7238,11 @@ MonoBehaviour:
   - situation: 6
     clipReactions: 0300000002000000
     seClips: []
+  - situation: 7
+    clipReactions: 080000000400000007000000
+    seClips:
+    - {fileID: 8300000, guid: 13fcb6648715d994ba42a6e4954aeba2, type: 3}
+    - {fileID: 8300000, guid: 2ea70a91006a0a249bec395ad064cf7c, type: 3}
   seAudioSource: {fileID: 905618911}
   seVolume: 1
   prioritySituations: 000000000100000002000000
@@ -7245,7 +7250,17 @@ MonoBehaviour:
   goClapParamName: goClap
   goCoolParamName: goCool
   goCallParamName: goCall
+  goSadIdleParamName: goSad_Idle
+  goRageParamName: goRage
+  goNervousParamName: goNervous
+  goBadSignParamName: goBad_Sign
+  goAngryParamName: goAngry
+  goSadnessParamName: goSadness
+  goCheersParamName: goCheers
   idleStateName: Idle
+  retreatDetectionDuration: 2.5
+  retreatMinSpeed: 0.05
+  retreatRetriggerCooldown: 0
   enableIdleVariations: 1
   idleVariationIntervalRange: {x: 2, y: 5}
   reactionSafetyTimeout: 10
