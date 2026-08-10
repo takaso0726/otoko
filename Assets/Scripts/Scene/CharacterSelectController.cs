@@ -8,6 +8,7 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// キャラクターセレクト画面の制御。
 /// 1P・2Pがそれぞれ独立したカーソルでキャラクターを選び、決定ボタンで確定する。
+/// 左右の担当エリアという制限は無く、1P・2Pともに全キャラクターへ上下左右自由に移動できる。
 /// 両者の選択が確定したら、演出→ディレイを挟んでインゲームシーンへ遷移する。
 ///
 /// ・カーソル移動のコルーチンとSE再生パターンは MainMenuController.cs を踏襲。
@@ -54,7 +55,14 @@ public class CharacterSelectController : MonoBehaviour
     {
         public string characterName;  // 表示名
         public RectTransform anchor;  // グリッド上の位置（各キャラアイコンのUI要素）
-        public Sprite portrait;       // カーソルを合わせた時に表示するドアップ画像
+
+        [Header("ドアップ画像")]
+        public Sprite portrait;       // デフォルトのドアップ画像（1P/2P専用画像が未設定の場合のフォールバック）
+        public Sprite portraitP1;     // 1Pがカーソルを合わせた時に表示する画像（未設定ならportraitを使用）
+        public Sprite portraitP2;     // 2Pがカーソルを合わせた時に表示する画像（未設定ならportraitを使用）
+
+        [Header("名前表示（画像）")]
+        public Sprite nameImage;      // キャラ名を表す画像（ロゴ・ロゴタイプ等）。選択中にnameImageObjectへ反映する
     }
 
     [System.Serializable]
@@ -64,10 +72,11 @@ public class CharacterSelectController : MonoBehaviour
         public RectTransform cursor;   // このプレイヤー用カーソル
         public GameObject readyMark;   // 決定後に表示する「READY」表示（Inspectorで非アクティブにしておく）
         public Image portraitImage;    // 選択中キャラのドアップ表示用（1Pは画面左、2Pは画面右に配置しておく）
+        public Image nameImageObject;  // 選択中キャラの名前画像表示用（未設定なら何もしない）
+        public int startIndex;         // このプレイヤーの初期カーソル位置（characters配列のインデックス）
 
-        [HideInInspector] public int currentIndex;   // allowedIndices内でのローカルなカーソル位置
+        [HideInInspector] public int currentIndex;   // characters配列内でのカーソル位置（グローバルインデックス）
         [HideInInspector] public bool decided;
-        [HideInInspector] public int[] allowedIndices; // このプレイヤーが選択できるcharactersのインデックス一覧（画面左右で自動振り分け）
     }
 
     [Header("キャラクター一覧（グリッド順）")]
@@ -89,7 +98,7 @@ public class CharacterSelectController : MonoBehaviour
     [SerializeField] float transitionDelay = 0.7f;
 
     bool isTransitioning;
-    bool groupsBuilt;
+    bool initialized;
     Coroutine p1CursorRoutine;
     Coroutine p2CursorRoutine;
 
@@ -104,16 +113,18 @@ public class CharacterSelectController : MonoBehaviour
         {
             player1.decided = false;
             SetReadyMarkActive(player1, false);
+            SetCursorVisible(player1, true);
         }
         if (player2 != null)
         {
             player2.decided = false;
             SetReadyMarkActive(player2, false);
+            SetCursorVisible(player2, true);
         }
 
         // Start()は初回のみ呼ばれる仕様なので、2回目以降の有効化時は
         // ここでカーソル位置とドアップ表示も選択初期状態へ戻しておく。
-        if (groupsBuilt)
+        if (initialized)
         {
             ResetSelectionPositions();
         }
@@ -131,71 +142,33 @@ public class CharacterSelectController : MonoBehaviour
         // 次シーンへ持ち越されてしまわないようにクリアしておく。
         CharacterSelectionResult.Clear();
 
-        BuildSideGroups();
-        groupsBuilt = true;
-
-        if (player1.allowedIndices.Length == 0)
-        {
-            Debug.LogWarning("[CharacterSelectController] 1P側（画面左）に該当するキャラクターがありません。anchorの配置を確認してください。");
-        }
-        if (player2.allowedIndices.Length == 0)
-        {
-            Debug.LogWarning("[CharacterSelectController] 2P側（画面右）に該当するキャラクターがありません。anchorの配置を確認してください。");
-        }
+        initialized = true;
 
         ResetSelectionPositions();
     }
 
     void ResetSelectionPositions()
     {
-        player1.currentIndex = 0;
-        player2.currentIndex = 0;
+        player1.currentIndex = Mathf.Clamp(player1.startIndex, 0, characters.Length - 1);
+        player2.currentIndex = Mathf.Clamp(player2.startIndex, 0, characters.Length - 1);
 
-        if (player1.allowedIndices != null && player1.allowedIndices.Length > 0 && player1.cursor != null)
+        if (player1.cursor != null)
         {
-            var anchor = characters[player1.allowedIndices[0]].anchor;
+            var anchor = characters[player1.currentIndex].anchor;
             if (anchor != null) player1.cursor.position = anchor.position;
         }
-        if (player2.allowedIndices != null && player2.allowedIndices.Length > 0 && player2.cursor != null)
+        if (player2.cursor != null)
         {
-            var anchor = characters[player2.allowedIndices[0]].anchor;
+            var anchor = characters[player2.currentIndex].anchor;
             if (anchor != null) player2.cursor.position = anchor.position;
         }
 
         SetReadyMarkActive(player1, false);
         SetReadyMarkActive(player2, false);
-        UpdatePortrait(player1);
-        UpdatePortrait(player2);
-    }
-
-    // characters配列を、各anchorの画面X座標が画面中央より左か右かで
-    // 1P側（左半分）／2P側（右半分）に自動振り分けする。
-    // ※ Canvasが Screen Space - Overlay の場合、anchor.position は画面ピクセル座標と一致するため
-    //   Screen.width/2 との比較で左右判定ができる。
-    //   Screen Space - Camera / World Space Canvas を使っている場合は判定方法の見直しが必要。
-    void BuildSideGroups()
-    {
-        var leftList = new List<int>();
-        var rightList = new List<int>();
-        float centerX = Screen.width / 2f;
-
-        for (int i = 0; i < characters.Length; i++)
-        {
-            var anchor = characters[i].anchor;
-            if (anchor == null) continue;
-
-            if (anchor.position.x < centerX)
-            {
-                leftList.Add(i);
-            }
-            else
-            {
-                rightList.Add(i);
-            }
-        }
-
-        player1.allowedIndices = leftList.ToArray();
-        player2.allowedIndices = rightList.ToArray();
+        SetCursorVisible(player1, true);
+        SetCursorVisible(player2, true);
+        UpdateSelectionDisplay(player1, 1);
+        UpdateSelectionDisplay(player2, 2);
     }
 
     void Update()
@@ -203,8 +176,8 @@ public class CharacterSelectController : MonoBehaviour
         if (isTransitioning) return;
         if (characters == null || characters.Length == 0) return;
 
-        HandlePlayer(player1, ReadP1Direction(), ReadP1Decide(), ReadP1Cancel(), ref p1CursorRoutine);
-        HandlePlayer(player2, ReadP2Direction(), ReadP2Decide(), ReadP2Cancel(), ref p2CursorRoutine);
+        HandlePlayer(player1, ReadP1Direction(), ReadP1Decide(), ReadP1Cancel(), ref p1CursorRoutine, 1);
+        HandlePlayer(player2, ReadP2Direction(), ReadP2Decide(), ReadP2Cancel(), ref p2CursorRoutine, 2);
 
         // 両者が決定していたら遷移演出へ
         if (player1.decided && player2.decided)
@@ -213,7 +186,7 @@ public class CharacterSelectController : MonoBehaviour
         }
     }
 
-    void HandlePlayer(PlayerSelector p, Vector2Int inputDir, bool decide, bool cancel, ref Coroutine routine)
+    void HandlePlayer(PlayerSelector p, Vector2Int inputDir, bool decide, bool cancel, ref Coroutine routine, int playerNumber)
     {
         if (p.decided)
         {
@@ -222,37 +195,30 @@ public class CharacterSelectController : MonoBehaviour
             {
                 p.decided = false;
                 SetReadyMarkActive(p, false);
+                SetCursorVisible(p, true);
             }
             return;
         }
-
-        // 担当側（左 or 右）にキャラが1体も無い場合は操作させない
-        if (p.allowedIndices == null || p.allowedIndices.Length == 0) return;
 
         // 同一フレームで斜め入力が来た場合は左右を優先する（上下と同時に判定すると挙動が分かりづらくなるため）
         Vector2Int navDir = inputDir.x != 0 ? new Vector2Int(inputDir.x, 0) : new Vector2Int(0, inputDir.y);
 
         if (navDir != Vector2Int.zero)
         {
-            int currentGlobalIndex = p.allowedIndices[p.currentIndex];
-            int nextGlobalIndex = FindNearestInDirection(p, currentGlobalIndex, new Vector2(navDir.x, navDir.y));
+            int nextIndex = FindNearestInDirection(p.currentIndex, new Vector2(navDir.x, navDir.y));
 
-            if (nextGlobalIndex >= 0)
+            if (nextIndex >= 0)
             {
-                int localIndex = System.Array.IndexOf(p.allowedIndices, nextGlobalIndex);
-                if (localIndex >= 0)
+                p.currentIndex = nextIndex;
+                PlaySE(moveSE);
+
+                if (p.cursor != null && characters[nextIndex].anchor != null)
                 {
-                    p.currentIndex = localIndex;
-                    PlaySE(moveSE);
-
-                    if (p.cursor != null && characters[nextGlobalIndex].anchor != null)
-                    {
-                        if (routine != null) StopCoroutine(routine);
-                        routine = StartCoroutine(MoveCursorSmooth(p.cursor, characters[nextGlobalIndex].anchor.position));
-                    }
-
-                    UpdatePortrait(p);
+                    if (routine != null) StopCoroutine(routine);
+                    routine = StartCoroutine(MoveCursorSmooth(p.cursor, characters[nextIndex].anchor.position));
                 }
+
+                UpdateSelectionDisplay(p, playerNumber);
             }
         }
 
@@ -260,15 +226,16 @@ public class CharacterSelectController : MonoBehaviour
         {
             p.decided = true;
             SetReadyMarkActive(p, true);
+            SetCursorVisible(p, false);
             PlaySE(decideSE);
         }
     }
 
-    // 現在位置(fromGlobalIndex)から見て、dir方向にある「担当側キャラの中で一番近いもの」のグローバルインデックスを返す。
-    // 見つからなければ-1。
+    // 現在位置(fromGlobalIndex)から見て、dir方向にある「characters全体の中で一番近いもの」の
+    // インデックスを返す（左右どちら側かは問わず、全キャラクターが対象）。見つからなければ-1。
     // dirが伸びる方向（主軸）の距離を優先しつつ、主軸から外れる（横ズレ・縦ズレ）ほどペナルティを与えることで、
     // 単純なグリッドでなくても自然に「右にある一番近いキャラ」「上にある一番近いキャラ」を選べるようにしている。
-    int FindNearestInDirection(PlayerSelector p, int fromGlobalIndex, Vector2 dir)
+    int FindNearestInDirection(int fromGlobalIndex, Vector2 dir)
     {
         var fromAnchor = characters[fromGlobalIndex].anchor;
         if (fromAnchor == null) return -1;
@@ -280,7 +247,7 @@ public class CharacterSelectController : MonoBehaviour
         int bestIndex = -1;
         float bestScore = float.MaxValue;
 
-        foreach (int idx in p.allowedIndices)
+        for (int idx = 0; idx < characters.Length; idx++)
         {
             if (idx == fromGlobalIndex) continue;
 
@@ -318,19 +285,52 @@ public class CharacterSelectController : MonoBehaviour
         }
     }
 
-    // カーソルが乗っているキャラクターのドアップ画像を、そのプレイヤー専用のImageに反映する
-    // （1P用Imageは画面左、2P用Imageは画面右のRectTransformに配置しておく想定）
-    void UpdatePortrait(PlayerSelector p)
+    // 決定時はカーソルを隠してREADYマークだけを見せ、選び直し時はカーソルを再表示する
+    void SetCursorVisible(PlayerSelector p, bool visible)
     {
-        if (p == null || p.portraitImage == null) return;
-        if (p.allowedIndices == null || p.allowedIndices.Length == 0) return;
+        if (p != null && p.cursor != null)
+        {
+            p.cursor.gameObject.SetActive(visible);
+        }
+    }
 
-        int charIndex = p.allowedIndices[p.currentIndex];
-        var sprite = characters[charIndex].portrait;
-        p.portraitImage.sprite = sprite;
+    // カーソルが乗っているキャラクターのドアップ画像・名前表示を、そのプレイヤー専用のUIに反映する
+    // （1P用UIは画面左、2P用UIは画面右のRectTransformに配置しておく想定）
+    // playerNumberが1なら portraitP1、2なら portraitP2 を優先して使用し、
+    // 未設定の場合は共通の portrait にフォールバックする。
+    void UpdateSelectionDisplay(PlayerSelector p, int playerNumber)
+    {
+        if (p == null) return;
+        if (characters == null || characters.Length == 0) return;
 
-        // portrait未設定のキャラの場合はImageを非表示にして「空の白い四角」が出ないようにする
-        p.portraitImage.enabled = sprite != null;
+        var entry = characters[p.currentIndex];
+
+        if (p.portraitImage != null)
+        {
+            Sprite sprite;
+            if (playerNumber == 1)
+            {
+                sprite = entry.portraitP1 != null ? entry.portraitP1 : entry.portrait;
+            }
+            else
+            {
+                sprite = entry.portraitP2 != null ? entry.portraitP2 : entry.portrait;
+            }
+
+            p.portraitImage.sprite = sprite;
+
+            // portrait未設定のキャラの場合はImageを非表示にして「空の白い四角」が出ないようにする
+            p.portraitImage.enabled = sprite != null;
+        }
+
+        if (p.nameImageObject != null)
+        {
+            var nameSprite = entry.nameImage;
+            p.nameImageObject.sprite = nameSprite;
+
+            // nameImage未設定のキャラの場合はImageを非表示にして「空の白い四角」が出ないようにする
+            p.nameImageObject.enabled = nameSprite != null;
+        }
     }
 
     // AudioClipがInspectorで未設定の場合にPlayOneShot(null)警告が出るのを防ぐ
@@ -374,19 +374,11 @@ public class CharacterSelectController : MonoBehaviour
     // プレイヤーごとに明示的に区別してCharacterSelectionResultへ書き込む。
     void SaveSelectionResult()
     {
-        if (player1.allowedIndices != null && player1.allowedIndices.Length > 0)
-        {
-            int p1GlobalIndex = player1.allowedIndices[player1.currentIndex];
-            CharacterSelectionResult.Player1CharacterIndex = p1GlobalIndex;
-            CharacterSelectionResult.Player1CharacterName = characters[p1GlobalIndex].characterName;
-        }
+        CharacterSelectionResult.Player1CharacterIndex = player1.currentIndex;
+        CharacterSelectionResult.Player1CharacterName = characters[player1.currentIndex].characterName;
 
-        if (player2.allowedIndices != null && player2.allowedIndices.Length > 0)
-        {
-            int p2GlobalIndex = player2.allowedIndices[player2.currentIndex];
-            CharacterSelectionResult.Player2CharacterIndex = p2GlobalIndex;
-            CharacterSelectionResult.Player2CharacterName = characters[p2GlobalIndex].characterName;
-        }
+        CharacterSelectionResult.Player2CharacterIndex = player2.currentIndex;
+        CharacterSelectionResult.Player2CharacterName = characters[player2.currentIndex].characterName;
     }
 
     // ---- 入力読み取り ----
