@@ -12,25 +12,25 @@ EditorBuildSettings:
     path: Assets/Scenes/MainMenu.unity
     guid: 1f0e17cc60f4b4f40b165ca29a41f42e
   - enabled: 1
-    path: Assets/Scenes/InGame1v1.unity
+    path: Assets/Scenes/1v1/InGame1v1.unity
     guid: 1bb7db4a3e48c6c43bd9c0c7141c346b
   - enabled: 1
-    path: Assets/Scenes/InGame.unity
+    path: Assets/Scenes/CPU/InGame.unity
     guid: af336db328aa5e14cb61496104d3a6c5
   - enabled: 1
-    path: Assets/Scenes/GameOver.unity
+    path: Assets/Scenes/CPU/GameOver.unity
     guid: bda3817d807b15147ba614178b65cc61
   - enabled: 1
-    path: Assets/Scenes/GameClear.unity
+    path: Assets/Scenes/CPU/GameClear.unity
     guid: 87912cdef48a28c439b8c2e69f70f379
   - enabled: 1
-    path: Assets/Scenes/Select.unity
+    path: Assets/Scenes/1v1/Select.unity
     guid: ff8ff38a96278d64e9ba4c4d32b2f759
   - enabled: 1
-    path: Assets/Scenes/SFC.unity
+    path: Assets/Scenes/CPU/SFC.unity
     guid: 5b413719266a32a4ca9fc47dcdef418d
   - enabled: 1
-    path: Assets/Scenes/Judgment.unity
+    path: Assets/Scenes/1v1/Judgment.unity
     guid: 42f59c4ff9be14d48a43633beabcc71b
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
