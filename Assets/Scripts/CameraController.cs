@@ -73,6 +73,9 @@ public class FightingCameraController : MonoBehaviour
     public float focusLookAtHeightOffset = 1.2f;
 
     [Header("仁王立ち被弾演出（ガードインパクトカメラ）")]
+    [Tooltip("仁王立ちで攻撃を受け止めた際に、カメラがローアングルの近距離へ寄る演出を行うかどうか。OFFにすると通常の追従カメラのまま位置は変化しない（OnGuardImpactStartイベントの発火やVolume演出には影響しない）")]
+    public bool guardImpactCameraMoveEnabled = true;
+
     [Tooltip("被弾した瞬間、対象からどれだけ離れるか（かなり近距離にして威圧感を出す）")]
     public float guardImpactDistance = 2.2f;
 
@@ -100,19 +103,6 @@ public class FightingCameraController : MonoBehaviour
 
     [Tooltip("新たな被弾が無い場合、この演出を継続する時間（秒）。連続被弾時はリセットされ続く")]
     public float guardImpactHoldDuration = 0.6f;
-
-    [Header("被弾シェイク設定")]
-    [Tooltip("1回目のガード成功時の揺れの強さ")]
-    public float shakeBaseAmplitude = 0.05f;
-
-    [Tooltip("連続ガード1回ごとに加算される揺れの強さ")]
-    public float shakeAmplitudePerCombo = 0.04f;
-
-    [Tooltip("揺れの強さの上限（これ以上は大きくならない）")]
-    public float shakeMaxAmplitude = 0.4f;
-
-    [Tooltip("揺れの細かさ（大きいほど小刻みに震える）")]
-    public float shakeFrequency = 25f;
 
     [Header("背景ボケ（被写界深度）連携")]
     [Tooltip("被写界深度(Depth of Field)を設定したVolumeを割り当てる（URP/HDRP共通）。未設定でも動作する")]
@@ -375,7 +365,11 @@ public class FightingCameraController : MonoBehaviour
 
         // ★追加：観客スクリプト等、外部へ「仁王立ちで受け止めた瞬間」を通知するイベント。
         //   comboCountを渡すので、連続で耐えるほど盛り上がりを強くする、といった演出に使える。
+        //   カメラ位置変更のオンオフに関わらず、この通知だけは常に行う。
         OnGuardImpactStart?.Invoke(target, Mathf.Max(1, comboCount));
+
+        // カメラ位置が変わる演出がOFFの場合は、通常の追従カメラのまま何もしない
+        if (!guardImpactCameraMoveEnabled) return;
 
         _isGuardImpactMode = true;
         _guardImpactTarget = target;
@@ -470,20 +464,8 @@ public class FightingCameraController : MonoBehaviour
             guardImpactMoveInSmoothTime
         );
 
-        // 4. 連続ガード回数に応じてシェイクの強さを決定（上限あり）
-        float amplitude = Mathf.Min(
-            shakeBaseAmplitude + shakeAmplitudePerCombo * (_guardImpactComboCount - 1),
-            shakeMaxAmplitude
-        );
-        float t = Time.time * shakeFrequency;
-        Vector3 shakeOffset = new Vector3(
-            (Mathf.PerlinNoise(t, 0f) - 0.5f) * 2f,
-            (Mathf.PerlinNoise(0f, t) - 0.5f) * 2f,
-            (Mathf.PerlinNoise(t, t) - 0.5f) * 2f
-        ) * amplitude;
-
-        // 5. シェイクを乗せた最終位置を反映し、見上げる注視点を向く
-        transform.position = smoothedPos + shakeOffset;
+        // 4. 最終位置を反映し、見上げる注視点を向く
+        transform.position = smoothedPos;
         transform.LookAt(lookAtTarget);
 
         // 通常モードに戻ったときに違和感が出ないよう、注視点の内部状態も合わせておく

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -76,6 +77,23 @@ public class GameMNG : MonoBehaviour
     [SerializeField] string gameClearSceneName = "GameClear";             // InGame（エネミー戦）勝利時
     [SerializeField] string inGame1v1ResultSceneName = "Judgment"; // InGame1v1（対人戦）の勝敗結果画面
 
+    //=======================================================================
+    // 仁王立ち成功時のスロー演出
+    //=======================================================================
+    [Header("仁王立ち成功時のスロー演出")]
+    [Tooltip("仁王立ちで攻撃を受け止めた瞬間に、ゲーム全体を一瞬スローにするかどうか")]
+    public bool guardSlowEnabled = true;
+
+    [Tooltip("スロー中の時間の進み方（0.1で1/10速度）。0に近いほど強く止まって見える")]
+    [Range(0.01f, 1f)]
+    public float guardSlowTimeScale = 0.1f;
+
+    [Tooltip("スローを保つ時間（秒）。実時間で計測されるため、timeScaleの影響を受けない")]
+    public float guardSlowDuration = 0.15f;
+
+    [Tooltip("スロー終了後、通常速度に戻るまでの時間（秒）")]
+    public float guardSlowRecoverDuration = 0.2f;
+
     //=========================================
     // 内部処理変数
     //=========================================
@@ -86,6 +104,10 @@ public class GameMNG : MonoBehaviour
     Player.Status player2Status;    // プレイヤー2の状態管理変数
 
     string currentScene = null;     // 現在のシーン名
+
+    // ★追加：仁王立ちスロー演出用の内部状態
+    Coroutine guardSlowCoroutine;   // 実行中のスローコルーチン（多重発火時の再スタート判定に使用）
+    float guardSlowNormalTimeScale = 1f; // スロー開始前のtimeScaleを退避しておく変数
 
     //-----------------------------------------------------------------------
     // 初期化
@@ -344,6 +366,70 @@ public class GameMNG : MonoBehaviour
     public void PlayerUI(float Timer, int Cnt)
     {
         // 今後実装予定
+    }
+
+    //=======================================================================
+    // 仁王立ち成功時の処理
+    //=======================================================================
+
+    // ★追加：仁王立ちで攻撃を受け止めることに成功した瞬間、Player.cs等から呼び出す。
+    //   ゲーム全体を一瞬スローにする演出を行う（guardSlowEnabledがOFFなら何もしない）。
+    //   PlayerNameは将来の拡張（演出をキャラごとに変える等）に備えて受け取っているだけで、
+    //   現状のスロー処理そのものはどちらのプレイヤーでも共通の挙動になる。
+    public void OnGuardImpactSuccess(string PlayerName)
+    {
+        if (!guardSlowEnabled) return;
+
+        TriggerGuardSlowMotion(guardSlowTimeScale, guardSlowDuration, guardSlowRecoverDuration);
+    }
+
+    // 指定時間だけゲーム全体をスローにし、その後なめらかに通常速度へ戻す
+    private void TriggerGuardSlowMotion(float slowScale, float holdDuration, float recoverDuration)
+    {
+        if (guardSlowCoroutine != null)
+        {
+            // 既にスロー中なら、元の速度を保ったまま再スタート（連続で受け止めた場合など）
+            StopCoroutine(guardSlowCoroutine);
+        }
+        else
+        {
+            guardSlowNormalTimeScale = Time.timeScale;
+        }
+
+        guardSlowCoroutine = StartCoroutine(GuardSlowMotionRoutine(slowScale, holdDuration, recoverDuration));
+    }
+
+    private IEnumerator GuardSlowMotionRoutine(float slowScale, float holdDuration, float recoverDuration)
+    {
+        // すぐにスロー速度へ
+        Time.timeScale = slowScale;
+        yield return new WaitForSecondsRealtime(holdDuration);
+
+        // 通常速度へなめらかに戻す（実時間で計測することで、スロー中でも正確に進む）
+        float elapsed = 0f;
+        while (elapsed < recoverDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / recoverDuration);
+            // イーズアウトで、戻り始めは緩やか・終盤で自然に収束させる
+            float eased = 1f - Mathf.Pow(1f - t, 2f);
+            Time.timeScale = Mathf.Lerp(slowScale, guardSlowNormalTimeScale, eased);
+            yield return null;
+        }
+
+        Time.timeScale = guardSlowNormalTimeScale;
+        guardSlowCoroutine = null;
+    }
+
+    // スロー中にこのオブジェクトが無効化・破棄されても、時間の速さが戻らなくなるのを防ぐ
+    void OnDisable()
+    {
+        if (guardSlowCoroutine != null)
+        {
+            StopCoroutine(guardSlowCoroutine);
+            guardSlowCoroutine = null;
+            Time.timeScale = guardSlowNormalTimeScale;
+        }
     }
 
     //=======================================================================
