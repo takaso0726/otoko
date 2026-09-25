@@ -40,7 +40,9 @@ public class Player : MonoBehaviour
         UpKick,     // 上キック
         DownKick,   // 下キック
         Guard,      // 仁王立ち
-        Throw,      // 投げ
+        Throw,      // 投げ：掴んでいる側（掴み始め～投げ飛ばすまでの一連の拘束）
+        Grabbed,    // ★追加：投げ：掴まれている側（脱出を試みている間の拘束）
+        Thrown,     // ★追加：投げ：投げ飛ばされて放物線上を飛んでいる間（着地するまで）
         Special,    // 必殺技（漢気ゲージ消費技）
         KnockedDown,// ダウン中（根性復活チャレンジ中）
         Dead,       // 死亡（復活失敗）
@@ -166,6 +168,28 @@ public class Player : MonoBehaviour
     [SerializeField] int upKickAtk = 10;   // 上キックの攻撃力
     [SerializeField] int downKickAtk = 10; // 下キックの攻撃力
     [SerializeField] int throwAtk = 5;     // 投げ（つかみ）成立時の固定ダメージ
+
+    //=====================================================
+    // ★追加：投げ（掴み）仕様変更に伴う詳細設定
+    //   掴み成立→(掴み状態中に脱出できなければ)→投げ飛ばし、という2段階の流れになる。
+    //   throwDurationは「掴んでから実際に投げ飛ばすまでの拘束時間」として引き続き使用する
+    //   （Animatorの"Throw-start"モーションの長さと合わせること）。
+    //=====================================================
+    [Header("投げ（掴み）詳細設定")]
+    [SerializeField] float grabRange = 1.75f; // 掴みが成立する間合い(Z軸の距離)。旧コードの固定値1.75fを変数化したもの
+    [Tooltip("HPが0の時に脱出（掴みを振りほどく）までに必要な時間。値が大きいほど脱出しにくい＝投げられやすい。")]
+    [SerializeField] float escapeTimeAtZeroHp = 1.5f;
+    [Tooltip("HPが満タンの時に脱出（掴みを振りほどく）までに必要な時間。値が小さいほど脱出しやすい＝投げられにくい。")]
+    [SerializeField] float escapeTimeAtFullHp = 0.4f;
+    [Tooltip("掴まれている間、ボタンやスティックを入力する度に、脱出に必要な残り時間からさらに追加で短縮する秒数。")]
+    [SerializeField] float escapeReductionPerInput = 0.15f;
+    [Tooltip("投げが成立した瞬間、相手に加える水平方向の初速。攻撃側の移動スティックの倒し方向（前/後）で向きが決まる。")]
+    [SerializeField] float throwHorizontalSpeed = 6f;
+    [Tooltip("投げが成立した瞬間、相手に加える上方向の初速。大きいほど放物線の弧が高くなる。")]
+    [SerializeField] float throwUpSpeed = 5f;
+    [Tooltip("掴み拘束時間が終わった時点で、掴んでいる側が方向スティックを入力していなかった場合の「投げ不成立」時に、" +
+             "お互いを後方（相手から離れる方向）へ押し出す距離。")]
+    [SerializeField] float grabFailPushDistance = 1.0f;
 
     //=====================================================
     // ★ガード（仁王立ち）成功時の攻撃力上昇設定
@@ -337,6 +361,11 @@ public class Player : MonoBehaviour
     private bool debugAlwaysGuard = false;
     bool rebornCamStarted;           // 根性復活のクローズアップカメラを開始済みか
     bool canThrow = true;            // 投げの多重発生を防ぐフラグ
+
+    // ★追加：投げ（掴み）仕様変更用の相互参照・タイマー
+    Player grabbedTarget;            // 自分が今掴んでいる相手（掴む側の時だけ使用。掴んでいなければnull）
+    Player grabbingPlayer;           // 自分を今掴んでいる相手（掴まれる側の時だけ使用。掴まれていなければnull）
+    float escapeTimer;               // 掴まれている間の、脱出に必要な残り時間（0になったら脱出成功）
 
     int rebornCount = 1;             // 復活回数のカウント
     float rebornTimer;               // 復活チャレンジの経過時間
@@ -688,8 +717,9 @@ public class Player : MonoBehaviour
         //   以前はEnterCrouch()内でcurrentStateとコライダー/アニメーターを同時に変更していたため、
         //   しゃがみ中にキック等のボタン入力でcurrentStateがCrouch以外へ上書きされると、
         //   その後スティックを離してもExitCrouch()が呼ばれず、しゃがみ見た目だけが残り続ける不具合があった。
-        //   ダウン中／Dead中はコライダー変更で見た目が破綻するので対象外にする。
-        if (currentState != PlayerState.KnockedDown && currentState != PlayerState.Dead)
+        //   ダウン中／Dead中／掴まれ中／投げ吹き飛び中はコライダー変更で見た目が破綻するので対象外にする。
+        if (currentState != PlayerState.KnockedDown && currentState != PlayerState.Dead
+            && currentState != PlayerState.Grabbed && currentState != PlayerState.Thrown)
         {
             SyncCrouchVisual(moveInput.y <= crouchInputThreshold);
         }
@@ -1450,7 +1480,10 @@ public class Player : MonoBehaviour
         Destroy(newParticle.gameObject, 1.0f);
     }
 
-    // 投げ（掴み）処理。敵との距離・状態を判定し、条件を満たせば投げを成立させる
+    // 投げ（掴み）処理。★仕様変更：この時点ではまだ投げ飛ばさず、
+    //   間合い・状態の条件を満たしていれば相手を「掴まれ状態(Grabbed)」へ移行させるだけにする。
+    //   実際に相手を投げ飛ばす（放物線状に飛ばす）のは、この掴み拘束(throwDuration)が終わる瞬間
+    //   （TickBusyState→ResolveThrowLaunch）であり、掴んでいる間の移動スティック入力で方向が決まる。
     void EnterThrow()
     {
         // ★修正：移動中に投げへ遷移した際、Moveアニメーション(bool)がONのまま残り、
@@ -1459,30 +1492,246 @@ public class Player : MonoBehaviour
 
         currentState = PlayerState.Throw;
         stateTimer = throwDuration;
-        animator.SetTrigger("Throw-start");
-        if (enemyPlayer != null &&
-            enemyPlayer.Player_status != Status.Attack &&
-            (enemyPlayer.transform.position.z - transform.position.z < 1.75f) &&
-            canThrow)
+        animator.SetTrigger("Throw-start"); // 掴み（ホールド）モーション。飛ばす瞬間は別トリガー"Throw-release"を使う
+        grabbedTarget = null;
+
+        Player target = GetGrabTarget();
+        if (target != null)
         {
-            DLog("投げ成功");
-            enemyPlayer.transform.Translate(0f, 0f, -0.0025f);      // 敵を少し引き寄せる
-            enemyPlayer.animator.SetTrigger("Thrown");              // 敵に投げられアニメーションを再生させる
-            enemyPlayer.damege(throwAtk);                           // 敵に投げのダメージ（Inspector設定値）を与える
-            canThrow = false;                                       // 一度成功したら再度投げが発動しないようにする
+            DLog($"[{PlayerName}] 掴み成立：{target.PlayerName}");
+            canThrow = false;                                  // 一度成立したら再度多重に発動しないようにする
+            grabbedTarget = target;
+            target.transform.Translate(0f, 0f, -0.0025f);      // 敵を少し引き寄せる（既存の演出を踏襲）
+            target.EnterGrabbed(this);                         // 相手を掴まれ状態へ移行させる（脱出タイマーは相手のHPから決まる）
+        }
+        else
+        {
+            DLog($"[{PlayerName}] 掴み失敗（間合い外／相手が掴める状態でない／多重発生防止のいずれか）");
+        }
+    }
+
+    // ★追加：掴みが成立する相手を判定する。
+    //   対人戦(enemyPlayer)のみ対応。対CPU戦(enemy)は、本ファイルの他の機能（多段ヒット等）と同様に
+    //   現状未対応（Enemy.cs側に同等の仕組みが必要）。
+    Player GetGrabTarget()
+    {
+        if (enemyPlayer == null) return null;
+        if (!canThrow) return null;
+        if (!enemyPlayer.CanBeGrabbed()) return null;
+
+        // ★修正：以前は符号なしの差分だけを見ており、相手が逆側にいる場合に距離判定が正しく働かなかったため、
+        //   絶対値で間合いを判定するようにした。
+        float distance = Mathf.Abs(enemyPlayer.transform.position.z - transform.position.z);
+        if (distance >= grabRange) return null;
+
+        return enemyPlayer;
+    }
+
+    // ★追加：外部（掴んでくる相手）から「今、掴まれる（投げられる）ことができる状態か」を問い合わせるための公開メソッド。
+    //   Player_status(Attack)は他の処理でほとんど更新されておらず信頼できないため、
+    //   実際の行動状態であるcurrentStateを基準に判定する。
+    public bool CanBeGrabbed()
+    {
+        return HP > 0
+            && currentState != PlayerState.Grabbed
+            && currentState != PlayerState.Thrown
+            && currentState != PlayerState.KnockedDown
+            && currentState != PlayerState.Dead;
+    }
+
+    // ★追加：現在のHPから、掴まれた際に脱出（振りほどき）に必要な時間を算出する。
+    //   HPが高いほど短時間で脱出でき、HPが低いほど脱出に時間がかかる（＝投げられやすい）仕様。
+    float CalculateEscapeTime()
+    {
+        float hpRatio = maxHP > 0 ? Mathf.Clamp01((float)HP / maxHP) : 0f;
+        return Mathf.Lerp(escapeTimeAtZeroHp, escapeTimeAtFullHp, hpRatio);
+    }
+
+    // ★追加：相手に掴まれた瞬間に、相手側(grabber)から呼び出される。
+    //   ここではまだダメージは発生させず（ダメージは実際に投げ飛ばされた瞬間に発生させる）、
+    //   脱出のための拘束状態(Grabbed)に入るだけにする。
+    public void EnterGrabbed(Player grabber)
+    {
+        StopMoveAnimation();
+        DisableAllHitboxes(); // 掴まれた瞬間に自分の攻撃判定は念のため止めておく
+        isGuarding = false;
+
+        currentState = PlayerState.Grabbed;
+        grabbingPlayer = grabber;
+        escapeTimer = CalculateEscapeTime();
+
+        animator.SetTrigger("Grabbed"); // ★要Animator追加：掴まれ中（もがき）専用のアニメーション。"Thrown"（飛んでいる間）とは別にする
+
+        DLog($"[{PlayerName}] 掴まれた！脱出に必要な時間={escapeTimer:F2}秒（HP={HP}/{maxHP}）");
+    }
+
+    // ★追加：掴まれている間、毎フレーム呼ばれる。時間経過に加え、
+    //   ボタン（既存の意図フラグ）かスティックの入力があるたびに追加で脱出時間を短縮する。
+    void TickGrabbed()
+    {
+        escapeTimer -= Time.deltaTime;
+
+        bool mashed = wantPunch || wantKick || wantGuard || wantJump || wantThrow || wantSpecial
+                   || Mathf.Abs(moveInput.x) >= moveInputThreshold
+                   || Mathf.Abs(moveInput.y) >= moveInputThreshold;
+        if (mashed)
+        {
+            escapeTimer -= escapeReductionPerInput;
         }
 
-        if (enemy != null &&
-            enemyPlayer.Player_status != Status.Attack &&
-            (enemyPlayer.transform.position.z - transform.position.z < 1.75f) &&
-            canThrow)
+        if (escapeTimer <= 0f)
         {
-            DLog("投げ成功");
-            enemyPlayer.transform.Translate(0f, 0f, -0.0025f);     // 敵を少し引き寄せる
-            enemyPlayer.animator.SetTrigger("Thrown");             // 敵に投げられアニメーションを再生させる
-            enemyPlayer.damege(throwAtk);                          // 敵に投げのダメージ（Inspector設定値）を与える
-            canThrow = false;                                // 一度成功したら再度投げが発動しないようにする
+            EscapeFromGrab();
         }
+    }
+
+    // ★追加：掴みからの脱出に成功した時の処理。自分をIdleへ戻し、掴んでいた相手の投げ動作も中断させる。
+    void EscapeFromGrab()
+    {
+        DLog($"[{PlayerName}] 掴みから脱出成功！");
+
+        currentState = PlayerState.Idle;
+        animator.SetTrigger("Grab-escape"); // ★要Animator追加（任意）：脱出演出用トリガー。未設定でも動作に支障はない
+
+        if (grabbingPlayer != null)
+        {
+            grabbingPlayer.NotifyGrabEscaped();
+            grabbingPlayer = null;
+        }
+    }
+
+    // ★追加：掴んでいた相手に脱出された時、掴んでいる側から呼び出される。
+    //   投げ拘束(Throw)を即座に打ち切ってIdleへ戻す。
+    public void NotifyGrabEscaped()
+    {
+        if (currentState != PlayerState.Throw) return; // 既に自分の掴み拘束が終わっていれば何もしない
+
+        DLog($"[{PlayerName}] 掴んでいた相手に逃げられた");
+
+        grabbedTarget = null;
+        DisableAllHitboxes();
+        isGuarding = false;
+        canThrow = true;
+        currentState = PlayerState.Idle;
+        animator.SetTrigger("Throw-whiff"); // ★要Animator追加（任意）：掴み失敗（逃げられた）演出用トリガー
+    }
+
+    // ★追加：掴み拘束(throwDuration)が時間切れになった＝相手が脱出できなかった時に、
+    //   TickBusyState()から呼ばれる。掴んでいる側が方向入力をしていれば実際にダメージを与えて
+    //   放物線状に投げ飛ばす。方向入力が無かった場合は「投げ不成立」として扱い、
+    //   （脱出できた時と同様に）お互いを後方へ押し出すだけにする。
+    void ResolveThrowLaunch()
+    {
+        if (grabbedTarget == null) return; // 掴み自体が不成立（空振り）だった場合は何もしない
+
+        bool hasDirectionInput = Mathf.Abs(moveInput.x) >= moveInputThreshold;
+
+        if (!hasDirectionInput)
+        {
+            // ★追加：方向入力が無いまま拘束時間切れ＝投げ不成立。脱出成功時と同じ扱いで、
+            //   ダメージも投げ飛ばしも発生させず、お互いを後方へ押し出すだけにする。
+            DLog($"[{PlayerName}] 方向入力が無いまま拘束時間切れ。投げ不成立扱いで{grabbedTarget.PlayerName}と共に後方へ離れる");
+
+            animator.SetTrigger("Throw-whiff"); // ★要Animator追加（任意）：投げ不成立演出用トリガー
+
+            grabbedTarget.ReleaseFromGrabWithoutThrow(this); // 相手側もGrabbedを終了させ、後方へ押し出す
+            PushBackFromGrabFailure(grabbedTarget);          // 自分も相手から離れる方向へ後方へ押し出す
+
+            grabbedTarget = null;
+            return;
+        }
+
+        DLog($"[{PlayerName}] 投げ成立！{grabbedTarget.PlayerName}を投げ飛ばす");
+
+        animator.SetTrigger("Throw-release"); // 掴みモーションとは別の「投げ飛ばす」モーション
+
+        grabbedTarget.damege(throwAtk); // ダメージは掴み成立時ではなく、実際に投げが決まった瞬間に与える
+
+        Vector3 launchDir = GetThrowDirectionFromStick();
+        grabbedTarget.LaunchByThrow(launchDir, throwHorizontalSpeed, throwUpSpeed);
+
+        grabbedTarget = null;
+    }
+
+    // ★追加：投げ不成立（掴んだ側の無入力タイムアウト）時に、掴まれていた側から呼び出される。
+    //   Grabbed状態を終了してIdleへ戻し、掴んでいた相手から離れる方向へ後方へ押し出される。
+    public void ReleaseFromGrabWithoutThrow(Player grabber)
+    {
+        if (currentState != PlayerState.Grabbed) return; // 既にGrabbedでなければ何もしない
+
+        DisableAllHitboxes();
+        isGuarding = false;
+        currentState = PlayerState.Idle;
+        grabbingPlayer = null;
+
+        animator.SetTrigger("Grab-escape"); // 脱出成功時と同じ演出用トリガーを流用
+
+        PushBackFromGrabFailure(grabber);
+
+        DLog($"[{PlayerName}] 投げ不成立のため掴みが解け、後方へ離れた");
+    }
+
+    // ★追加：投げ不成立時に、相手(other)から離れる方向（Z軸）へ自分を後方へ押し出す。
+    //   移動範囲はUpdate/LateUpdateのClampPositionWithinBounds()で最終的に制限される。
+    void PushBackFromGrabFailure(Player other)
+    {
+        float deltaZ = transform.position.z - other.transform.position.z;
+        float dir;
+        if (Mathf.Abs(deltaZ) > 0.0001f)
+        {
+            dir = Mathf.Sign(deltaZ);
+        }
+        else
+        {
+            // 完全に同じZ座標の場合は、InstanceIDで押し出す向きを決定的に振り分ける
+            dir = GetInstanceID() < other.GetInstanceID() ? -1f : 1f;
+        }
+
+        transform.Translate(0f, 0f, dir * grabFailPushDistance, Space.World);
+    }
+
+    // ★追加：掴んでいる間の移動スティック入力から、投げ飛ばす水平方向を決定する。
+    //   Move()と同じくX入力で前方/後方(Vector3.forward/back)を判定し、
+    //   ニュートラルなら自分が向いている方向へ飛ばす。
+    Vector3 GetThrowDirectionFromStick()
+    {
+        if (moveInput.x >= moveInputThreshold) return Vector3.forward;
+        if (moveInput.x <= -moveInputThreshold) return Vector3.back;
+        return transform.forward;
+    }
+
+    // ★追加：投げ技によって、放物線状に吹き飛ばされる処理。掴んでいた相手から呼び出される。
+    //   Rigidbodyに初速を与えるだけで、あとは重力(既存のJump同様の物理設定)に任せて放物線を描かせる。
+    public void LaunchByThrow(Vector3 horizontalDirection, float horizontalSpeed, float upSpeed)
+    {
+        StopMoveAnimation();
+        DisableAllHitboxes();
+        isGuarding = false;
+
+        currentState = PlayerState.Thrown;
+        grabbingPlayer = null;
+
+        animator.SetTrigger("Thrown"); // 飛んでいる間の専用アニメーション（Grabbedとは別のモーション）
+
+        if (rb != null)
+        {
+            // ★Note：rb.velocity / rb.linearVelocity はUnityのバージョンによってプロパティ名が異なるため、
+            //   どちらの環境でも動くようにAddForce(ForceMode.VelocityChange)で速度を直接加算する方式にしている。
+            //   掴まれている間は移動していない想定なので、既存の速度への加算でほぼ意図通りの初速になる。
+            Vector3 launchVelocity = horizontalDirection.normalized * horizontalSpeed + Vector3.up * upSpeed;
+            rb.AddForce(launchVelocity, ForceMode.VelocityChange);
+        }
+
+        DLog($"[{PlayerName}] 投げられて吹き飛んだ！");
+    }
+
+    // ★追加：投げで吹き飛ばされた後、地面に着地した瞬間にOnCollisionEnterから呼ばれる。
+    //   Thrown状態を終えてIdleへ戻す。
+    void LandFromThrow()
+    {
+        DLog($"[{PlayerName}] 投げから着地して復帰");
+        currentState = PlayerState.Idle;
+        animator.SetTrigger("Thrown-land"); // ★要Animator追加（任意）：着地モーション用トリガー。未設定でも動作に支障はない
     }
 
     // 現在の漢気ゲージで必殺技を発動できるかどうか
@@ -1594,6 +1843,21 @@ public class Player : MonoBehaviour
     // ただし必殺技(Special)中に限り、タイマー消化と並行して移動だけは受け付ける。
     void TickBusyState()
     {
+        // ★追加：掴まれている間は専用の脱出判定（TickGrabbed）だけを行い、
+        //   通常の拘束時間消化（stateTimer）とは別ロジックで終了条件を管理する。
+        if (currentState == PlayerState.Grabbed)
+        {
+            TickGrabbed();
+            return;
+        }
+
+        // ★追加：投げ飛ばされて飛んでいる間は、着地判定(OnCollisionEnter→LandFromThrow)で
+        //   終了するため、ここでは何もしない（stateTimerも消化しない）。
+        if (currentState == PlayerState.Thrown)
+        {
+            return;
+        }
+
         if (currentState == PlayerState.Special)
         {
             MoveDuringSpecial();
@@ -1613,6 +1877,12 @@ public class Player : MonoBehaviour
                 transkunn.y += 2.0f;
                 HitEffectSpawner.Instance.SpawnAtDirection(missHitEffectData, transkunn, transform.forward);
             }
+        }
+
+        // ★追加：掴み拘束が時間切れになった＝相手が脱出できなかった場合、ここで実際に投げ飛ばす
+        if (currentState == PlayerState.Throw)
+        {
+            ResolveThrowLaunch();
         }
 
         DisableAllHitboxes();
@@ -1737,6 +2007,12 @@ public class Player : MonoBehaviour
         if (other.gameObject.CompareTag("Ground"))
         {
             Jumpflag = true;
+
+            // ★追加：投げで放物線状に吹き飛ばされている最中に地面へ着地したら、Thrown状態を終えて復帰する
+            if (currentState == PlayerState.Thrown)
+            {
+                LandFromThrow();
+            }
         }
     }
 
