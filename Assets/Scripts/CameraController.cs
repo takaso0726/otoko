@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering; // 被写界深度(背景ボケ)用のVolume制御に使用
@@ -65,6 +66,16 @@ public class FightingCameraController : MonoBehaviour
     [Tooltip("注視点の回転スムーズさ")]
     public float rotationSmoothTime = 0.2f;
 
+    [Header("カメラ追従の移動範囲制限")]
+    [Tooltip("ONにすると、カメラが指定した座標範囲より外へは進まなくなる（通常追従・勝利フォーカス演出に適用）")]
+    public bool cameraBoundsEnabled = false;
+
+    [Tooltip("カメラが移動できる範囲の最小座標（X/Y/Z）")]
+    public Vector3 cameraBoundsMin = new Vector3(-10f, 1f, -15f);
+
+    [Tooltip("カメラが移動できる範囲の最大座標（X/Y/Z）")]
+    public Vector3 cameraBoundsMax = new Vector3(10f, 8f, -3f);
+
     [Header("勝利演出（フォーカス）設定")]
     [Tooltip("勝利したキャラクターにズームする際のカメラ距離")]
     public float focusZoomDistance = 4f;
@@ -103,6 +114,20 @@ public class FightingCameraController : MonoBehaviour
 
     [Tooltip("新たな被弾が無い場合、この演出を継続する時間（秒）。連続被弾時はリセットされ続く")]
     public float guardImpactHoldDuration = 0.6f;
+
+    [Header("仁王立ち成功時のスロー演出")]
+    [Tooltip("仁王立ちで受け止めた瞬間に、ゲーム全体をスローにするかどうか")]
+    public bool guardImpactSlowEnabled = true;
+
+    [Tooltip("スロー中の時間の進み方（0.1で1/10速度）。0に近いほど強く止まって見える")]
+    [Range(0.01f, 1f)]
+    public float guardImpactSlowTimeScale = 0.1f;
+
+    [Tooltip("スローを保つ時間（秒）。実時間で計測されるため、timeScaleの影響を受けない")]
+    public float guardImpactSlowDuration = 0.15f;
+
+    [Tooltip("スロー終了後、通常速度に戻るまでの時間（秒）")]
+    public float guardImpactSlowRecoverDuration = 0.2f;
 
     [Header("背景ボケ（被写界深度）連携")]
     [Tooltip("被写界深度(Depth of Field)を設定したVolumeを割り当てる（URP/HDRP共通）。未設定でも動作する")]
@@ -176,6 +201,10 @@ public class FightingCameraController : MonoBehaviour
     private Vector3 _rebornVelocityPos;
     private float _rebornOrbitTimer;
     private float _rebornOrbitStartAngle;
+
+    // スロー演出関連
+    private Coroutine _slowCoroutine;
+    private float _normalTimeScale = 1f;
 
     void Start()
     {
@@ -252,11 +281,13 @@ public class FightingCameraController : MonoBehaviour
         Vector3 desiredCameraPos = _smoothedLookAt + offsetDirection * _currentDistance;
 
         // 5. カメラ位置をスムーズに移動
-        transform.position = Vector3.SmoothDamp(
-            transform.position,
-            desiredCameraPos,
-            ref _velocityPos,
-            followSmoothTime
+        transform.position = ClampToCameraBounds(
+            Vector3.SmoothDamp(
+                transform.position,
+                desiredCameraPos,
+                ref _velocityPos,
+                followSmoothTime
+            )
         );
 
         // 6. 常に中心点を見るように回転
@@ -311,6 +342,20 @@ public class FightingCameraController : MonoBehaviour
     }
 
     /// <summary>
+    /// cameraBoundsEnabledがONの場合、指定した座標をcameraBoundsMin〜cameraBoundsMaxの範囲に収める。
+    /// OFFの場合は何もせずそのまま返す。
+    /// </summary>
+    private Vector3 ClampToCameraBounds(Vector3 position)
+    {
+        if (!cameraBoundsEnabled) return position;
+
+        position.x = Mathf.Clamp(position.x, cameraBoundsMin.x, cameraBoundsMax.x);
+        position.y = Mathf.Clamp(position.y, cameraBoundsMin.y, cameraBoundsMax.y);
+        position.z = Mathf.Clamp(position.z, cameraBoundsMin.z, cameraBoundsMax.z);
+        return position;
+    }
+
+    /// <summary>
     /// フォーカスモード中のカメラ更新処理
     /// 指定した勝者キャラクターにズームして注視する
     /// </summary>
@@ -341,11 +386,13 @@ public class FightingCameraController : MonoBehaviour
         Vector3 desiredCameraPos = _smoothedLookAt + offsetDirection * _currentDistance;
 
         // カメラ位置をスムーズに移動
-        transform.position = Vector3.SmoothDamp(
-            transform.position,
-            desiredCameraPos,
-            ref _velocityPos,
-            followSmoothTime
+        transform.position = ClampToCameraBounds(
+            Vector3.SmoothDamp(
+                transform.position,
+                desiredCameraPos,
+                ref _velocityPos,
+                followSmoothTime
+            )
         );
 
         // 常に勝者を見るように回転
@@ -367,6 +414,16 @@ public class FightingCameraController : MonoBehaviour
         //   comboCountを渡すので、連続で耐えるほど盛り上がりを強くする、といった演出に使える。
         //   カメラ位置変更のオンオフに関わらず、この通知だけは常に行う。
         OnGuardImpactStart?.Invoke(target, Mathf.Max(1, comboCount));
+
+        // ★追加：一瞬スローになる演出（カメラ移動のON/OFFに関わらず実行）
+        if (guardImpactSlowEnabled)
+        {
+            TriggerSlowMotion(
+                guardImpactSlowTimeScale,
+                guardImpactSlowDuration,
+                guardImpactSlowRecoverDuration
+            );
+        }
 
         // カメラ位置が変わる演出がOFFの場合は、通常の追従カメラのまま何もしない
         if (!guardImpactCameraMoveEnabled) return;
@@ -486,6 +543,62 @@ public class FightingCameraController : MonoBehaviour
             volumeWeightSmoothSpeed * Time.deltaTime
         );
         guardImpactVolume.weight = _currentVolumeWeight;
+    }
+
+    /// <summary>
+    /// 指定時間だけゲーム全体をスローにし、その後なめらかに通常速度へ戻す
+    /// </summary>
+    /// <param name="slowScale">スロー中のTime.timeScale（0.1で1/10速度）</param>
+    /// <param name="holdDuration">スローを保つ時間（実時間・秒）</param>
+    /// <param name="recoverDuration">通常速度へ戻すまでの時間（実時間・秒）</param>
+    public void TriggerSlowMotion(float slowScale, float holdDuration, float recoverDuration)
+    {
+        if (_slowCoroutine != null)
+        {
+            // 既にスロー中なら、元の速度を保ったまま再スタート（連続で受け止めた場合など）
+            StopCoroutine(_slowCoroutine);
+        }
+        else
+        {
+            _normalTimeScale = Time.timeScale;
+        }
+
+        _slowCoroutine = StartCoroutine(SlowMotionRoutine(slowScale, holdDuration, recoverDuration));
+    }
+
+    private IEnumerator SlowMotionRoutine(float slowScale, float holdDuration, float recoverDuration)
+    {
+        // すぐにスロー速度へ
+        Time.timeScale = slowScale;
+        yield return new WaitForSecondsRealtime(holdDuration);
+
+        // 通常速度へなめらかに戻す（実時間で計測することで、スロー中でも正確に進む）
+        float elapsed = 0f;
+        while (elapsed < recoverDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / recoverDuration);
+            // イーズアウトで、戻り始めは緩やか・終盤で自然に収束させる
+            float eased = 1f - Mathf.Pow(1f - t, 2f);
+            Time.timeScale = Mathf.Lerp(slowScale, _normalTimeScale, eased);
+            yield return null;
+        }
+
+        Time.timeScale = _normalTimeScale;
+        _slowCoroutine = null;
+    }
+
+    /// <summary>
+    /// スロー中にこのオブジェクトが無効化・破棄されても、時間の速さが戻らなくなるのを防ぐ
+    /// </summary>
+    private void OnDisable()
+    {
+        if (_slowCoroutine != null)
+        {
+            StopCoroutine(_slowCoroutine);
+            _slowCoroutine = null;
+            Time.timeScale = _normalTimeScale;
+        }
     }
 
     /// <summary>
@@ -664,6 +777,15 @@ public class FightingCameraController : MonoBehaviour
     // デバッグ用：シーンビューに中心点と広がり範囲を可視化
     private void OnDrawGizmosSelected()
     {
+        // カメラの移動可能範囲を箱状に可視化
+        if (cameraBoundsEnabled)
+        {
+            Gizmos.color = Color.cyan;
+            Vector3 boundsCenter = (cameraBoundsMin + cameraBoundsMax) * 0.5f;
+            Vector3 size = cameraBoundsMax - cameraBoundsMin;
+            Gizmos.DrawWireCube(boundsCenter, size);
+        }
+
         if (targets == null || targets.Count == 0) return;
 
         Vector3 center = CalculateCenterPoint();
