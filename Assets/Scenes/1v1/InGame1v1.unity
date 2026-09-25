@@ -1228,6 +1228,7 @@ MonoBehaviour:
   rotationSmoothTime: 0.2
   focusZoomDistance: 2
   focusLookAtHeightOffset: 1.2
+  guardImpactCameraMoveEnabled: 0
   guardImpactDistance: 3
   guardImpactCamHeight: 1
   guardImpactHorizontalAngle: -20
@@ -1236,10 +1237,6 @@ MonoBehaviour:
   guardImpactLookAtSideOffset: 0.3
   guardImpactMoveInSmoothTime: 0.08
   guardImpactHoldDuration: 0.6
-  shakeBaseAmplitude: 0
-  shakeAmplitudePerCombo: 0
-  shakeMaxAmplitude: 0.4
-  shakeFrequency: 0
   guardImpactVolume: {fileID: 832575518}
   guardImpactVolumeWeight: 1
   volumeWeightSmoothSpeed: 8
