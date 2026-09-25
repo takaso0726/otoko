@@ -187,9 +187,11 @@ public class Player : MonoBehaviour
     [SerializeField] float throwHorizontalSpeed = 6f;
     [Tooltip("投げが成立した瞬間、相手に加える上方向の初速。大きいほど放物線の弧が高くなる。")]
     [SerializeField] float throwUpSpeed = 5f;
-    [Tooltip("掴み拘束時間が終わった時点で、掴んでいる側が方向スティックを入力していなかった場合の「投げ不成立」時に、" +
-             "お互いを後方（相手から離れる方向）へ押し出す距離。")]
-    [SerializeField] float grabFailPushDistance = 1.0f;
+    [Tooltip("★変更：掴み拘束時間が終わった時点で、掴んでいる側が方向スティックを入力していなかった場合の「投げ不成立」時に、" +
+             "お互いを後方（相手から離れる方向）へ吹き飛ばす水平方向の初速。投げ成立時(throwHorizontalSpeed)より弱めが目安。")]
+    [SerializeField] float grabFailHorizontalSpeed = 3f;
+    [Tooltip("★追加：投げ不成立時に、お互いを後方へ吹き飛ばす上方向の初速。大きいほど放物線の弧が高くなる。")]
+    [SerializeField] float grabFailUpSpeed = 3f;
 
     //=====================================================
     // ★ガード（仁王立ち）成功時の攻撃力上昇設定
@@ -1038,40 +1040,85 @@ public class Player : MonoBehaviour
     [SerializeField] int mashPromptFontSize = 64;               // 文字サイズ
     [SerializeField] Color mashPromptColor = Color.yellow;      // 文字色
 
+    // ★追加：残り連打回数を画面中央に大きく表示するための設定。
+    //   押すごとに（mashCountが増えるごとに）GetRemainingMashCount()の値が減っていく。
+    [Header("残り連打回数表示設定")]
+    [SerializeField] bool showMashRemainingCount = true;        // 残り連打回数の数字を表示するか
+    [SerializeField] int mashRemainingFontSize = 150;            // 数字のフォントサイズ（Inspectorで調整可能）
+    [SerializeField] Color mashRemainingColor = Color.white;    // 数字の色
+    [SerializeField] float mashRemainingYRatio = 0.42f;         // 数字を表示するY位置（画面高さに対する割合。中央付近）
+
     void OnGUI()
     {
-        if (!showMashPrompt) return;
+        if (!showMashPrompt && !showMashRemainingCount) return;
         if (currentState != PlayerState.KnockedDown) return;
 
         // 明滅させて視認性・緊張感を出す
         float blink = 0.6f + 0.4f * Mathf.Sin(Time.time * 10f);
 
-        GUIStyle style = new GUIStyle(GUI.skin.label)
+        if (showMashPrompt)
         {
-            fontSize = mashPromptFontSize,
-            fontStyle = FontStyle.Bold,
-            alignment = TextAnchor.MiddleCenter,
-        };
+            GUIStyle style = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = mashPromptFontSize,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+            };
 
-        Color baseColor = mashPromptColor;
-        style.normal.textColor = new Color(baseColor.r, baseColor.g, baseColor.b, blink);
+            Color baseColor = mashPromptColor;
+            style.normal.textColor = new Color(baseColor.r, baseColor.g, baseColor.b, blink);
 
-        float width = 800f;
-        float height = 120f;
-        Rect rect = new Rect((Screen.width - width) / 2f, Screen.height * 0.15f, width, height);
+            float width = 800f;
+            float height = 120f;
+            Rect rect = new Rect((Screen.width - width) / 2f, Screen.height * 0.15f, width, height);
 
-        // 縁取り（黒）を少しずらして重ね描きし、背景が明るくても読めるようにする
-        GUIStyle outlineStyle = new GUIStyle(style)
-        {
-            normal = { textColor = new Color(0f, 0f, 0f, blink) }
-        };
-        Vector2[] offsets = { new Vector2(-2, -2), new Vector2(2, -2), new Vector2(-2, 2), new Vector2(2, 2) };
-        foreach (var offset in offsets)
-        {
-            GUI.Label(new Rect(rect.x + offset.x, rect.y + offset.y, rect.width, rect.height), mashPromptText, outlineStyle);
+            // 縁取り（黒）を少しずらして重ね描きし、背景が明るくても読めるようにする
+            GUIStyle outlineStyle = new GUIStyle(style)
+            {
+                normal = { textColor = new Color(0f, 0f, 0f, blink) }
+            };
+            Vector2[] offsets = { new Vector2(-2, -2), new Vector2(2, -2), new Vector2(-2, 2), new Vector2(2, 2) };
+            foreach (var offset in offsets)
+            {
+                GUI.Label(new Rect(rect.x + offset.x, rect.y + offset.y, rect.width, rect.height), mashPromptText, outlineStyle);
+            }
+
+            GUI.Label(rect, mashPromptText, style);
         }
 
-        GUI.Label(rect, mashPromptText, style);
+        if (showMashRemainingCount)
+        {
+            int remaining = GetRemainingMashCount();
+            string remainingText = remaining.ToString();
+
+            GUIStyle numberStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = mashRemainingFontSize,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+            };
+            numberStyle.normal.textColor = mashRemainingColor;
+
+            float width = 400f;
+            float height = mashRemainingFontSize * 1.4f;
+            Rect rect = new Rect(
+                (Screen.width - width) / 2f,
+                Screen.height * mashRemainingYRatio - height / 2f,
+                width, height);
+
+            // 縁取り（黒）を少しずらして重ね描きし、背景が明るくても読めるようにする
+            GUIStyle outlineStyle = new GUIStyle(numberStyle)
+            {
+                normal = { textColor = Color.black }
+            };
+            Vector2[] offsets = { new Vector2(-3, -3), new Vector2(3, -3), new Vector2(-3, 3), new Vector2(3, 3) };
+            foreach (var offset in offsets)
+            {
+                GUI.Label(new Rect(rect.x + offset.x, rect.y + offset.y, rect.width, rect.height), remainingText, outlineStyle);
+            }
+
+            GUI.Label(rect, remainingText, numberStyle);
+        }
     }
 
     //-----------------------------------------------------
@@ -1628,14 +1675,16 @@ public class Player : MonoBehaviour
 
         if (!hasDirectionInput)
         {
-            // ★追加：方向入力が無いまま拘束時間切れ＝投げ不成立。脱出成功時と同じ扱いで、
-            //   ダメージも投げ飛ばしも発生させず、お互いを後方へ押し出すだけにする。
-            DLog($"[{PlayerName}] 方向入力が無いまま拘束時間切れ。投げ不成立扱いで{grabbedTarget.PlayerName}と共に後方へ離れる");
+            // ★変更：方向入力が無いまま拘束時間切れ＝投げ不成立。
+            //   ダメージは発生させないが、お互いを相手から離れる方向へ放物線を描いて吹き飛ばす。
+            DLog($"[{PlayerName}] 方向入力が無いまま拘束時間切れ。投げ不成立扱いで{grabbedTarget.PlayerName}と共に後方へ吹き飛ぶ");
 
-            animator.SetTrigger("Throw-whiff"); // ★要Animator追加（任意）：投げ不成立演出用トリガー
+            // ★変更：自分（掴んでいた側）もこの後PushBackFromGrabFailure()で放物線へ吹き飛ぶため、
+            //   ここでは専用の「投げ不成立」トリガーは発火させない（吹き飛び用のトリガーと競合するため）。
+            //   吹き飛ぶ際のモーションはPushBackFromGrabFailure→LaunchByThrow内の"Grab-fail-fly"トリガーに任せる。
 
-            grabbedTarget.ReleaseFromGrabWithoutThrow(this); // 相手側もGrabbedを終了させ、後方へ押し出す
-            PushBackFromGrabFailure(grabbedTarget);          // 自分も相手から離れる方向へ後方へ押し出す
+            grabbedTarget.ReleaseFromGrabWithoutThrow(this); // 相手側もGrabbedを終了させ、放物線で後方へ吹き飛ばす
+            PushBackFromGrabFailure(grabbedTarget);          // 自分も相手から離れる方向へ放物線で後方へ吹き飛ぶ
 
             grabbedTarget = null;
             return;
@@ -1659,21 +1708,33 @@ public class Player : MonoBehaviour
     {
         if (currentState != PlayerState.Grabbed) return; // 既にGrabbedでなければ何もしない
 
-        DisableAllHitboxes();
-        isGuarding = false;
-        currentState = PlayerState.Idle;
         grabbingPlayer = null;
 
-        animator.SetTrigger("Grab-escape"); // 脱出成功時と同じ演出用トリガーを流用
-
+        // ★変更：以前はここでIdleへ戻してから瞬間的に押し出していたが、
+        //   PushBackFromGrabFailure()がLaunchByThrow()を流用してThrown状態へ遷移させ、
+        //   放物線を描いて吹き飛ばした上で着地時に自動でIdleへ戻すようにした。
         PushBackFromGrabFailure(grabber);
 
-        DLog($"[{PlayerName}] 投げ不成立のため掴みが解け、後方へ離れた");
+        DLog($"[{PlayerName}] 投げ不成立のため掴みが解け、後方へ吹き飛んだ");
     }
 
-    // ★追加：投げ不成立時に、相手(other)から離れる方向（Z軸）へ自分を後方へ押し出す。
-    //   移動範囲はUpdate/LateUpdateのClampPositionWithinBounds()で最終的に制限される。
+    // ★変更：投げ不成立時に、相手(other)から離れる方向（Z軸）へ、放物線を描いて吹き飛ぶ。
+    //   以前は transform.Translate による瞬間的な押し出しだったが、仕様変更により
+    //   LaunchByThrow()を流用して実際にThrown状態へ遷移させ、重力に任せて放物線を描かせた上で
+    //   着地時（OnCollisionEnter→LandFromThrow）に自動でIdleへ復帰させるようにした。
+    //   速度は投げ成立時(throwHorizontalSpeed/throwUpSpeed)より弱いgrabFailHorizontalSpeed/grabFailUpSpeedを使う。
     void PushBackFromGrabFailure(Player other)
+    {
+        Vector3 awayDirection = GetAwayDirectionFrom(other);
+
+        // "Grab-fail-fly"：★要Animator追加（任意）：投げ不成立で後方へ吹き飛ぶ専用モーション。
+        //   未設定の場合、Animator側にトリガーが無いと警告が出るだけで動作（物理的な吹き飛び）には支障はない。
+        LaunchByThrow(awayDirection, grabFailHorizontalSpeed, grabFailUpSpeed, "Grab-fail-fly");
+    }
+
+    // ★追加：相手(other)から見て自分が離れるべき方向（Z軸、±Vector3.forward）を返すヘルパー。
+    //   PushBackFromGrabFailure専用に、Z座標の位置関係から決定する（同一Z座標の場合はInstanceIDで決定的に振り分ける）。
+    Vector3 GetAwayDirectionFrom(Player other)
     {
         float deltaZ = transform.position.z - other.transform.position.z;
         float dir;
@@ -1683,11 +1744,10 @@ public class Player : MonoBehaviour
         }
         else
         {
-            // 完全に同じZ座標の場合は、InstanceIDで押し出す向きを決定的に振り分ける
             dir = GetInstanceID() < other.GetInstanceID() ? -1f : 1f;
         }
 
-        transform.Translate(0f, 0f, dir * grabFailPushDistance, Space.World);
+        return new Vector3(0f, 0f, dir);
     }
 
     // ★追加：掴んでいる間の移動スティック入力から、投げ飛ばす水平方向を決定する。
@@ -1702,7 +1762,10 @@ public class Player : MonoBehaviour
 
     // ★追加：投げ技によって、放物線状に吹き飛ばされる処理。掴んでいた相手から呼び出される。
     //   Rigidbodyに初速を与えるだけで、あとは重力(既存のJump同様の物理設定)に任せて放物線を描かせる。
-    public void LaunchByThrow(Vector3 horizontalDirection, float horizontalSpeed, float upSpeed)
+    //   ★変更：投げ成立時（相手を飛ばす）だけでなく、投げ不成立時にお互いが後方へ吹き飛ぶ演出
+    //   （PushBackFromGrabFailure）でも共用できるよう、再生するアニメーショントリガーを引数化した。
+    //   省略時は従来通り"Thrown"（通常の投げ成立で飛ばされる側のモーション）を使う。
+    public void LaunchByThrow(Vector3 horizontalDirection, float horizontalSpeed, float upSpeed, string animTrigger = "Thrown")
     {
         StopMoveAnimation();
         DisableAllHitboxes();
@@ -1711,7 +1774,7 @@ public class Player : MonoBehaviour
         currentState = PlayerState.Thrown;
         grabbingPlayer = null;
 
-        animator.SetTrigger("Thrown"); // 飛んでいる間の専用アニメーション（Grabbedとは別のモーション）
+        animator.SetTrigger(animTrigger); // 飛んでいる間の専用アニメーション（Grabbedとは別のモーション）
 
         if (rb != null)
         {
@@ -1722,7 +1785,7 @@ public class Player : MonoBehaviour
             rb.AddForce(launchVelocity, ForceMode.VelocityChange);
         }
 
-        DLog($"[{PlayerName}] 投げられて吹き飛んだ！");
+        DLog($"[{PlayerName}] 投げられて吹き飛んだ！（trigger={animTrigger}）");
     }
 
     // ★追加：投げで吹き飛ばされた後、地面に着地した瞬間にOnCollisionEnterから呼ばれる。
@@ -1885,6 +1948,16 @@ public class Player : MonoBehaviour
             ResolveThrowLaunch();
         }
 
+        // ★追加：投げ不成立（方向入力なしのタイムアウト）で自分自身もPushBackFromGrabFailure()により
+        //   Thrown状態へ遷移した場合は、ここで即座にIdleへ戻さない。
+        //   放物線飛行中の状態管理はThrown用の分岐（このメソッド冒頭）と、
+        //   着地判定(OnCollisionEnter→LandFromThrow)に委ねる。
+        if (currentState == PlayerState.Thrown)
+        {
+            canThrow = true;
+            return;
+        }
+
         DisableAllHitboxes();
         isGuarding = false;
         canThrow = true;
@@ -1894,6 +1967,22 @@ public class Player : MonoBehaviour
     //-----------------------------------------------------
     // 復活チャレンジ（ダウン中の処理）
     //-----------------------------------------------------
+    // 復活に必要な連打回数のしきい値を計算する（復活回数が増えるほど厳しくなる）
+    // ★追加：HandleKnockedDown()とOnGUI()の両方から参照するため共通メソッド化。
+    int CurrentMashThreshold()
+    {
+        return mashThresholdBase + mashThresholdStep * rebornCount;
+    }
+
+    // 現在の残り連打回数（0未満にはならない）を計算する。
+    // mashCountがmashThresholdを超えた瞬間に復活成功するため、必要な残り回数は
+    // 「しきい値 + 1 - 現在の連打数」になる。
+    int GetRemainingMashCount()
+    {
+        int mashThreshold = CurrentMashThreshold();
+        return Mathf.Max(mashThreshold + 1 - mashCount, 0);
+    }
+
     // HPが0になった際に毎フレーム呼ばれる、根性復活（ボタン連打による復活）の処理
     void HandleKnockedDown()
     {
@@ -1913,7 +2002,7 @@ public class Player : MonoBehaviour
         }
 
         // 復活に必要な連打回数のしきい値（復活回数が増えるほど厳しくなる）
-        int mashThreshold = mashThresholdBase + mashThresholdStep * rebornCount;
+        int mashThreshold = CurrentMashThreshold();
 
         if (rebornTimer < rebornTimeLimit)
         {
