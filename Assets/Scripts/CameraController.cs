@@ -66,6 +66,16 @@ public class FightingCameraController : MonoBehaviour
     [Tooltip("注視点の回転スムーズさ")]
     public float rotationSmoothTime = 0.2f;
 
+    [Header("カメラ回転の固定")]
+    [Tooltip("ONにすると、通常追従・勝利フォーカス中のカメラ回転を固定する（位置だけが追従する）。演出カメラ（ガードインパクト／根性復活）は従来どおり対象を向く")]
+    public bool lockRotation = true;
+
+    [Tooltip("ONなら、ゲーム開始時のカメラの向きを固定回転として使う。OFFなら下のlockedEulerAnglesを使う")]
+    public bool useInitialRotationAsLocked = true;
+
+    [Tooltip("固定するカメラの向き（オイラー角）。useInitialRotationAsLockedがOFFのときのみ有効")]
+    public Vector3 lockedEulerAngles = new Vector3(20f, 0f, 0f);
+
     [Header("カメラ追従の移動範囲制限")]
     [Tooltip("ONにすると、カメラが指定した座標範囲より外へは進まなくなる（通常追従・勝利フォーカス演出に適用）")]
     public bool cameraBoundsEnabled = false;
@@ -177,6 +187,7 @@ public class FightingCameraController : MonoBehaviour
     private float _currentDistance; // 現在のカメラ距離
     private Vector3 _currentLookAtVelocity;
     private Vector3 _smoothedLookAt;
+    private Quaternion _lockedRotation; // 回転固定時に使う向き
 
     // フォーカス（勝者ズーム）関連
     private bool _isFocusMode = false;
@@ -210,6 +221,41 @@ public class FightingCameraController : MonoBehaviour
     {
         _currentDistance = (maxZoomDistance + minZoomDistance) * 0.5f;
         _smoothedLookAt = CalculateCenterPoint();
+
+        // 回転固定用の向きを確定する
+        _lockedRotation = useInitialRotationAsLocked
+            ? transform.rotation
+            : Quaternion.Euler(lockedEulerAngles);
+    }
+
+    /// <summary>
+    /// 通常追従・フォーカス時のカメラ目標位置を返す。
+    /// 回転固定時は「向きの逆方向に距離ぶん下がった位置」にすることで、注視点が常に画面中央に来る。
+    /// </summary>
+    private Vector3 GetDesiredCameraPosition()
+    {
+        if (lockRotation)
+        {
+            return _smoothedLookAt - (_lockedRotation * Vector3.forward) * _currentDistance;
+        }
+        return _smoothedLookAt + baseOffset.normalized * _currentDistance;
+    }
+
+    /// <summary>
+    /// 通常追従・フォーカス時のカメラ回転を反映する。
+    /// 回転固定ON：固定回転へ（演出カメラから戻った直後だけなめらかに収束）。OFF：従来どおり注視点を向く。
+    /// </summary>
+    private void ApplyFollowRotation()
+    {
+        if (lockRotation)
+        {
+            float t = 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.0001f, rotationSmoothTime));
+            transform.rotation = Quaternion.Slerp(transform.rotation, _lockedRotation, t);
+        }
+        else
+        {
+            transform.LookAt(_smoothedLookAt);
+        }
     }
 
     void LateUpdate()
@@ -276,9 +322,8 @@ public class FightingCameraController : MonoBehaviour
             rotationSmoothTime
         );
 
-        // 4. オフセット方向を距離に応じてスケーリングしてカメラ目標位置を算出
-        Vector3 offsetDirection = baseOffset.normalized;
-        Vector3 desiredCameraPos = _smoothedLookAt + offsetDirection * _currentDistance;
+        // 4. カメラ目標位置を算出（回転固定時は固定の向きを基準にする）
+        Vector3 desiredCameraPos = GetDesiredCameraPosition();
 
         // 5. カメラ位置をスムーズに移動
         transform.position = ClampToCameraBounds(
@@ -290,8 +335,8 @@ public class FightingCameraController : MonoBehaviour
             )
         );
 
-        // 6. 常に中心点を見るように回転
-        transform.LookAt(_smoothedLookAt);
+        // 6. 回転（固定ON：向きを固定 / OFF：中心点を見る）
+        ApplyFollowRotation();
     }
 
     /// <summary>
@@ -381,9 +426,8 @@ public class FightingCameraController : MonoBehaviour
             zoomSmoothTime
         );
 
-        // オフセット方向を距離に応じてスケーリングしてカメラ目標位置を算出
-        Vector3 offsetDirection = baseOffset.normalized;
-        Vector3 desiredCameraPos = _smoothedLookAt + offsetDirection * _currentDistance;
+        // カメラ目標位置を算出（回転固定時は固定の向きを基準にする）
+        Vector3 desiredCameraPos = GetDesiredCameraPosition();
 
         // カメラ位置をスムーズに移動
         transform.position = ClampToCameraBounds(
@@ -395,8 +439,8 @@ public class FightingCameraController : MonoBehaviour
             )
         );
 
-        // 常に勝者を見るように回転
-        transform.LookAt(_smoothedLookAt);
+        // 回転（固定ON：向きを固定 / OFF：勝者を見る）
+        ApplyFollowRotation();
     }
 
     /// <summary>
