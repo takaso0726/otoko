@@ -70,7 +70,9 @@ public class CharacterSelectController : MonoBehaviour
     {
         public string playerName;      // "1P" / "2P" など表示用
         public RectTransform cursor;   // このプレイヤー用カーソル
-        public GameObject readyMark;   // 決定後に表示する「READY」表示（Inspectorで非アクティブにしておく）
+        public GameObject readyMark;   // 決定後に表示する「READY」表示（Inspectorで非アクティブにしておく。1Pと2Pで必ず別々のオブジェクトを割り当てること）
+        [Tooltip("READYマークを選択キャラのアンカー位置からどれだけずらすか。1Pと2Pで違う値にしておくと、同じキャラを選んでも重ならず両方見える（例: 1P=(-40,0) / 2P=(40,0)）")]
+        public Vector2 readyMarkOffset; // ScreenSpace-Overlayならピクセル単位
         public Image portraitImage;    // 選択中キャラのドアップ表示用（1Pは画面左、2Pは画面右に配置しておく）
         public Image nameImageObject;  // 選択中キャラの名前画像表示用（未設定なら何もしない）
         public int startIndex;         // このプレイヤーの初期カーソル位置（characters配列のインデックス）
@@ -136,6 +138,12 @@ public class CharacterSelectController : MonoBehaviour
         {
             Debug.LogWarning("[CharacterSelectController] characters が設定されていません。", this);
             return;
+        }
+
+        // 1Pと2Pに同じREADYマークを割り当てていると、片方しか表示されないので警告する
+        if (player1.readyMark != null && player1.readyMark == player2.readyMark)
+        {
+            Debug.LogWarning("[CharacterSelectController] player1 と player2 に同じ readyMark が設定されています。1P用・2P用で別々のオブジェクトを割り当ててください。", this);
         }
 
         // 新しいセレクトセッションの開始時点で、前回分の選択結果が残ったまま
@@ -225,6 +233,7 @@ public class CharacterSelectController : MonoBehaviour
         if (decide)
         {
             p.decided = true;
+            PlaceReadyMarkOnSelectedCharacter(p);
             SetReadyMarkActive(p, true);
             SetCursorVisible(p, false);
             PlaySE(decideSE);
@@ -283,6 +292,22 @@ public class CharacterSelectController : MonoBehaviour
         {
             p.readyMark.SetActive(active);
         }
+    }
+
+    // READYマークを、そのプレイヤーが選択しているキャラクターの位置へ移動させる。
+    // カーソルと同様にanchor.positionへ合わせるので、同一Canvas内であれば親が違っても位置が揃う。
+    void PlaceReadyMarkOnSelectedCharacter(PlayerSelector p)
+    {
+        if (p == null || p.readyMark == null) return;
+        if (characters == null || p.currentIndex < 0 || p.currentIndex >= characters.Length) return;
+
+        var anchor = characters[p.currentIndex].anchor;
+        if (anchor == null) return;
+
+        p.readyMark.transform.position = anchor.position + (Vector3)p.readyMarkOffset;
+
+        // 他のUI（キャラアイコンなど）の裏に隠れないよう、同じ親の中で最前面へ持ってくる
+        p.readyMark.transform.SetAsLastSibling();
     }
 
     // 決定時はカーソルを隠してREADYマークだけを見せ、選び直し時はカーソルを再表示する
