@@ -10,24 +10,24 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c78ae74799c0f5b45aa3c941e4c49d2f, type: 3}
-  m_Name: Data_hit_panch
+  m_Name: Data_mash_gyakudodo
   m_EditorClassIdentifier: Assembly-CSharp::HitEffectData
-  effectPrefab: {fileID: 6815328702670523096, guid: c6be3c072ac2a2e40a333f3347a50189, type: 3}
-  baseAngle: -180
-  angleRandomRange: 19.6
-  distanceRange: {x: 1.14, y: 2.1}
-  spawnPositionOffset: {x: -0.58, y: -0.61, z: -2.51}
-  overallScale: 0.81
-  scaleRange: {x: 2.71, y: 2.6}
-  lifeTime: 0.4
+  effectPrefab: {fileID: 6815328702670523096, guid: 300fbefd18f8fee4eada6bae9b438132, type: 3}
+  baseAngle: 47
+  angleRandomRange: 23.7
+  distanceRange: {x: 0.28, y: 3.56}
+  spawnPositionOffset: {x: 0, y: 1, z: 0}
+  overallScale: 0.17
+  scaleRange: {x: 1.71, y: 1.55}
+  lifeTime: 0.33
   scaleCurve:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
+      value: -0.004761905
+      inSlope: 2
+      outSlope: 2
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
@@ -44,6 +44,6 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  use2DRotation: 0
-  allowOverlap: 0
+  use2DRotation: 1
+  allowOverlap: 1
   overlapAllowedBeforeEnd: 0

@@ -13,13 +13,13 @@ MonoBehaviour:
   m_Name: Data_mash_dodo
   m_EditorClassIdentifier: Assembly-CSharp::HitEffectData
   effectPrefab: {fileID: 6815328702670523096, guid: e57c04fa4aa5ca3439e63dfff87fa410, type: 3}
-  baseAngle: 180
-  angleRandomRange: 20
-  distanceRange: {x: 1.14, y: 2.1}
+  baseAngle: 6
+  angleRandomRange: 0
+  distanceRange: {x: -0.47, y: 2.08}
   spawnPositionOffset: {x: 0, y: 1, z: 0}
-  overallScale: 1
-  scaleRange: {x: 2.71, y: 2.6}
-  lifeTime: 0.4
+  overallScale: 0.64
+  scaleRange: {x: 0.37, y: 0.55}
+  lifeTime: 0.14
   scaleCurve:
     serializedVersion: 2
     m_Curve:
@@ -45,3 +45,5 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   use2DRotation: 1
+  allowOverlap: 1
+  overlapAllowedBeforeEnd: 0

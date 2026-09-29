@@ -10,22 +10,22 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c78ae74799c0f5b45aa3c941e4c49d2f, type: 3}
-  m_Name: Data_miss_suka
+  m_Name: Data_hit_panch
   m_EditorClassIdentifier: Assembly-CSharp::HitEffectData
-  effectPrefab: {fileID: 6815328702670523096, guid: 0cf321337e00024408ad87a0bd92e211, type: 3}
-  baseAngle: 180
-  angleRandomRange: 20
-  distanceRange: {x: 1.14, y: 8.23}
-  spawnPositionOffset: {x: 0, y: 1.37, z: 3.08}
-  overallScale: 1
+  effectPrefab: {fileID: 6815328702670523096, guid: c6be3c072ac2a2e40a333f3347a50189, type: 3}
+  baseAngle: -180
+  angleRandomRange: 19.6
+  distanceRange: {x: 1.14, y: 2.1}
+  spawnPositionOffset: {x: -0.58, y: -0.61, z: -2.51}
+  overallScale: 0.25
   scaleRange: {x: 2.71, y: 2.6}
-  lifeTime: 0.48
+  lifeTime: 0.4
   scaleCurve:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
-      time: 0.012498983
-      value: 0.1976112
+      time: 0
+      value: 0
       inSlope: 0
       outSlope: 0
       tangentMode: 0

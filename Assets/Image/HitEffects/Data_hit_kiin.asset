@@ -10,22 +10,22 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c78ae74799c0f5b45aa3c941e4c49d2f, type: 3}
-  m_Name: Data_mash_gyakudodo
+  m_Name: Data_hit_kiin
   m_EditorClassIdentifier: Assembly-CSharp::HitEffectData
-  effectPrefab: {fileID: 6815328702670523096, guid: 300fbefd18f8fee4eada6bae9b438132, type: 3}
-  baseAngle: 45
-  angleRandomRange: 23.7
-  distanceRange: {x: 0.28, y: 3.56}
-  spawnPositionOffset: {x: 0, y: 1, z: 0}
+  effectPrefab: {fileID: 6815328702670523096, guid: 0d0600e8737c2fc4b8c487bf331a59d1, type: 3}
+  baseAngle: 127
+  angleRandomRange: 20
+  distanceRange: {x: 1.14, y: 1.16}
+  spawnPositionOffset: {x: 0, y: 1.73, z: 3.08}
   overallScale: 1
-  scaleRange: {x: 2.71, y: 2.6}
-  lifeTime: 2.06
+  scaleRange: {x: 1.91, y: 1.5}
+  lifeTime: 0.63
   scaleCurve:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: -0.004761905
+      value: 0
       inSlope: 2
       outSlope: 2
       tangentMode: 0
@@ -44,4 +44,6 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  use2DRotation: 1
+  use2DRotation: 0
+  allowOverlap: 0
+  overlapAllowedBeforeEnd: 0
