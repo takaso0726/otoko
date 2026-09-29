@@ -1,2 +1,28 @@
 fileFormatVersion: 2
 guid: 10851af5d3775e249a0132d6b6ce3467
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - MenBlock_se: {instanceID: 0}
+  - Men_particle: {instanceID: 0}
+  - Hit_particle: {instanceID: 0}
+  - punchHitEffectData: {instanceID: 0}
+  - kickHitEffectData: {instanceID: 0}
+  - guardHitEffectData: {instanceID: 0}
+  - mashHitEffectData: {instanceID: 0}
+  - missHitEffectData: {instanceID: 0}
+  - guardSuccessEffectPrefab: {instanceID: 0}
+  - guardBuffEffectPrefab: {instanceID: 0}
+  - kankiChargeEffectPrefab: {fileID: 6396199705279390725, guid: 3033e5beaf41edf45b102dad69361753, type: 3}
+  - specialSe: {instanceID: 0}
+  - specialEffectPrefab: {instanceID: 0}
+  - enemy: {instanceID: 0}
+  - enemyPlayer: {instanceID: 0}
+  - animator: {instanceID: 0}
+  - fightingCamera: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

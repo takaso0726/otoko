@@ -60,6 +60,8 @@ public class Player : MonoBehaviour
     [Header("デバッグキー 有効設定（キャラクターごとに選択可能）")]
     [Tooltip("ONにすると、このキャラクターでF2キー（漢気ゲージデバッグログのON/OFF切替）が使えます。")]
     [SerializeField] bool enableF2DebugKey = true;
+    [Tooltip("ONにすると、このキャラクターでF3キー（エフェクト発生ログのON/OFF切替）が使えます。")]
+    [SerializeField] bool enableF3DebugKey = true;
     [Tooltip("ONにすると、このキャラクターでF4キー（ダウン中／Dead中からの強制復活）が使えます。")]
     [SerializeField] bool enableF4DebugKey = false;
     [Tooltip("ONにすると、このキャラクターでF5キー（HPを強制的に0にする）が使えます。")]
@@ -87,6 +89,17 @@ public class Player : MonoBehaviour
     void GaugeDLog(string message)
     {
         if (kankiGaugeDebugLogEnabled) Debug.Log(message);
+    }
+
+    // ★追加：エフェクト発生専用のデバッグログ。F3キーでON/OFFをトグルする。
+    //   ヒット・ガード・必殺技・漢気ゲージ充填などのエフェクトが「生成された瞬間」にだけ出力される。
+    //   通常のenableDebugLogとは独立して管理する（F2の漢気ゲージログと同じ方式）。
+    private bool effectDebugLogEnabled = false;
+
+    // エフェクト発生ログはすべてこのメソッド経由にする。F3でトグルした時だけ出力される。
+    void EffectDLog(string message)
+    {
+        if (effectDebugLogEnabled) Debug.Log($"[EFFECT] {message}");
     }
 
     //=====================================================
@@ -290,6 +303,22 @@ public class Player : MonoBehaviour
 
     // ゲージによる補正がかかる前の、素の攻撃力
     private int baseAtk;
+
+    //=====================================================
+    // ★追加：漢気ゲージが1本以上たまっている間、自身の中心に出し続けるエフェクト設定
+    //   ゲージ1本分(kankiGaugePerBar)以上 → 表示開始／1本分未満になった → 停止（自然にフェードアウト）
+    //=====================================================
+    [Header("漢気ゲージ充填中エフェクト設定")]
+    [SerializeField] bool enableKankiChargeEffect = true;          // ゲージ充填中エフェクトを出すかどうか
+    [Tooltip("ゲージが1本以上たまっている間、出し続けるパーティクル（Loopオン推奨・未設定なら出さない）")]
+    [SerializeField] ParticleSystem kankiChargeEffectPrefab;
+    [Tooltip("プレイヤー基準の生成位置。キャラクターの体の中心あたりになるよう調整してください。")]
+    [SerializeField] Vector3 kankiChargeEffectOffset = new Vector3(0f, 1.0f, 0f);
+
+    [Tooltip("ONにすると、パーティクルの発生位置がプレイヤーと一緒に動く（Local）。OFFだと発生済みの粒は移動時にその場へ置き去りになる（World）。")]
+    [SerializeField] bool kankiChargeEffectFollowLocal = true;
+
+    private ParticleSystem activeKankiChargeEffect; // 生成中のエフェクト参照（多重生成防止・停止処理用）
 
     //=====================================================
     // ---- 必殺技（漢気ゲージ消費） ----
@@ -675,6 +704,7 @@ public class Player : MonoBehaviour
             if (HitEffectSpawner.Instance != null && mashHitEffectData != null)
             {
                 HitEffectSpawner.Instance.SpawnAtDirection(mashHitEffectData, transform.position, transform.forward);
+                EffectDLog($"[{PlayerName}] 連打擬音エフェクト発生 pos={transform.position}");
             }
 
             return;
@@ -714,6 +744,7 @@ public class Player : MonoBehaviour
     // そうでなければ現在の状態に応じて「拘束中のタイマー消化」か「新しい行動の受付」を行う。
     void Update()
     {
+        MaintainKankiChargeEffect(); // ★追加：漢気ゲージ1本以上の間、追従エフェクトを出し続ける
         // ★修正：しゃがみの見た目（コライダー・アニメーター）は、
         //   currentState（状態機械）を経由せず、毎フレーム「スティック下入力の有無」だけで直接同期する。
         //   以前はEnterCrouch()内でcurrentStateとコライダー/アニメーターを同時に変更していたため、
@@ -737,6 +768,20 @@ public class Player : MonoBehaviour
             else
             {
                 DLog($"[{PlayerName}] F2キーを検知しましたが、enableF2DebugKeyがOFFのため無視します。");
+            }
+        }
+
+        // ★追加：F3キーでエフェクト発生ログのON/OFFを切り替える（対象キャラクターはenableF3DebugKeyで選択）
+        if (Keyboard.current != null && Keyboard.current.f3Key.wasPressedThisFrame)
+        {
+            if (enableF3DebugKey)
+            {
+                effectDebugLogEnabled = !effectDebugLogEnabled;
+                Debug.Log($"[{PlayerName}] エフェクト発生ログ: {(effectDebugLogEnabled ? "ON" : "OFF")}");
+            }
+            else
+            {
+                DLog($"[{PlayerName}] F3キーを検知しましたが、enableF3DebugKeyがOFFのため無視します。");
             }
         }
 
@@ -1190,6 +1235,7 @@ public class Player : MonoBehaviour
         activeGuardBuffEffect.Play();
 
         DLog($"[{PlayerName}] 攻撃力上昇エフェクト開始");
+        EffectDLog($"[{PlayerName}] 攻撃力上昇(ガードバフ)エフェクト開始 pos={activeGuardBuffEffect.transform.position}");
     }
 
     // 攻撃力上昇エフェクトを停止する（次の攻撃が当たった時に呼ばれる）
@@ -1203,6 +1249,7 @@ public class Player : MonoBehaviour
         activeGuardBuffEffect = null;
 
         DLog($"[{PlayerName}] 攻撃力上昇エフェクト終了");
+        EffectDLog($"[{PlayerName}] 攻撃力上昇(ガードバフ)エフェクト終了");
     }
 
     //-----------------------------------------------------
@@ -1525,6 +1572,7 @@ public class Player : MonoBehaviour
             Quaternion.Euler(-90f, 0f, 0f));
         newParticle.Play();
         Destroy(newParticle.gameObject, 1.0f);
+        EffectDLog($"[{PlayerName}] 仁王立ちエフェクト発生 pos={newParticle.transform.position}");
     }
 
     // 投げ（掴み）処理。★仕様変更：この時点ではまだ投げ飛ばさず、
@@ -1855,6 +1903,7 @@ public class Player : MonoBehaviour
             fx.transform.localPosition = specialEffectOffset;
             fx.Play();
             Destroy(fx.gameObject, specialEffectLifetime);
+            EffectDLog($"[{PlayerName}] 必殺技エフェクト発生 pos={fx.transform.position}");
         }
 
         // 自分の漢気ゲージを消費する
@@ -1939,6 +1988,7 @@ public class Player : MonoBehaviour
                 Vector3 transkunn = transform.position;
                 transkunn.y += 2.0f;
                 HitEffectSpawner.Instance.SpawnAtDirection(missHitEffectData, transkunn, transform.forward);
+                EffectDLog($"[{PlayerName}] 空振り擬音エフェクト発生 pos={transkunn}");
             }
         }
 
@@ -2193,6 +2243,7 @@ public class Player : MonoBehaviour
             if (HitEffectSpawner.Instance != null && guardHitEffectData != null)
             {
                 HitEffectSpawner.Instance.Spawn(guardHitEffectData, guardAttackerTf.position, transform.position);
+                EffectDLog($"[{PlayerName}] ガード成功擬音エフェクト発生 pos={transform.position}");
             }
 
             // ガード成功専用エフェクト（インスペクターで設定したパーティクルを生成）
@@ -2204,6 +2255,7 @@ public class Player : MonoBehaviour
                     Quaternion.Euler(-90f, 0f, 0f));
                 guardSuccessEffect.Play();
                 Destroy(guardSuccessEffect.gameObject, guardSuccessEffectLifetime);
+                EffectDLog($"[{PlayerName}] ガード成功パーティクル発生 pos={guardSuccessEffect.transform.position}");
                 DLog($"[{PlayerName}] ガード成功エフェクトを再生");
             }
 
@@ -2224,6 +2276,7 @@ public class Player : MonoBehaviour
             ParticleSystem hitParticle = Instantiate(Hit_particle, hitPoint, Quaternion.Euler(-90f, 0f, 0f));
             hitParticle.Play();
             Destroy(hitParticle.gameObject, 1.0f);
+            EffectDLog($"[{PlayerName}] 被弾パーティクル発生 pos={hitPoint}");
 
             // 「ドカン」「ドドン」等の擬音演出。
             // 攻撃者に今の攻撃タイプ(パンチ/キック)を問い合わせて、対応する擬音データを選ぶ。
@@ -2247,6 +2300,7 @@ public class Player : MonoBehaviour
             if (HitEffectSpawner.Instance != null && selectedHitEffect != null)
             {
                 HitEffectSpawner.Instance.Spawn(selectedHitEffect, attackerTf.position, hitPoint);
+                EffectDLog($"[{PlayerName}] 被弾擬音エフェクト発生 pos={hitPoint}");
             }
 
             HP -= attackerAtk;
@@ -2373,6 +2427,84 @@ public class Player : MonoBehaviour
     {
         int filledBars = Mathf.FloorToInt(kankiGauge / kankiGaugePerBar);
         atk = Mathf.RoundToInt(baseAtk * (1f + atkPowerPerBar * filledBars));
+
+        // ★追加：ゲージ量が変わるたびに、充填中エフェクトのON/OFFを判定し直す
+        UpdateKankiChargeEffect(filledBars >= 1);
+    }
+
+    // ★追加：充填中エフェクトが何かの拍子に止まっていたら再生し直す（毎フレームUpdateから呼ぶ）。
+    //   ゲージが1本以上ある間は出し続けるための保険。
+    private void MaintainKankiChargeEffect()
+    {
+        if (!enableKankiChargeEffect) return;
+
+        bool hasBar = Mathf.FloorToInt(kankiGauge / kankiGaugePerBar) >= 1;
+        if (!hasBar) return;
+
+        // 生成されていない（破棄された等）場合は作り直し、止まっている場合は再生し直す
+        if (activeKankiChargeEffect == null || !activeKankiChargeEffect.gameObject.activeInHierarchy)
+        {
+            activeKankiChargeEffect = null;
+            UpdateKankiChargeEffect(true);
+        }
+        else if (!activeKankiChargeEffect.isPlaying)
+        {
+            activeKankiChargeEffect.Play();
+            EffectDLog($"[{PlayerName}] 漢気ゲージ充填中エフェクトが停止していたため再生し直し");
+        }
+    }
+
+    // ★追加：漢気ゲージ充填中エフェクトの開始／停止を切り替える。
+    //   hasBar = 1本以上たまっているか。状態が変わった時だけ生成・停止する（多重生成しない）。
+    private void UpdateKankiChargeEffect(bool hasBar)
+    {
+        if (hasBar && enableKankiChargeEffect)
+        {
+            if (kankiChargeEffectPrefab == null)
+            {
+                // ★Prefab未設定だと何も出ないため、原因に気づけるよう警告を出す（常時出力）
+                Debug.LogWarning($"[{PlayerName}] kankiChargeEffectPrefabが未設定のため、漢気ゲージ充填中エフェクトを出せません。Inspectorで設定してください。", this);
+                return;
+            }
+
+            if (activeKankiChargeEffect != null)
+            {
+                if (!activeKankiChargeEffect.isPlaying) activeKankiChargeEffect.Play();
+                return;
+            }
+
+            activeKankiChargeEffect = Instantiate(
+                kankiChargeEffectPrefab,
+                transform.position + kankiChargeEffectOffset,
+                Quaternion.Euler(-90f, 0f, 0f),
+                transform); // プレイヤーに追従させるため子オブジェクトにする
+            activeKankiChargeEffect.transform.localPosition = kankiChargeEffectOffset;
+
+            // ★Prefab側の設定に関係なく、ゲージが1本以上ある間は出し続けるようループを強制する。
+            //   （Loop OFF・Stop Action=Destroy/Disableだと1回だけで終わってしまうため）
+            foreach (var ps in activeKankiChargeEffect.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                var main = ps.main;
+                main.loop = true;
+                main.stopAction = ParticleSystemStopAction.None;
+                if (kankiChargeEffectFollowLocal) main.simulationSpace = ParticleSystemSimulationSpace.Local;
+            }
+
+            activeKankiChargeEffect.Play();
+
+            EffectDLog($"[{PlayerName}] 漢気ゲージ充填中エフェクト開始 pos={activeKankiChargeEffect.transform.position} / ゲージ={kankiGauge:F1}");
+        }
+        else
+        {
+            if (activeKankiChargeEffect == null) return;
+
+            // 新規発生だけ止め、出ている分は自然にフェードアウトさせる
+            activeKankiChargeEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            Destroy(activeKankiChargeEffect.gameObject, activeKankiChargeEffect.main.startLifetime.constantMax + 0.5f);
+            activeKankiChargeEffect = null;
+
+            EffectDLog($"[{PlayerName}] 漢気ゲージ充填中エフェクト終了 / ゲージ={kankiGauge:F1}");
+        }
     }
 
     // ★追加：ガード成功による一時的な攻撃力上昇分をクリアし、
