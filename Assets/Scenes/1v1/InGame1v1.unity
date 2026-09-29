@@ -1226,6 +1226,12 @@ MonoBehaviour:
   zoomSmoothTime: 0.06
   lookAtHeightOffset: 1
   rotationSmoothTime: 0.2
+  lockRotation: 1
+  useInitialRotationAsLocked: 1
+  lockedEulerAngles: {x: 20, y: 0, z: 0}
+  cameraBoundsEnabled: 1
+  cameraBoundsMin: {x: -10, y: 1, z: -7.5}
+  cameraBoundsMax: {x: 10, y: 8, z: 7.5}
   focusZoomDistance: 2
   focusLookAtHeightOffset: 1.2
   guardImpactCameraMoveEnabled: 0
@@ -1237,6 +1243,10 @@ MonoBehaviour:
   guardImpactLookAtSideOffset: 0.3
   guardImpactMoveInSmoothTime: 0.08
   guardImpactHoldDuration: 0.6
+  guardImpactSlowEnabled: 1
+  guardImpactSlowTimeScale: 0.1
+  guardImpactSlowDuration: 0.15
+  guardImpactSlowRecoverDuration: 0.2
   guardImpactVolume: {fileID: 832575518}
   guardImpactVolumeWeight: 1
   volumeWeightSmoothSpeed: 8
@@ -3548,6 +3558,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::test
   enableDebugLog: 1
   enableF2DebugKey: 1
+  enableF3DebugKey: 1
   enableF4DebugKey: 0
   enableF5DebugKey: 0
   enableF6DebugKey: 1
@@ -3588,7 +3599,8 @@ MonoBehaviour:
   escapeReductionPerInput: 0.15
   throwHorizontalSpeed: 6
   throwUpSpeed: 5
-  grabFailPushDistance: 1
+  grabFailHorizontalSpeed: 3
+  grabFailUpSpeed: 3
   guardAtkBonusMultiplier: 10.5
   rebornTimeLimit: 5
   rebornHpRatio: 0.3
@@ -3623,6 +3635,10 @@ MonoBehaviour:
   gaugeGainOnGuard: 10
   gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
+  enableKankiChargeEffect: 1
+  kankiChargeEffectPrefab: {fileID: 0}
+  kankiChargeEffectOffset: {x: 0, y: 1, z: 0}
+  kankiChargeEffectFollowLocal: 1
   specialRequiredGauge: 100
   specialGaugeCost: 100
   specialAtk: 172
@@ -3658,6 +3674,10 @@ MonoBehaviour:
   mashPromptText: "B\u30DC\u30BF\u30F3\u3092\u9023\u6253\u3057\u308D\uFF01"
   mashPromptFontSize: 64
   mashPromptColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  showMashRemainingCount: 1
+  mashRemainingFontSize: 150
+  mashRemainingColor: {r: 1, g: 1, b: 1, a: 1}
+  mashRemainingYRatio: 0.42
 --- !u!54 &956537539
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -9424,6 +9444,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::test
   enableDebugLog: 1
   enableF2DebugKey: 0
+  enableF3DebugKey: 1
   enableF4DebugKey: 0
   enableF5DebugKey: 1
   enableF6DebugKey: 1
@@ -9464,7 +9485,8 @@ MonoBehaviour:
   escapeReductionPerInput: 0.15
   throwHorizontalSpeed: 6
   throwUpSpeed: 5
-  grabFailPushDistance: 1
+  grabFailHorizontalSpeed: 3
+  grabFailUpSpeed: 3
   guardAtkBonusMultiplier: 10.5
   rebornTimeLimit: 5
   rebornHpRatio: 0.3
@@ -9499,6 +9521,10 @@ MonoBehaviour:
   gaugeGainOnGuard: 10
   gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
+  enableKankiChargeEffect: 1
+  kankiChargeEffectPrefab: {fileID: 0}
+  kankiChargeEffectOffset: {x: 0, y: 1, z: 0}
+  kankiChargeEffectFollowLocal: 1
   specialRequiredGauge: 100
   specialGaugeCost: 100
   specialAtk: 172
@@ -9534,6 +9560,10 @@ MonoBehaviour:
   mashPromptText: "B\u30DC\u30BF\u30F3\u3092\u9023\u6253\u3057\u308D\uFF01"
   mashPromptFontSize: 64
   mashPromptColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  showMashRemainingCount: 1
+  mashRemainingFontSize: 150
+  mashRemainingColor: {r: 1, g: 1, b: 1, a: 1}
+  mashRemainingYRatio: 0.42
 --- !u!4 &1873253616 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
