@@ -8,7 +8,8 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// キャラクターセレクト画面の制御。
 /// 1P・2Pがそれぞれ独立したカーソルでキャラクターを選び、決定ボタンで確定する。
-/// 左右の担当エリアという制限は無く、1P・2Pともに全キャラクターへ上下左右自由に移動できる。
+/// 左右の担当エリアという制限は無く、上下左右自由に移動できる。
+/// ただし各キャラの selectableBy で「1Pだけ／2Pだけ」が選べるキャラを指定できる（既定は両方選択可）。
 /// 両者の選択が確定したら、演出→ディレイを挟んでインゲームシーンへ遷移する。
 ///
 /// ・カーソル移動のコルーチンとSE再生パターンは MainMenuController.cs を踏襲。
@@ -50,16 +51,25 @@ public class CharacterSelectController : MonoBehaviour
         }
     }
 
+    /// <summary>このキャラクターをどのプレイヤーが選択できるか</summary>
+    public enum SelectablePlayer
+    {
+        Both,         // 1P・2Pどちらも選択可能
+        Player1Only,  // 1Pだけが選択可能（2Pのカーソルは飛ばされる）
+        Player2Only   // 2Pだけが選択可能（1Pのカーソルは飛ばされる）
+    }
+
     [System.Serializable]
     public class CharacterEntry
     {
         public string characterName;  // 表示名
         public RectTransform anchor;  // グリッド上の位置（各キャラアイコンのUI要素）
 
+        [Tooltip("このキャラを選べるプレイヤー。例: 「Player1」というキャラは Player1Only、「Player2」は Player2Only にすると、それぞれ1P・2Pだけが選べる")]
+        public SelectablePlayer selectableBy = SelectablePlayer.Both;
+
         [Header("ドアップ画像")]
-        public Sprite portrait;       // デフォルトのドアップ画像（1P/2P専用画像が未設定の場合のフォールバック）
-        public Sprite portraitP1;     // 1Pがカーソルを合わせた時に表示する画像（未設定ならportraitを使用）
-        public Sprite portraitP2;     // 2Pがカーソルを合わせた時に表示する画像（未設定ならportraitを使用）
+        public Sprite portrait;       // カーソルを合わせた時に表示するドアップ画像（1P・2P共通）
 
         [Header("名前表示（画像）")]
         public Sprite nameImage;      // キャラ名を表す画像（ロゴ・ロゴタイプ等）。選択中にnameImageObjectへ反映する
@@ -157,8 +167,8 @@ public class CharacterSelectController : MonoBehaviour
 
     void ResetSelectionPositions()
     {
-        player1.currentIndex = Mathf.Clamp(player1.startIndex, 0, characters.Length - 1);
-        player2.currentIndex = Mathf.Clamp(player2.startIndex, 0, characters.Length - 1);
+        player1.currentIndex = ResolveStartIndex(player1, 1);
+        player2.currentIndex = ResolveStartIndex(player2, 2);
 
         if (player1.cursor != null)
         {
@@ -177,6 +187,34 @@ public class CharacterSelectController : MonoBehaviour
         SetCursorVisible(player2, true);
         UpdateSelectionDisplay(player1, 1);
         UpdateSelectionDisplay(player2, 2);
+    }
+
+    // 指定したプレイヤーがこのキャラクターを選択できるか
+    bool CanSelect(int characterIndex, int playerNumber)
+    {
+        if (characterIndex < 0 || characterIndex >= characters.Length) return false;
+
+        switch (characters[characterIndex].selectableBy)
+        {
+            case SelectablePlayer.Player1Only: return playerNumber == 1;
+            case SelectablePlayer.Player2Only: return playerNumber == 2;
+            default: return true;
+        }
+    }
+
+    // startIndexのキャラをそのプレイヤーが選べない場合は、選べる最初のキャラへ切り替える
+    int ResolveStartIndex(PlayerSelector p, int playerNumber)
+    {
+        int start = Mathf.Clamp(p.startIndex, 0, characters.Length - 1);
+        if (CanSelect(start, playerNumber)) return start;
+
+        for (int i = 0; i < characters.Length; i++)
+        {
+            if (CanSelect(i, playerNumber)) return i;
+        }
+
+        Debug.LogWarning($"[CharacterSelectController] {playerNumber}P が選択できるキャラクターがありません。characters の selectableBy を確認してください。", this);
+        return start;
     }
 
     void Update()
@@ -213,7 +251,7 @@ public class CharacterSelectController : MonoBehaviour
 
         if (navDir != Vector2Int.zero)
         {
-            int nextIndex = FindNearestInDirection(p.currentIndex, new Vector2(navDir.x, navDir.y));
+            int nextIndex = FindNearestInDirection(p.currentIndex, new Vector2(navDir.x, navDir.y), playerNumber);
 
             if (nextIndex >= 0)
             {
@@ -240,11 +278,11 @@ public class CharacterSelectController : MonoBehaviour
         }
     }
 
-    // 現在位置(fromGlobalIndex)から見て、dir方向にある「characters全体の中で一番近いもの」の
-    // インデックスを返す（左右どちら側かは問わず、全キャラクターが対象）。見つからなければ-1。
+    // 現在位置(fromGlobalIndex)から見て、dir方向にある「そのプレイヤーが選択可能なキャラの中で一番近いもの」の
+    // インデックスを返す（selectableByで選べないキャラは飛ばす）。見つからなければ-1。
     // dirが伸びる方向（主軸）の距離を優先しつつ、主軸から外れる（横ズレ・縦ズレ）ほどペナルティを与えることで、
     // 単純なグリッドでなくても自然に「右にある一番近いキャラ」「上にある一番近いキャラ」を選べるようにしている。
-    int FindNearestInDirection(int fromGlobalIndex, Vector2 dir)
+    int FindNearestInDirection(int fromGlobalIndex, Vector2 dir, int playerNumber)
     {
         var fromAnchor = characters[fromGlobalIndex].anchor;
         if (fromAnchor == null) return -1;
@@ -259,6 +297,7 @@ public class CharacterSelectController : MonoBehaviour
         for (int idx = 0; idx < characters.Length; idx++)
         {
             if (idx == fromGlobalIndex) continue;
+            if (!CanSelect(idx, playerNumber)) continue; // このプレイヤーが選べないキャラは対象外
 
             var anchor = characters[idx].anchor;
             if (anchor == null) continue;
@@ -321,8 +360,7 @@ public class CharacterSelectController : MonoBehaviour
 
     // カーソルが乗っているキャラクターのドアップ画像・名前表示を、そのプレイヤー専用のUIに反映する
     // （1P用UIは画面左、2P用UIは画面右のRectTransformに配置しておく想定）
-    // playerNumberが1なら portraitP1、2なら portraitP2 を優先して使用し、
-    // 未設定の場合は共通の portrait にフォールバックする。
+    // ドアップ画像は1P・2P共通の portrait を使用する。
     void UpdateSelectionDisplay(PlayerSelector p, int playerNumber)
     {
         if (p == null) return;
@@ -332,15 +370,7 @@ public class CharacterSelectController : MonoBehaviour
 
         if (p.portraitImage != null)
         {
-            Sprite sprite;
-            if (playerNumber == 1)
-            {
-                sprite = entry.portraitP1 != null ? entry.portraitP1 : entry.portrait;
-            }
-            else
-            {
-                sprite = entry.portraitP2 != null ? entry.portraitP2 : entry.portrait;
-            }
+            Sprite sprite = entry.portrait;
 
             p.portraitImage.sprite = sprite;
 

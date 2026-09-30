@@ -2177,6 +2177,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c211e6f0c49a6b749a55de866adee0f8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameInputManager
+  characterPrefabs:
+  - characterName: Player1
+    prefab: {fileID: 6758519040437653269, guid: aa90d0cad5f0e2e49a621f84ddd6fc4d, type: 3}
+  - characterName: Player2
+    prefab: {fileID: 5939530159737485577, guid: c5323318139c20442940e84b82dfc630, type: 3}
+  player1SpawnPoint: {fileID: 1435874237}
+  player2SpawnPoint: {fileID: 1195980007}
+  fallbackPrefab: {fileID: 0}
+  player1ControlScheme: 
+  player2ControlScheme: 
 --- !u!114 &750834242
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2190,7 +2200,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.PlayerInputManager
   m_NotificationBehavior: 0
-  m_MaxPlayerCount: -1
+  m_MaxPlayerCount: 2
   m_AllowJoining: 1
   m_JoinBehavior: 0
   m_PlayerJoinedEvent:
@@ -6168,60 +6178,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1997720376}
   m_CullTransparentMesh: 1
---- !u!1 &2006462093
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2006462095}
-  - component: {fileID: 2006462094}
-  m_Layer: 0
-  m_Name: PlayerCharacterSpawner
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &2006462094
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2006462093}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e4820ad3b40eab34a91997194203552c, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerCharacterSpawner
-  characterPrefabs:
-  - characterName: Player1
-    prefab: {fileID: 6758519040437653269, guid: aa90d0cad5f0e2e49a621f84ddd6fc4d, type: 3}
-  - characterName: Player2
-    prefab: {fileID: 5939530159737485577, guid: c5323318139c20442940e84b82dfc630, type: 3}
-  - characterName: 
-    prefab: {fileID: 0}
-  player1SpawnPoint: {fileID: 1435874237}
-  player2SpawnPoint: {fileID: 1195980007}
-  fallbackPrefab: {fileID: 0}
---- !u!4 &2006462095
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2006462093}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 5.82138, y: 5.20398, z: 1.15365}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &2010192535
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -6595,6 +6551,5 @@ SceneRoots:
   - {fileID: 1892936214}
   - {fileID: 450604259}
   - {fileID: 1846907281}
-  - {fileID: 2006462095}
   - {fileID: 1435874237}
   - {fileID: 1195980007}
