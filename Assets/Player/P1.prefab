@@ -1687,10 +1687,10 @@ MonoBehaviour:
   enableDebugLog: 1
   enableF2DebugKey: 1
   enableF3DebugKey: 1
-  enableF4DebugKey: 0
-  enableF5DebugKey: 0
+  enableF4DebugKey: 1
+  enableF5DebugKey: 1
   enableF6DebugKey: 1
-  enableF7DebugKey: 0
+  enableF7DebugKey: 1
   enableF8DebugKey: 1
   PlayerName: P1
   PLayerTagName: 
@@ -1702,7 +1702,7 @@ MonoBehaviour:
   minMoveAnimSpeed: 0.6
   maxMoveAnimSpeed: 1.4
   minMoveSpeedRatio: 0.4
-  minPosition: {x: -10, y: -0.8, z: -10}
+  minPosition: {x: -10, y: 0.2, z: -10}
   maxPosition: {x: 10, y: 10, z: 10}
   force: {x: 0, y: 400, z: 0}
   Jumpflag: 0
@@ -1715,7 +1715,7 @@ MonoBehaviour:
   upKickDuration: 0.5
   downKickDuration: 0.5
   guardDuration: 0.3
-  throwDuration: 1.5
+  throwDuration: 0.75
   punchAtk: 27
   kickAtk: 5
   upKickAtk: 148
@@ -1736,14 +1736,14 @@ MonoBehaviour:
   mashThresholdStep: 3
   standHeight: 1.93
   standCenter: {x: 0, y: 0.82, z: 0}
-  crouchHeight: 1.25
-  crouchCenter: {x: 0, y: 0.65, z: 0.27}
+  crouchHeight: 1.15
+  crouchCenter: {x: 0, y: 0.47, z: 0}
   MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   punchHitEffectData: {fileID: 11400000, guid: 8772ce0eb28849c4abaede33a1153937, type: 2}
   kickHitEffectData: {fileID: 11400000, guid: d4c9d40f25fe1244796e06fbb64cc7fc, type: 2}
-  guardHitEffectData: {fileID: 11400000, guid: f94d7da69ad3ede499f8c4f145d7a9eb, type: 2}
+  guardHitEffectData: {fileID: 11400000, guid: 0efc11a881f5de141897cb73e3f94d51, type: 2}
   mashHitEffectData: {fileID: 11400000, guid: de286e7f5553bf1418b0df8c98938742, type: 2}
   missHitEffectData: {fileID: 11400000, guid: 182479a3e4175444d9090102939c91b9, type: 2}
   enableHitStop: 1
@@ -1814,9 +1814,9 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6758519040437653269}
   serializedVersion: 5
-  m_Mass: 1
+  m_Mass: 0.58
   m_LinearDamping: 0
-  m_AngularDamping: 0.05
+  m_AngularDamping: 0.93
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
