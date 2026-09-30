@@ -95,7 +95,30 @@ public class GameInputManager : MonoBehaviour
             CharacterSelectController.CharacterSelectionResult.Player2CharacterName,
             player2SpawnPoint, "2P", 1, player2ControlScheme, GetP2Devices());
 
+        LinkOpponents(Player1Instance, Player2Instance);
+
         OnSpawned?.Invoke(Player1Instance, Player2Instance);
+    }
+
+    // 生成した1P/2PのenemyPlayerを、お互いに設定する。
+    // プレハブはシーン上のオブジェクトを参照できないため、プレハブのenemyPlayerは空になっている。
+    // ここで相互に設定しないと、相手の攻撃を「相手の攻撃か？」と判定できず、当たり判定が働かない。
+    // （Player側にも保険の自動補完はあるが、ここで確実に設定しておく）
+    void LinkOpponents(GameObject p1, GameObject p2)
+    {
+        if (p1 == null || p2 == null) return;
+
+        var player1 = p1.GetComponent<Player>();
+        var player2 = p2.GetComponent<Player>();
+        if (player1 == null || player2 == null)
+        {
+            Debug.LogWarning("[GameInputManager] 生成したオブジェクトにPlayerコンポーネントが見つからず、" +
+                             "enemyPlayerを設定できませんでした。");
+            return;
+        }
+
+        player1.enemyPlayer = player2;
+        player2.enemyPlayer = player1;
     }
 
     // ---- 生成 ----

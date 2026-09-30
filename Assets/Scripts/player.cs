@@ -2364,8 +2364,13 @@ public class Player : MonoBehaviour
         //地面に当たっている場合は無視
         if (collision.gameObject.CompareTag("Ground")) return;
 
-        //自分自身のタグ、またはすでに倒れている場合は無視
-        if (collision.gameObject.tag == this.PLayerTagName || HP <= 0) return;
+        // すでに倒れている場合は無視
+        // ★変更：以前は「自分のタグ(PLayerTagName)と同じタグのオブジェクトは無視」も行っていたが、削除した。
+        //   自分自身のヒットボックスの除外は、この後の「相手(enemyPlayer/enemy)の攻撃用ヒットボックスか？」の
+        //   参照比較で既に確実に行われているため不要。むしろ、GameInputManagerからプレハブで生成すると、
+        //   同じキャラを選んだ場合などに1P/2Pのタグが同じになり、相手の攻撃まで無視して
+        //   「当たり判定が消える」原因になっていた。
+        if (HP <= 0) return;
 
         // ★追加：必殺技(waza)発動中は無敵。相手の攻撃用当たり判定が触れても一切反応しない
         //  （ダメージ・ヒットストップ・ガード演出等、何も発生させない）。
