@@ -1226,7 +1226,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.5
+      value: 0.269415
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
       propertyPath: m_LocalPosition.z
@@ -1710,16 +1710,8 @@ MonoBehaviour:
   maxHP: 1000
   atk: 10
   Player_status: 0
-  punchDuration: 0.2
-  kickDuration: 0.3
-  upKickDuration: 0.5
-  downKickDuration: 0.5
   guardDuration: 0.3
   throwDuration: 0.75
-  punchAtk: 27
-  kickAtk: 5
-  upKickAtk: 148
-  downKickAtk: 10
   throwAtk: 5
   grabRange: 1.75
   escapeTimeAtZeroHp: 10
@@ -1750,6 +1742,35 @@ MonoBehaviour:
   hitStopDuration: 0.15
   guardHitStopDuration: 0.05
   freezeAnimatorDuringHitStop: 1
+  punchAtk: 27
+  punchDuration: 0.2
+  punchHitStopDuration: 0.08
+  punchKnockback:
+    horizontalSpeed: 2.5
+    upSpeed: 0
+  kickAtk: 5
+  kickDuration: 0.3
+  kickHitStopDuration: 0.08
+  kickKnockback:
+    horizontalSpeed: 3.5
+    upSpeed: 0
+  upKickAtk: 148
+  upKickDuration: 0.5
+  upKickHitStopDuration: 0.08
+  upKickKnockback:
+    horizontalSpeed: 2
+    upSpeed: 5
+  downKickAtk: 10
+  downKickDuration: 0.5
+  downKickHitStopDuration: 0.08
+  downKickKnockback:
+    horizontalSpeed: 3
+    upSpeed: 0
+  specialAtk: 172
+  specialHitStopDuration: 0.08
+  specialKnockback:
+    horizontalSpeed: 0
+    upSpeed: 0
   enableGuardSuccessEffect: 1
   guardSuccessEffectPrefab: {fileID: 4575220094214949160, guid: 2b606bf4bbf80c64585e8eed7a58d48d, type: 3}
   guardSuccessEffectOffset: {x: 0, y: 1.98, z: 0}
@@ -1769,16 +1790,15 @@ MonoBehaviour:
   kankiChargeEffectFollowLocal: 1
   specialRequiredGauge: 100
   specialGaugeCost: 100
-  specialAtk: 172
   specialDuration: 2.25
   specialSe: {fileID: 0}
   specialEffectPrefab: {fileID: 4575220094214949160, guid: 2b606bf4bbf80c64585e8eed7a58d48d, type: 3}
   specialEffectOffset: {x: 0, y: 1.54, z: 0}
   specialEffectLifetime: 2.45
   enemy: {fileID: 0}
-  enemyPlayer: {fileID: 0}
+  enemyPlayer: {fileID: 3267743640789704827, guid: c5323318139c20442940e84b82dfc630, type: 3}
   animator: {fileID: 5361200534041497870}
-  fightingCamera: {fileID: 0}
+  fightingCamera: {fileID: 9096632630280813122, guid: 89c452da849cda84489bc37e8a782689, type: 3}
   punchMultiHit:
     allowMultiHit: 0
     maxHitCount: 1
@@ -1982,7 +2002,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6758519040437653269}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9bdf7386e4b1da14bbdab4b6a20ea870, type: 3}
   m_Name: 

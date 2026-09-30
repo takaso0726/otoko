@@ -172,11 +172,8 @@ public class Player : MonoBehaviour
     //   ここに新しい技を追加する場合は、対応するフィールドを増やし、
     //   GetAttackPower() の switch にもケースを追加すること。
     //=====================================================
-    [Header("攻撃力設定（攻撃の種類ごと）")]
-    [SerializeField] int punchAtk = 10;    // パンチ（空中攻撃含む）の攻撃力
-    [SerializeField] int kickAtk = 10;     // 通常キックの攻撃力
-    [SerializeField] int upKickAtk = 10;   // 上キックの攻撃力
-    [SerializeField] int downKickAtk = 10; // 下キックの攻撃力
+    // ※パンチ／キック／上キック／下キック／必殺技の攻撃力は、下の「攻撃ごとの設定」（各技のヘッダー）へ移動した。
+    [Header("投げの攻撃力")]
     [SerializeField] int throwAtk = 5;     // 投げ（つかみ）成立時の固定ダメージ
 
     //=====================================================
@@ -264,11 +261,15 @@ public class Player : MonoBehaviour
     //=====================================================
     // ★攻撃ごとの設定（攻撃の種類ごと）
     //   各技のヘッダーの下に、次の順で並べている：
-    //     ① 攻撃後のクールダウン（拘束時間）… 攻撃を出した後、次の行動ができるまでの時間
-    //     ② ヒットストップ … この技を当てられた相手が止まる時間
-    //     ③ ノックバック … この技を当てられた相手が飛ぶ量（攻撃者から離れる方向＋上方向）
-    //   ②③は「攻撃する側」のInspectorで調整する（攻撃力・多段ヒット設定と同じ考え方）。
+    //     ① 攻撃力 … この技が当たった時に相手へ与えるダメージ（漢気ゲージ補正の前の素の値）
+    //     ② 攻撃後のクールダウン（拘束時間）… 攻撃を出した後、次の行動ができるまでの時間
+    //     ③ ヒットストップ … この技を当てられた相手が止まる時間
+    //     ④ ノックバック … この技を当てられた相手が飛ぶ量（攻撃者から離れる方向＋上方向）
+    //   ③④は「攻撃する側」のInspectorで調整する。
     //   ※仁王立ちガードで防がれた時は、ヒットストップはguardHitStopDuration、ノックバックは無し。
+    //   ※新しい技を追加する場合は、対応するフィールドを増やし、GetAttackPower() /
+    //     GetCurrentHitStopDuration() / GetCurrentKnockbackSetting() / GetMultiHitSetting() の
+    //     switchにもケースを追加すること。
     //=====================================================
     [System.Serializable]
     public class KnockbackSetting
@@ -281,42 +282,53 @@ public class Player : MonoBehaviour
     }
 
     [Header("パンチ（空中攻撃含む）")]
-    [Tooltip("① 攻撃後のクールダウン（拘束時間・秒）。パンチを出してから次の行動ができるまでの時間。")]
+    [Tooltip("① パンチの攻撃力（ダメージ量）")]
+    [SerializeField] int punchAtk = 10;
+    [Tooltip("② 攻撃後のクールダウン（拘束時間・秒）。パンチを出してから次の行動ができるまでの時間。")]
     [SerializeField] float punchDuration = 0.5f;
-    [Tooltip("② パンチを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
+    [Tooltip("③ パンチを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
     [SerializeField] float punchHitStopDuration = 0.08f;
-    [Tooltip("③ パンチを当てた時の、相手のノックバック量")]
+    [Tooltip("④ パンチを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting punchKnockback = new KnockbackSetting { horizontalSpeed = 2.5f, upSpeed = 0f };
 
     [Header("通常キック")]
-    [Tooltip("① 攻撃後のクールダウン（拘束時間・秒）。キックを出してから次の行動ができるまでの時間。")]
+    [Tooltip("① 通常キックの攻撃力（ダメージ量）")]
+    [SerializeField] int kickAtk = 10;
+    [Tooltip("② 攻撃後のクールダウン（拘束時間・秒）。キックを出してから次の行動ができるまでの時間。")]
     [SerializeField] float kickDuration = 0.6f;
-    [Tooltip("② 通常キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
+    [Tooltip("③ 通常キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
     [SerializeField] float kickHitStopDuration = 0.08f;
-    [Tooltip("③ 通常キックを当てた時の、相手のノックバック量")]
+    [Tooltip("④ 通常キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting kickKnockback = new KnockbackSetting { horizontalSpeed = 3.5f, upSpeed = 0f };
 
     [Header("上キック")]
-    [Tooltip("① 攻撃後のクールダウン（拘束時間・秒）。上キックを出してから次の行動ができるまでの時間。")]
+    [Tooltip("① 上キックの攻撃力（ダメージ量）")]
+    [SerializeField] int upKickAtk = 10;
+    [Tooltip("② 攻撃後のクールダウン（拘束時間・秒）。上キックを出してから次の行動ができるまでの時間。")]
     [SerializeField] float upKickDuration = 0.7f;
-    [Tooltip("② 上キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
+    [Tooltip("③ 上キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
     [SerializeField] float upKickHitStopDuration = 0.08f;
-    [Tooltip("③ 上キックを当てた時の、相手のノックバック量")]
+    [Tooltip("④ 上キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting upKickKnockback = new KnockbackSetting { horizontalSpeed = 2f, upSpeed = 5f };
 
     [Header("下キック")]
-    [Tooltip("① 攻撃後のクールダウン（拘束時間・秒）。下キックを出してから次の行動ができるまでの時間。")]
+    [Tooltip("① 下キックの攻撃力（ダメージ量）")]
+    [SerializeField] int downKickAtk = 10;
+    [Tooltip("② 攻撃後のクールダウン（拘束時間・秒）。下キックを出してから次の行動ができるまでの時間。")]
     [SerializeField] float downKickDuration = 0.5f;
-    [Tooltip("② 下キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
+    [Tooltip("③ 下キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
     [SerializeField] float downKickHitStopDuration = 0.08f;
-    [Tooltip("③ 下キックを当てた時の、相手のノックバック量")]
+    [Tooltip("④ 下キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting downKickKnockback = new KnockbackSetting { horizontalSpeed = 3f, upSpeed = 0f };
 
-    [Header("必殺技（waza）の被弾側設定")]
-    [Tooltip("必殺技のクールダウン（拘束時間）は、上の「必殺技設定」のspecialDurationで調整する（waza アニメーションの長さと合わせる必要があるため）。\n" +
-             "② 必殺技を当てた時の、相手のヒットストップ時間（秒）。多段ヒットごとに毎回かかる点に注意。0だと止まらない。")]
+    [Header("必殺技（waza）")]
+    [Tooltip("① 必殺技（左足の攻撃判定）が相手に命中した時のダメージ量。パンチ・キック等と同じ仕組みで、" +
+             "漢気ゲージによる攻撃力補正（atkPowerPerBar）もこの値を基準に上乗せされる。")]
+    [SerializeField] int specialAtk = 20;
+    [Tooltip("③ 必殺技を当てた時の、相手のヒットストップ時間（秒）。多段ヒットごとに毎回かかる点に注意。0だと止まらない。\n" +
+             "※② 必殺技のクールダウン（拘束時間）は、下の「必殺技設定」のspecialDurationで調整する（waza アニメーションの長さと合わせる必要があるため）。")]
     [SerializeField] float specialHitStopDuration = 0.08f;
-    [Tooltip("③ 必殺技を当てた時の、相手のノックバック量。多段ヒットするため、既定は0（飛ばさない）。")]
+    [Tooltip("④ 必殺技を当てた時の、相手のノックバック量。多段ヒットするため、既定は0（飛ばさない）。")]
     [SerializeField] KnockbackSetting specialKnockback = new KnockbackSetting { horizontalSpeed = 0f, upSpeed = 0f };
 
     //=====================================================
@@ -389,9 +401,7 @@ public class Player : MonoBehaviour
     [Tooltip("必殺技発動で消費する漢気ゲージ量。")]
     public float specialGaugeCost = 200f;
 
-    [Tooltip("必殺技（左足の攻撃判定）が相手に命中した時のダメージ量。パンチ・キック等と同じ仕組みで、" +
-             "漢気ゲージによる攻撃力補正（atkPowerPerBar）もこの値を基準に上乗せされる。")]
-    [SerializeField] int specialAtk = 20;
+    // ※必殺技の攻撃力(specialAtk)は、「攻撃ごとの設定」の「必殺技（waza）」ヘッダーへ移動した。
 
     [Tooltip("必殺技発動中の拘束時間(秒)。既定値は3秒。\n" +
              "この間は攻撃・ガード・投げ・ジャンプ・必殺技の再発動は一切できず、移動のみ可能。\n" +
@@ -675,6 +685,53 @@ public class Player : MonoBehaviour
         }
     }
 
+    // ★追加：相手（enemyPlayer / enemy）の参照が切れている時に、シーン内から自動で探し直す。
+    //   プレハブはシーン上のオブジェクトへの参照を保持できないため、プレハブ化して置き直したり、
+    //   相手側を置き直したりすると、Inspectorで設定していたenemyPlayer/enemyが空(None/Missing)になり、
+    //   OnTriggerEnterの「相手の攻撃か？」判定が常にfalseになって当たり判定が消えたように見える。
+    //   ・enemyPlayerもenemyも未設定（または破棄済み）の時だけ、0.5秒おきに探す（設定済みなら何もしない）。
+    //   ・まず自分以外のPlayerを探し、いなければCPUのEnemyを探す。
+    //   ・Inspectorで設定されていればそちらが常に優先される。
+    private float opponentResolveTimer = 0f;
+
+    void ResolveOpponentIfMissing()
+    {
+        // UnityのObjectの==は、破棄済み(Missing)の参照もnull扱いにする
+        if (enemyPlayer != null || enemy != null) return;
+
+        opponentResolveTimer -= Time.unscaledDeltaTime;
+        if (opponentResolveTimer > 0f) return;
+        opponentResolveTimer = 0.5f;
+
+        // 自分以外のPlayer（対人戦の相手）を探す。PLayerTagNameが自分と違うものを優先する
+        Player found = null;
+        foreach (Player candidate in FindObjectsByType<Player>(FindObjectsSortMode.None))
+        {
+            if (candidate == this || !candidate.gameObject.activeInHierarchy) continue;
+            if (found == null || (found.PLayerTagName == PLayerTagName && candidate.PLayerTagName != PLayerTagName))
+            {
+                found = candidate;
+            }
+        }
+
+        if (found != null)
+        {
+            enemyPlayer = found;
+            Debug.LogWarning($"[{PlayerName}] enemyPlayerが未設定だったため、シーン内の'{found.gameObject.name}'を自動で設定しました。" +
+                             "プレハブはシーン上のオブジェクトを参照できないため、Inspectorで設定し直すことをおすすめします。", this);
+            return;
+        }
+
+        // 対人戦の相手がいなければ、CPU(Enemy)を探す
+        Enemy foundEnemy = FindAnyObjectByType<Enemy>();
+        if (foundEnemy != null)
+        {
+            enemy = foundEnemy;
+            Debug.LogWarning($"[{PlayerName}] enemyが未設定だったため、シーン内の'{foundEnemy.gameObject.name}'を自動で設定しました。" +
+                             "Inspectorで設定し直すことをおすすめします。", this);
+        }
+    }
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     // 各種コンポーネント・子オブジェクトの当たり判定の取得と初期化を行う
     void Start()
@@ -840,6 +897,7 @@ public class Player : MonoBehaviour
     void Update()
     {
         MaintainKankiChargeEffect(); // ★追加：漢気ゲージ1本以上の間、追従エフェクトを出し続ける
+        ResolveOpponentIfMissing();  // ★追加：プレハブ化・再配置等で相手(enemyPlayer/enemy)の参照が切れていたら自動で探し直す
         // ★修正：しゃがみの見た目（コライダー・アニメーター）は、
         //   currentState（状態機械）を経由せず、毎フレーム「スティック下入力の有無」だけで直接同期する。
         //   以前はEnterCrouch()内でcurrentStateとコライダー/アニメーターを同時に変更していたため、

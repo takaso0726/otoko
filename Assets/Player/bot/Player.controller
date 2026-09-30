@@ -20,7 +20,7 @@ AnimatorStateTransition:
   m_TransitionDuration: 0.07734495
   m_TransitionOffset: 0
   m_ExitTime: 0.0000000012074737
-  m_HasExitTime: 0
+  m_HasExitTime: 1
   m_HasFixedDuration: 1
   m_InterruptionSource: 0
   m_OrderedInterruption: 1
@@ -33,7 +33,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: HeadHit
-  m_Speed: 2
+  m_Speed: 1.5
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: -4998892980128286792}
@@ -47,7 +47,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: 4e9c4a90d02288944aa00d61a24fae8d, type: 3}
+  m_Motion: {fileID: -203655887218126122, guid: 6dc5677d2de17a241a2829427f4d2731, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
