@@ -249,6 +249,35 @@ public class Player : MonoBehaviour
     public HitEffectData missHitEffectData;    // 攻撃が空振りした時に出す擬音の設定（未設定なら出さない）
 
     //=====================================================
+    // ★被弾時のノックバック設定（攻撃の種類ごと）
+    //   「攻撃する側」のInspectorで調整する（攻撃力・多段ヒット設定と同じ考え方）。
+    //   ガードされなかった攻撃が相手に当たった時、相手を「攻撃者から離れる方向（Z軸）」へ吹き飛ばす。
+    //   水平・上方向とも0なら、その技はノックバックしない。
+    //   ※仁王立ちガードで防がれた時はノックバックしない。
+    //=====================================================
+    [System.Serializable]
+    public class KnockbackSetting
+    {
+        [Tooltip("相手を後方（攻撃者から離れる方向）へ飛ばす水平方向の初速。大きいほど遠くまで飛ぶ。0で水平方向には飛ばない。")]
+        public float horizontalSpeed = 3f;
+        [Tooltip("相手を上方向へ飛ばす初速。大きいほど高く浮く。0で浮かない。" +
+                 "1未満だと実際にはほとんど浮かないので、浮かせたい時は1以上を目安に。")]
+        public float upSpeed = 0f;
+    }
+
+    [Header("ノックバック設定（攻撃の種類ごと）")]
+    [Tooltip("パンチ（空中攻撃含む）を当てた時の相手のノックバック量")]
+    [SerializeField] KnockbackSetting punchKnockback = new KnockbackSetting { horizontalSpeed = 2.5f, upSpeed = 0f };
+    [Tooltip("通常キックを当てた時の相手のノックバック量")]
+    [SerializeField] KnockbackSetting kickKnockback = new KnockbackSetting { horizontalSpeed = 3.5f, upSpeed = 0f };
+    [Tooltip("上キックを当てた時の相手のノックバック量")]
+    [SerializeField] KnockbackSetting upKickKnockback = new KnockbackSetting { horizontalSpeed = 2f, upSpeed = 5f };
+    [Tooltip("下キックを当てた時の相手のノックバック量")]
+    [SerializeField] KnockbackSetting downKickKnockback = new KnockbackSetting { horizontalSpeed = 3f, upSpeed = 0f };
+    [Tooltip("必殺技（waza）を当てた時の相手のノックバック量。多段ヒットするため、既定は0（飛ばさない）。")]
+    [SerializeField] KnockbackSetting specialKnockback = new KnockbackSetting { horizontalSpeed = 0f, upSpeed = 0f };
+
+    //=====================================================
     // ★ヒットストップ設定
     //=====================================================
     [Header("ヒットストップ設定")]
@@ -259,6 +288,8 @@ public class Player : MonoBehaviour
 
     private float hitStopTimer = 0f;   // 残りヒットストップ時間。0より大きい間は入力処理をすべてスキップする
     private bool pendingHeadHitAnimation = false; // ヒットストップ終了時にHeadHitアニメーションを再生するか（ガード成功時はfalse）
+    private bool hasPendingKnockback = false;    // ヒットストップ終了時にノックバックを与えるか
+    private Vector3 pendingKnockbackVelocity;    // 与えるノックバックの初速（水平＋上方向）
 
     //=====================================================
     // ★仁王立ち（ガード）成功エフェクト設定
@@ -527,6 +558,24 @@ public class Player : MonoBehaviour
             case AttackType.UpKick: return upKickMultiHit;
             case AttackType.DownKick: return downKickMultiHit;
             default: return punchMultiHit; // 想定外の場合のフォールバック
+        }
+    }
+
+    // ★追加：被弾した相手側（OnTriggerEnter）から、「今出している技のノックバック量」を問い合わせるための公開メソッド。
+    //   必殺技中はspecialKnockback、それ以外はCurrentAttackTypeに応じた設定を返す。
+    //   攻撃中でない場合（想定外）はnullを返す＝ノックバックなし。
+    //   新しい技を追加した場合は、対応するKnockbackSettingフィールドを増やし、ここにもケースを追加すること。
+    public KnockbackSetting GetCurrentKnockbackSetting()
+    {
+        if (currentState == PlayerState.Special) return specialKnockback;
+
+        switch (CurrentAttackType)
+        {
+            case AttackType.Punch: return punchKnockback;
+            case AttackType.Kick: return kickKnockback;
+            case AttackType.UpKick: return upKickKnockback;
+            case AttackType.DownKick: return downKickKnockback;
+            default: return null;
         }
     }
 
@@ -1207,7 +1256,51 @@ public class Player : MonoBehaviour
             }
         }
 
+        // ★追加：ヒットストップ中は相手もアニメーションも止まっているので、
+        //   止まっている間に滑らないよう、ヒットストップが終わった瞬間にノックバックを開始する。
+        if (hasPendingKnockback)
+        {
+            hasPendingKnockback = false;
+            ApplyKnockback(pendingKnockbackVelocity);
+        }
+
         DLog($"[{PlayerName}] ヒットストップ終了");
+    }
+
+    //-----------------------------------------------------
+    // 被弾時のノックバック
+    //-----------------------------------------------------
+    // ノックバックを要求する。ヒットストップが有効な場合はその終了時（EndHitStop）に、
+    // 無効な場合はその場ですぐにApplyKnockbackを実行する。
+    // ※StartHitStopの早期return条件（enableHitStopがfalse、またはhitStopDurationが0以下）と揃えてある。
+    void RequestKnockback(Vector3 velocity)
+    {
+        if (enableHitStop && hitStopDuration > 0f)
+        {
+            hasPendingKnockback = true;
+            pendingKnockbackVelocity = velocity;
+        }
+        else
+        {
+            ApplyKnockback(velocity);
+        }
+    }
+
+    // 実際にRigidbodyへ初速を与える。LaunchByThrow()と同じくAddForce(VelocityChange)を使う
+    // （rb.velocity / rb.linearVelocity のUnityバージョン差を避けるため）。
+    // ★currentStateは変更しない（通常被弾は元々状態遷移しないため、それに合わせている）。
+    void ApplyKnockback(Vector3 velocity)
+    {
+        if (rb == null) return;
+
+        rb.AddForce(velocity, ForceMode.VelocityChange);
+
+        // しっかり浮くほどの上方向速度がある場合は空中扱いにして、飛んでいる間の空中ジャンプを防ぐ。
+        // 着地時はOnCollisionEnterでtrueに戻る。
+        // （ほとんど浮かない小さな値でfalseにすると、着地イベントが来ずfalseのままになる恐れがあるためしきい値を設けている）
+        if (velocity.y >= 1f) Jumpflag = false;
+
+        DLog($"[{PlayerName}] ノックバック velocity={velocity}");
     }
 
     //-----------------------------------------------------
@@ -2271,6 +2364,20 @@ public class Player : MonoBehaviour
 
             // 通常被弾時のヒットストップ（少しだけ動けなくする）
             StartHitStop(hitStopDuration);
+
+            // ★追加：ノックバック。攻撃者（相手Player）の技ごとの設定に従って、
+            //   攻撃者から離れる方向（Z軸）＋上方向へ飛ばす。
+            //   ※CPU(Enemy)の攻撃は未対応（Enemy.cs側にも同様のGetCurrentKnockbackSetting()が必要）。
+            //   ※この一撃でHPが0になる場合は、ダウン処理と干渉しないようノックバックしない。
+            if (isEnemyPlayerAttack && HP - attackerAtk > 0)
+            {
+                KnockbackSetting knockback = enemyPlayer.GetCurrentKnockbackSetting();
+                if (knockback != null && (knockback.horizontalSpeed != 0f || knockback.upSpeed != 0f))
+                {
+                    Vector3 awayDirection = GetAwayDirectionFrom(enemyPlayer);
+                    RequestKnockback(awayDirection * knockback.horizontalSpeed + Vector3.up * knockback.upSpeed);
+                }
+            }
 
             Vector3 hitPoint = collision.ClosestPoint(collision.transform.position);
             ParticleSystem hitParticle = Instantiate(Hit_particle, hitPoint, Quaternion.Euler(-90f, 0f, 0f));
