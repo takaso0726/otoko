@@ -163,10 +163,7 @@ public class Player : MonoBehaviour
     // ★各アクションの持続時間（Inspectorで調整可能）
     //=====================================================
     [Header("アクション時間設定（秒）")]
-    [SerializeField] float punchDuration = 0.5f;    // パンチ（空中攻撃含む）の拘束時間
-    [SerializeField] float kickDuration = 0.6f;     // 通常キックの拘束時間
-    [SerializeField] float upKickDuration = 0.7f;   // 上キックの拘束時間
-    [SerializeField] float downKickDuration = 0.5f; // 下キックの拘束時間
+    // ※パンチ／キック／上キック／下キックの拘束時間は、下の「攻撃ごとの設定」（各技のヘッダー）へ移動した。
     [SerializeField] float guardDuration = 0.5f;    // 仁王立ちの拘束時間
     [SerializeField] float throwDuration = 1.5f;    // 投げの拘束時間
 
@@ -249,11 +246,29 @@ public class Player : MonoBehaviour
     public HitEffectData missHitEffectData;    // 攻撃が空振りした時に出す擬音の設定（未設定なら出さない）
 
     //=====================================================
-    // ★被弾時のノックバック設定（攻撃の種類ごと）
-    //   「攻撃する側」のInspectorで調整する（攻撃力・多段ヒット設定と同じ考え方）。
-    //   ガードされなかった攻撃が相手に当たった時、相手を「攻撃者から離れる方向（Z軸）」へ吹き飛ばす。
-    //   水平・上方向とも0なら、その技はノックバックしない。
-    //   ※仁王立ちガードで防がれた時はノックバックしない。
+    // ★ヒットストップ設定
+    //=====================================================
+    [Header("ヒットストップ設定")]
+    [SerializeField] bool enableHitStop = true;             // ヒットストップ機能を使うかどうか
+    [Tooltip("CPU(Enemy)の攻撃を受けた時など、攻撃側に個別設定が無い場合に使う、通常被弾時のヒットストップ時間（秒）。\n" +
+             "対人戦でPlayerの攻撃を受けた時は、攻撃者側の「攻撃ごとの設定」のヒットストップ時間が使われる。")]
+    [SerializeField] float hitStopDuration = 0.08f;         // 通常被弾時（CPU等の攻撃側設定が無い場合）に少しだけ動けなくなる時間（秒）
+    [SerializeField] float guardHitStopDuration = 0.05f;    // 仁王立ちガード成功時に少しだけ動けなくなる時間（秒）
+    [SerializeField] bool freezeAnimatorDuringHitStop = true; // ヒットストップ中はアニメーションも一瞬止めるか
+
+    private float hitStopTimer = 0f;   // 残りヒットストップ時間。0より大きい間は入力処理をすべてスキップする
+    private bool pendingHeadHitAnimation = false; // ヒットストップ終了時にHeadHitアニメーションを再生するか（ガード成功時はfalse）
+    private bool hasPendingKnockback = false;    // ヒットストップ終了時にノックバックを与えるか
+    private Vector3 pendingKnockbackVelocity;    // 与えるノックバックの初速（水平＋上方向）
+
+    //=====================================================
+    // ★攻撃ごとの設定（攻撃の種類ごと）
+    //   各技のヘッダーの下に、次の順で並べている：
+    //     ① 攻撃後のクールダウン（拘束時間）… 攻撃を出した後、次の行動ができるまでの時間
+    //     ② ヒットストップ … この技を当てられた相手が止まる時間
+    //     ③ ノックバック … この技を当てられた相手が飛ぶ量（攻撃者から離れる方向＋上方向）
+    //   ②③は「攻撃する側」のInspectorで調整する（攻撃力・多段ヒット設定と同じ考え方）。
+    //   ※仁王立ちガードで防がれた時は、ヒットストップはguardHitStopDuration、ノックバックは無し。
     //=====================================================
     [System.Serializable]
     public class KnockbackSetting
@@ -265,31 +280,44 @@ public class Player : MonoBehaviour
         public float upSpeed = 0f;
     }
 
-    [Header("ノックバック設定（攻撃の種類ごと）")]
-    [Tooltip("パンチ（空中攻撃含む）を当てた時の相手のノックバック量")]
+    [Header("パンチ（空中攻撃含む）")]
+    [Tooltip("① 攻撃後のクールダウン（拘束時間・秒）。パンチを出してから次の行動ができるまでの時間。")]
+    [SerializeField] float punchDuration = 0.5f;
+    [Tooltip("② パンチを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
+    [SerializeField] float punchHitStopDuration = 0.08f;
+    [Tooltip("③ パンチを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting punchKnockback = new KnockbackSetting { horizontalSpeed = 2.5f, upSpeed = 0f };
-    [Tooltip("通常キックを当てた時の相手のノックバック量")]
+
+    [Header("通常キック")]
+    [Tooltip("① 攻撃後のクールダウン（拘束時間・秒）。キックを出してから次の行動ができるまでの時間。")]
+    [SerializeField] float kickDuration = 0.6f;
+    [Tooltip("② 通常キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
+    [SerializeField] float kickHitStopDuration = 0.08f;
+    [Tooltip("③ 通常キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting kickKnockback = new KnockbackSetting { horizontalSpeed = 3.5f, upSpeed = 0f };
-    [Tooltip("上キックを当てた時の相手のノックバック量")]
+
+    [Header("上キック")]
+    [Tooltip("① 攻撃後のクールダウン（拘束時間・秒）。上キックを出してから次の行動ができるまでの時間。")]
+    [SerializeField] float upKickDuration = 0.7f;
+    [Tooltip("② 上キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
+    [SerializeField] float upKickHitStopDuration = 0.08f;
+    [Tooltip("③ 上キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting upKickKnockback = new KnockbackSetting { horizontalSpeed = 2f, upSpeed = 5f };
-    [Tooltip("下キックを当てた時の相手のノックバック量")]
+
+    [Header("下キック")]
+    [Tooltip("① 攻撃後のクールダウン（拘束時間・秒）。下キックを出してから次の行動ができるまでの時間。")]
+    [SerializeField] float downKickDuration = 0.5f;
+    [Tooltip("② 下キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
+    [SerializeField] float downKickHitStopDuration = 0.08f;
+    [Tooltip("③ 下キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting downKickKnockback = new KnockbackSetting { horizontalSpeed = 3f, upSpeed = 0f };
-    [Tooltip("必殺技（waza）を当てた時の相手のノックバック量。多段ヒットするため、既定は0（飛ばさない）。")]
+
+    [Header("必殺技（waza）の被弾側設定")]
+    [Tooltip("必殺技のクールダウン（拘束時間）は、上の「必殺技設定」のspecialDurationで調整する（waza アニメーションの長さと合わせる必要があるため）。\n" +
+             "② 必殺技を当てた時の、相手のヒットストップ時間（秒）。多段ヒットごとに毎回かかる点に注意。0だと止まらない。")]
+    [SerializeField] float specialHitStopDuration = 0.08f;
+    [Tooltip("③ 必殺技を当てた時の、相手のノックバック量。多段ヒットするため、既定は0（飛ばさない）。")]
     [SerializeField] KnockbackSetting specialKnockback = new KnockbackSetting { horizontalSpeed = 0f, upSpeed = 0f };
-
-    //=====================================================
-    // ★ヒットストップ設定
-    //=====================================================
-    [Header("ヒットストップ設定")]
-    [SerializeField] bool enableHitStop = true;             // ヒットストップ機能を使うかどうか
-    [SerializeField] float hitStopDuration = 0.08f;         // 通常被弾時に少しだけ動けなくなる時間（秒）
-    [SerializeField] float guardHitStopDuration = 0.05f;    // 仁王立ちガード成功時に少しだけ動けなくなる時間（秒）
-    [SerializeField] bool freezeAnimatorDuringHitStop = true; // ヒットストップ中はアニメーションも一瞬止めるか
-
-    private float hitStopTimer = 0f;   // 残りヒットストップ時間。0より大きい間は入力処理をすべてスキップする
-    private bool pendingHeadHitAnimation = false; // ヒットストップ終了時にHeadHitアニメーションを再生するか（ガード成功時はfalse）
-    private bool hasPendingKnockback = false;    // ヒットストップ終了時にノックバックを与えるか
-    private Vector3 pendingKnockbackVelocity;    // 与えるノックバックの初速（水平＋上方向）
 
     //=====================================================
     // ★仁王立ち（ガード）成功エフェクト設定
@@ -576,6 +604,24 @@ public class Player : MonoBehaviour
             case AttackType.UpKick: return upKickKnockback;
             case AttackType.DownKick: return downKickKnockback;
             default: return null;
+        }
+    }
+
+    // ★追加：被弾した相手側（OnTriggerEnter）から、「今出している技のヒットストップ時間（秒）」を問い合わせるための公開メソッド。
+    //   必殺技中はspecialHitStopDuration、それ以外はCurrentAttackTypeに応じた値を返す。
+    //   攻撃中でない場合（想定外）は、呼び出し側のフォールバックで扱えるよう負の値(-1)を返す。
+    //   新しい技を追加した場合は、対応するフィールドを増やし、ここにもケースを追加すること。
+    public float GetCurrentHitStopDuration()
+    {
+        if (currentState == PlayerState.Special) return specialHitStopDuration;
+
+        switch (CurrentAttackType)
+        {
+            case AttackType.Punch: return punchHitStopDuration;
+            case AttackType.Kick: return kickHitStopDuration;
+            case AttackType.UpKick: return upKickHitStopDuration;
+            case AttackType.DownKick: return downKickHitStopDuration;
+            default: return -1f;
         }
     }
 
@@ -1272,10 +1318,11 @@ public class Player : MonoBehaviour
     //-----------------------------------------------------
     // ノックバックを要求する。ヒットストップが有効な場合はその終了時（EndHitStop）に、
     // 無効な場合はその場ですぐにApplyKnockbackを実行する。
-    // ※StartHitStopの早期return条件（enableHitStopがfalse、またはhitStopDurationが0以下）と揃えてある。
-    void RequestKnockback(Vector3 velocity)
+    // ※StartHitStopの早期return条件（enableHitStopがfalse、またはヒットストップ時間が0以下）と揃えてある。
+    //   appliedHitStopDuration: 今回の被弾で実際にStartHitStopへ渡したヒットストップ時間。
+    void RequestKnockback(Vector3 velocity, float appliedHitStopDuration)
     {
-        if (enableHitStop && hitStopDuration > 0f)
+        if (enableHitStop && appliedHitStopDuration > 0f)
         {
             hasPendingKnockback = true;
             pendingKnockbackVelocity = velocity;
@@ -2362,8 +2409,16 @@ public class Player : MonoBehaviour
             guardComboCount = 0;
             animator.SetTrigger("Hit");
 
-            // 通常被弾時のヒットストップ（少しだけ動けなくする）
-            StartHitStop(hitStopDuration);
+            // 通常被弾時のヒットストップ（少しだけ動けなくする）。
+            // ★変更：対人戦では、攻撃者の「攻撃ごとの設定」のヒットストップ時間を使う。
+            //   CPU(Enemy)の攻撃、または攻撃種別が取れない場合は、従来のhitStopDurationにフォールバックする。
+            float appliedHitStop = hitStopDuration;
+            if (isEnemyPlayerAttack)
+            {
+                float perAttackHitStop = enemyPlayer.GetCurrentHitStopDuration();
+                if (perAttackHitStop >= 0f) appliedHitStop = perAttackHitStop;
+            }
+            StartHitStop(appliedHitStop);
 
             // ★追加：ノックバック。攻撃者（相手Player）の技ごとの設定に従って、
             //   攻撃者から離れる方向（Z軸）＋上方向へ飛ばす。
@@ -2375,7 +2430,7 @@ public class Player : MonoBehaviour
                 if (knockback != null && (knockback.horizontalSpeed != 0f || knockback.upSpeed != 0f))
                 {
                     Vector3 awayDirection = GetAwayDirectionFrom(enemyPlayer);
-                    RequestKnockback(awayDirection * knockback.horizontalSpeed + Vector3.up * knockback.upSpeed);
+                    RequestKnockback(awayDirection * knockback.horizontalSpeed + Vector3.up * knockback.upSpeed, appliedHitStop);
                 }
             }
 
