@@ -1697,7 +1697,7 @@ MonoBehaviour:
   moveSpeed: 5
   turnSpeed: 180
   moveInputThreshold: 0.03
-  crouchInputThreshold: -0.43
+  crouchInputThreshold: -0.73
   upKickInputThreshold: 0.25
   minMoveAnimSpeed: 0.6
   maxMoveAnimSpeed: 1.4
@@ -1722,10 +1722,10 @@ MonoBehaviour:
   grabFailHorizontalSpeed: 3
   grabFailUpSpeed: 3
   guardAtkBonusMultiplier: 10.5
-  rebornTimeLimit: 5
-  rebornHpRatio: 0.3
-  mashThresholdBase: 11
-  mashThresholdStep: 3
+  rebornTimeLimit: 3
+  rebornHpRatio: 0.5
+  mashThresholdBase: 10
+  mashThresholdStep: 5
   standHeight: 1.93
   standCenter: {x: 0, y: 0.82, z: 0}
   crouchHeight: 1.15
@@ -1742,31 +1742,35 @@ MonoBehaviour:
   hitStopDuration: 0.15
   guardHitStopDuration: 0.05
   freezeAnimatorDuringHitStop: 1
-  punchAtk: 27
-  punchDuration: 0.2
+  punchAtk: 15
+  punchMissDuration: 0.2
+  punchHitDuration: 0.5
   punchHitStopDuration: 0.08
   punchKnockback:
-    horizontalSpeed: 2.5
-    upSpeed: 0
-  kickAtk: 5
-  kickDuration: 0.3
+    horizontalSpeed: 3
+    upSpeed: 8
+  kickAtk: 25
+  kickMissDuration: 0.3
+  kickHitDuration: 0.6
   kickHitStopDuration: 0.08
   kickKnockback:
-    horizontalSpeed: 3.5
-    upSpeed: 0
-  upKickAtk: 148
-  upKickDuration: 0.5
+    horizontalSpeed: 5
+    upSpeed: 5
+  upKickAtk: 50
+  upKickMissDuration: 0.7
+  upKickHitDuration: 0.7
   upKickHitStopDuration: 0.08
   upKickKnockback:
-    horizontalSpeed: 2
-    upSpeed: 5
+    horizontalSpeed: 3
+    upSpeed: 10
   downKickAtk: 10
-  downKickDuration: 0.5
+  downKickMissDuration: 0.5
+  downKickHitDuration: 0.5
   downKickHitStopDuration: 0.08
   downKickKnockback:
     horizontalSpeed: 3
     upSpeed: 0
-  specialAtk: 172
+  specialAtk: 100
   specialHitStopDuration: 0.08
   specialKnockback:
     horizontalSpeed: 0

@@ -1230,7 +1230,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 7.000006
+      value: 7.0025063
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1717,10 +1717,10 @@ MonoBehaviour:
   grabFailHorizontalSpeed: 3
   grabFailUpSpeed: 3
   guardAtkBonusMultiplier: 10.5
-  rebornTimeLimit: 5
-  rebornHpRatio: 0.3
-  mashThresholdBase: 11
-  mashThresholdStep: 3
+  rebornTimeLimit: 3
+  rebornHpRatio: 0.5
+  mashThresholdBase: 10
+  mashThresholdStep: 5
   standHeight: 1.93
   standCenter: {x: 0, y: 0.82, z: 0}
   crouchHeight: 1.15
@@ -1737,31 +1737,35 @@ MonoBehaviour:
   hitStopDuration: 0.15
   guardHitStopDuration: 0.05
   freezeAnimatorDuringHitStop: 1
-  punchAtk: 27
-  punchDuration: 0.2
+  punchAtk: 15
+  punchMissDuration: 0.2
+  punchHitDuration: 0.5
   punchHitStopDuration: 0.08
   punchKnockback:
-    horizontalSpeed: 2.5
-    upSpeed: 0
-  kickAtk: 5
-  kickDuration: 0.3
+    horizontalSpeed: 3
+    upSpeed: 8
+  kickAtk: 25
+  kickMissDuration: 0.3
+  kickHitDuration: 0.6
   kickHitStopDuration: 0.08
   kickKnockback:
-    horizontalSpeed: 3.5
-    upSpeed: 0
-  upKickAtk: 148
-  upKickDuration: 0.5
+    horizontalSpeed: 5
+    upSpeed: 5
+  upKickAtk: 50
+  upKickMissDuration: 0.7
+  upKickHitDuration: 0.7
   upKickHitStopDuration: 0.08
   upKickKnockback:
-    horizontalSpeed: 2
-    upSpeed: 5
+    horizontalSpeed: 3
+    upSpeed: 10
   downKickAtk: 10
-  downKickDuration: 0.5
+  downKickMissDuration: 0.5
+  downKickHitDuration: 0.5
   downKickHitStopDuration: 0.08
   downKickKnockback:
     horizontalSpeed: 3
     upSpeed: 0
-  specialAtk: 172
+  specialAtk: 100
   specialHitStopDuration: 0.08
   specialKnockback:
     horizontalSpeed: 0
@@ -1791,7 +1795,7 @@ MonoBehaviour:
   specialEffectOffset: {x: 0, y: 1.54, z: 0}
   specialEffectLifetime: 2.45
   enemy: {fileID: 0}
-  enemyPlayer: {fileID: 6785771700806157088, guid: aa90d0cad5f0e2e49a621f84ddd6fc4d, type: 3}
+  enemyPlayer: {fileID: 0}
   animator: {fileID: 321369193941556440}
   fightingCamera: {fileID: 9096632630280813122, guid: 89c452da849cda84489bc37e8a782689, type: 3}
   punchMultiHit:

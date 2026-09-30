@@ -43,6 +43,12 @@ public class GameInputManager : MonoBehaviour
     [Header("該当キャラが見つからなかった場合の保険（任意）")]
     [SerializeField] GameObject fallbackPrefab;
 
+    [Header("シーン内の参照（空なら実行時に自動で探す）")]
+    [Tooltip("HPバー・漢気ゲージを管理するGameMNG。空ならシーンから自動で探します。")]
+    [SerializeField] GameMNG gameMNG;
+    [Tooltip("追従カメラ（FightingCameraController）。空ならシーンから自動で探します。")]
+    [SerializeField] FightingCameraController cameraController;
+
     [Header("Control Scheme（空なら自動選択）")]
     [SerializeField] string player1ControlScheme = "";
     [SerializeField] string player2ControlScheme = "";
@@ -96,6 +102,7 @@ public class GameInputManager : MonoBehaviour
             player2SpawnPoint, "2P", 1, player2ControlScheme, GetP2Devices());
 
         LinkOpponents(Player1Instance, Player2Instance);
+        SetupSceneLinks(Player1Instance, Player2Instance);
 
         OnSpawned?.Invoke(Player1Instance, Player2Instance);
     }
@@ -119,6 +126,52 @@ public class GameInputManager : MonoBehaviour
 
         player1.enemyPlayer = player2;
         player2.enemyPlayer = player1;
+    }
+
+    // 生成した1P/2Pを、シーン上のカメラ・GameMNG（HPバー/漢気ゲージ）につなぐ。
+    // プレハブはシーン上のオブジェクトを参照できないため、生成のたびに実行時に設定する必要がある。
+    //   ・PlayerName ... GameMNGがHPバー更新や勝敗判定を"P1"/"P2"で振り分けているため、
+    //                    プレハブ側の値に関係なく、生成時に1Pは"P1"、2Pは"P2"へ固定する。
+    //   ・カメラ ........ 追従対象へ登録し、Player側のfightingCamera（ガード演出・復活演出用）も設定する。
+    //   ・GameMNG ....... p1/p2を差し替え、HPバー・漢気ゲージを生成したプレイヤーの値に合わせ直す。
+    void SetupSceneLinks(GameObject p1, GameObject p2)
+    {
+        var player1 = p1 != null ? p1.GetComponent<Player>() : null;
+        var player2 = p2 != null ? p2.GetComponent<Player>() : null;
+
+        if (player1 != null) player1.PlayerName = "P1";
+        if (player2 != null) player2.PlayerName = "P2";
+
+        var cam = cameraController != null ? cameraController : FindAnyObjectByType<FightingCameraController>();
+        if (cam != null)
+        {
+            if (player1 != null)
+            {
+                player1.fightingCamera = cam;
+                cam.RegisterTarget(player1.transform);
+            }
+            if (player2 != null)
+            {
+                player2.fightingCamera = cam;
+                cam.RegisterTarget(player2.transform);
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[GameInputManager] シーン内にFightingCameraControllerが見つからないため、" +
+                             "カメラの追従対象に登録できませんでした。");
+        }
+
+        var mng = gameMNG != null ? gameMNG : FindAnyObjectByType<GameMNG>();
+        if (mng != null)
+        {
+            mng.SetPlayers(player1, player2, cam);
+        }
+        else
+        {
+            Debug.LogWarning("[GameInputManager] シーン内にGameMNGが見つからないため、" +
+                             "HPバー・漢気ゲージを生成したプレイヤーにつなげませんでした。");
+        }
     }
 
     // ---- 生成 ----

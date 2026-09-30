@@ -340,6 +340,34 @@ public class GameMNG : MonoBehaviour
         }
     }
 
+    // ★追加：GameInputManagerなどから、実行時に生成したP1/P2（プレハブ）とカメラを登録するための公開メソッド。
+    //   プレハブはシーン上のオブジェクトを参照できないため、p1/p2をInspectorで設定していても
+    //   生成されたプレイヤーとは別物になる。生成後にこのメソッドで差し替え、
+    //   HPバー・漢気ゲージの表示を生成したプレイヤーの現在値に合わせ直す。
+    //   ・null を渡した引数は、既存の設定を変更しない。
+    //   ・HPバー/漢気ゲージのUI自体（Slider/KankiGaugeCircle）はシーン上のものをそのまま使う。
+    public void SetPlayers(Player player1, Player player2, FightingCameraController camera = null)
+    {
+        if (player1 != null)
+        {
+            p1 = player1;
+            PlayerTransform = player1.transform; // 勝利時カメラのズーム対象
+        }
+        if (player2 != null)
+        {
+            p2 = player2;
+            EnemyTransform = player2.transform;  // 1P敗北＝2P勝利時のズーム対象
+        }
+        if (camera != null) cameraController = camera;
+
+        // HPバーを、生成したプレイヤーの現在HPに合わせる
+        if (P_HPbar != null && p1 != null) P_HPbar.value = p1.HP;
+        if (E_HPbar != null && p2 != null) E_HPbar.value = p2.HP;
+
+        // 漢気ゲージ(円形)を、生成したプレイヤーの現在値に合わせる
+        Player_UpdateKankiGauge();
+    }
+
     // ド根性復活のタイマーとカウントを表示する
     public void PlayerUI(float Timer, int Cnt)
     {

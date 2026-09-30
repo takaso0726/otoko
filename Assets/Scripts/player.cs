@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 using UnityEngine.UIElements;
 
 //=====================================================
@@ -263,6 +264,8 @@ public class Player : MonoBehaviour
     //   各技のヘッダーの下に、次の順で並べている：
     //     ① 攻撃力 … この技が当たった時に相手へ与えるダメージ（漢気ゲージ補正の前の素の値）
     //     ② 攻撃後のクールダウン（拘束時間）… 攻撃を出した後、次の行動ができるまでの時間
+//        ★空振り時(〇〇MissDuration)と命中時(〇〇HitDuration)を別々に設定できる。
+//        どちらも「攻撃を出した瞬間からの合計時間」。命中した瞬間に、残り時間が命中時の値へ切り替わる。
     //     ③ ヒットストップ … この技を当てられた相手が止まる時間
     //     ④ ノックバック … この技を当てられた相手が飛ぶ量（攻撃者から離れる方向＋上方向）
     //   ③④は「攻撃する側」のInspectorで調整する。
@@ -284,8 +287,11 @@ public class Player : MonoBehaviour
     [Header("パンチ（空中攻撃含む）")]
     [Tooltip("① パンチの攻撃力（ダメージ量）")]
     [SerializeField] int punchAtk = 10;
-    [Tooltip("② 攻撃後のクールダウン（拘束時間・秒）。パンチを出してから次の行動ができるまでの時間。")]
-    [SerializeField] float punchDuration = 0.5f;
+    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束時間・秒）。パンチを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [FormerlySerializedAs("punchDuration")]
+    [SerializeField] float punchMissDuration = 0.5f;
+    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束時間・秒）。パンチを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
+    [SerializeField] float punchHitDuration = 0.5f;
     [Tooltip("③ パンチを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
     [SerializeField] float punchHitStopDuration = 0.08f;
     [Tooltip("④ パンチを当てた時の、相手のノックバック量")]
@@ -294,8 +300,11 @@ public class Player : MonoBehaviour
     [Header("通常キック")]
     [Tooltip("① 通常キックの攻撃力（ダメージ量）")]
     [SerializeField] int kickAtk = 10;
-    [Tooltip("② 攻撃後のクールダウン（拘束時間・秒）。キックを出してから次の行動ができるまでの時間。")]
-    [SerializeField] float kickDuration = 0.6f;
+    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束時間・秒）。キックを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [FormerlySerializedAs("kickDuration")]
+    [SerializeField] float kickMissDuration = 0.6f;
+    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束時間・秒）。キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
+    [SerializeField] float kickHitDuration = 0.6f;
     [Tooltip("③ 通常キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
     [SerializeField] float kickHitStopDuration = 0.08f;
     [Tooltip("④ 通常キックを当てた時の、相手のノックバック量")]
@@ -304,8 +313,11 @@ public class Player : MonoBehaviour
     [Header("上キック")]
     [Tooltip("① 上キックの攻撃力（ダメージ量）")]
     [SerializeField] int upKickAtk = 10;
-    [Tooltip("② 攻撃後のクールダウン（拘束時間・秒）。上キックを出してから次の行動ができるまでの時間。")]
-    [SerializeField] float upKickDuration = 0.7f;
+    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束時間・秒）。上キックを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [FormerlySerializedAs("upKickDuration")]
+    [SerializeField] float upKickMissDuration = 0.7f;
+    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束時間・秒）。上キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
+    [SerializeField] float upKickHitDuration = 0.7f;
     [Tooltip("③ 上キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
     [SerializeField] float upKickHitStopDuration = 0.08f;
     [Tooltip("④ 上キックを当てた時の、相手のノックバック量")]
@@ -314,8 +326,11 @@ public class Player : MonoBehaviour
     [Header("下キック")]
     [Tooltip("① 下キックの攻撃力（ダメージ量）")]
     [SerializeField] int downKickAtk = 10;
-    [Tooltip("② 攻撃後のクールダウン（拘束時間・秒）。下キックを出してから次の行動ができるまでの時間。")]
-    [SerializeField] float downKickDuration = 0.5f;
+    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束時間・秒）。下キックを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [FormerlySerializedAs("downKickDuration")]
+    [SerializeField] float downKickMissDuration = 0.5f;
+    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束時間・秒）。下キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
+    [SerializeField] float downKickHitDuration = 0.5f;
     [Tooltip("③ 下キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
     [SerializeField] float downKickHitStopDuration = 0.08f;
     [Tooltip("④ 下キックを当てた時の、相手のノックバック量")]
@@ -432,6 +447,7 @@ public class Player : MonoBehaviour
     Animator currentanimator;                               //現在のアニメーションを管理する変数
     private PlayerState currentState = PlayerState.Idle;   // 現在の行動状態
     private float stateTimer;                               // 現在の行動が終わるまでの残り時間（秒）
+    private float currentAttackMissDuration;                // ★追加：今出している通常攻撃の「空振り時」拘束時間（命中時に経過時間を求めるために保持）
 
     Rigidbody rb;
     AudioSource se;
@@ -668,9 +684,33 @@ public class Player : MonoBehaviour
         return true;
     }
 
+    // ★追加：攻撃種別ごとの「命中時」クールダウン（攻撃開始からの合計秒数）を返す。
+    //   新しい技を追加したときはここにもケースを追加すること。
+    float GetHitDuration(AttackType type)
+    {
+        switch (type)
+        {
+            case AttackType.Punch: return punchHitDuration;
+            case AttackType.Kick: return kickHitDuration;
+            case AttackType.UpKick: return upKickHitDuration;
+            case AttackType.DownKick: return downKickHitDuration;
+            default: return 0f;
+        }
+    }
+
     // ★追加：被弾した相手側から「あなたの攻撃、当たりましたよ」と通知してもらうための公開メソッド。
     public void NotifyAttackLanded()
     {
+        // ★追加：この攻撃で最初の命中だった場合、クールダウンを「空振り時」から「命中時」の長さへ切り替える。
+        //   （必殺技や投げなど、CurrentAttackTypeがNoneの状態では対象外）
+        if (!attackLandedThisAttack && CurrentAttackType != AttackType.None)
+        {
+            float elapsed = currentAttackMissDuration - stateTimer; // 攻撃開始からの経過時間
+            float newTimer = Mathf.Max(GetHitDuration(CurrentAttackType) - elapsed, 0f);
+            DLog($"[{PlayerName}] 命中によりクールダウン切替：残り{stateTimer:F2}秒 → {newTimer:F2}秒（命中時={GetHitDuration(CurrentAttackType):F2}秒 / 経過={elapsed:F2}秒）");
+            stateTimer = newTimer;
+        }
+
         attackLandedThisAttack = true;
 
         // 相手にダメージを与えた（攻撃を命中させた）ので、漢気ゲージを増やす
@@ -1679,7 +1719,8 @@ public class Player : MonoBehaviour
 
         ResetAttackTriggers();
         currentState = PlayerState.Punch;
-        stateTimer = punchDuration;
+        stateTimer = punchMissDuration;
+        currentAttackMissDuration = punchMissDuration;
         attackLandedThisAttack = false; // 空振り判定用にリセット
         ResetMultiHitCount();           // 多段ヒットカウントを新しい攻撃用にリセット
 
@@ -1717,7 +1758,8 @@ public class Player : MonoBehaviour
         if (isCrouchInput)
         {
             currentState = PlayerState.DownKick;
-            stateTimer = downKickDuration;
+            stateTimer = downKickMissDuration;
+            currentAttackMissDuration = downKickMissDuration;
             animator.SetTrigger("DownKick");
             RightFoot.enabled = true;
             RightLeg.enabled = true;
@@ -1729,7 +1771,8 @@ public class Player : MonoBehaviour
         else if (moveInput.y > upKickInputThreshold)
         {
             currentState = PlayerState.UpKick;
-            stateTimer = upKickDuration;
+            stateTimer = upKickMissDuration;
+            currentAttackMissDuration = upKickMissDuration;
             animator.SetTrigger("UpKick");
             RightFoot.enabled = true;
             RightLeg.enabled = true;
@@ -1741,7 +1784,8 @@ public class Player : MonoBehaviour
         else
         {
             currentState = PlayerState.Kick;
-            stateTimer = kickDuration;
+            stateTimer = kickMissDuration;
+            currentAttackMissDuration = kickMissDuration;
             animator.SetTrigger("Kick");
             RightFoot.enabled = true;
             RightUpLeg.enabled = true;
