@@ -1146,17 +1146,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CharacterSelectController
   characters:
-  - characterName: Player
+  - characterName: Player1
     anchor: {fileID: 1047786491}
-    portrait: {fileID: 21300000, guid: 0c62fbc5485201b48a5b529d512447dc, type: 3}
-    portraitP1: {fileID: 21300000, guid: 3407ca66426e5de4695d7492512abfc3, type: 3}
-    portraitP2: {fileID: 21300000, guid: 44eef005d432a0d4889e41d07d467196, type: 3}
+    selectableBy: 1
+    portrait: {fileID: 21300000, guid: 3407ca66426e5de4695d7492512abfc3, type: 3}
     nameImage: {fileID: 21300000, guid: 6d94763c859627644bbdfd0c515465d1, type: 3}
-  - characterName: Test
+  - characterName: Player2
+    anchor: {fileID: 1047786491}
+    selectableBy: 2
+    portrait: {fileID: 21300000, guid: 44eef005d432a0d4889e41d07d467196, type: 3}
+    nameImage: {fileID: 21300000, guid: 6d94763c859627644bbdfd0c515465d1, type: 3}
+  - characterName: Rikishi
     anchor: {fileID: 802211629}
-    portrait: {fileID: 21300000, guid: ab4affb5d49221a4c97dc0265669d0dc, type: 3}
-    portraitP1: {fileID: 21300000, guid: ab4affb5d49221a4c97dc0265669d0dc, type: 3}
-    portraitP2: {fileID: 21300000, guid: ab4affb5d49221a4c97dc0265669d0dc, type: 3}
+    selectableBy: 0
+    portrait: {fileID: 21300000, guid: 79c2f451664104740be4aeb93612206d, type: 3}
     nameImage: {fileID: 0}
   player1:
     playerName: Player1
