@@ -2185,6 +2185,9 @@ MonoBehaviour:
   player1SpawnPoint: {fileID: 1435874237}
   player2SpawnPoint: {fileID: 1195980007}
   fallbackPrefab: {fileID: 0}
+  debugPlayer1Prefab: {fileID: 6758519040437653269, guid: aa90d0cad5f0e2e49a621f84ddd6fc4d, type: 3}
+  debugPlayer2Prefab: {fileID: 5939530159737485577, guid: c5323318139c20442940e84b82dfc630, type: 3}
+  debugSpawnKey: 102
   gameMNG: {fileID: 0}
   cameraController: {fileID: 0}
   player1ControlScheme: 

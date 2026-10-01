@@ -15,6 +15,9 @@ using UnityEngine.InputSystem.Users;
 //       2P = Player2CharacterName / player2SpawnPoint / Gamepad[1]
 //   ・ゲームパッドの抜き差しがあっても、生成済みキャラは入れ替わらず、
 //     操作デバイスだけを割り当て直す（新しいパッドでの自動参加はしない）
+//   ・【デバッグ】セレクト画面でキャラが選択されていない場合、
+//     インゲーム画面で F9 を押すと、1P/2Pのスポーン地点にデバッグ用プレハブを生成する
+//     （Editor / Development Build のみ有効）
 //
 // PlayerInputManager側の設定：
 //   ・Player Prefab は空でOK（このスクリプトが実行時に設定する）
@@ -43,6 +46,14 @@ public class GameInputManager : MonoBehaviour
     [Header("該当キャラが見つからなかった場合の保険（任意）")]
     [SerializeField] GameObject fallbackPrefab;
 
+    [Header("デバッグ生成（セレクト未選択時にキーで生成するプレハブ）")]
+    [Tooltip("1P用。空ならfallbackPrefabを使用します。")]
+    [SerializeField] GameObject debugPlayer1Prefab;
+    [Tooltip("2P用。空ならfallbackPrefabを使用します。")]
+    [SerializeField] GameObject debugPlayer2Prefab;
+    [Tooltip("デバッグ生成を行うキー")]
+    [SerializeField] Key debugSpawnKey = Key.F9;
+
     [Header("シーン内の参照（空なら実行時に自動で探す）")]
     [Tooltip("HPバー・漢気ゲージを管理するGameMNG。空ならシーンから自動で探します。")]
     [SerializeField] GameMNG gameMNG;
@@ -54,6 +65,7 @@ public class GameInputManager : MonoBehaviour
     [SerializeField] string player2ControlScheme = "";
 
     PlayerInputManager manager;
+    bool spawned; // 二重生成防止
 
     public GameObject Player1Instance { get; private set; }
     public GameObject Player2Instance { get; private set; }
@@ -89,17 +101,60 @@ public class GameInputManager : MonoBehaviour
 
         if (!CharacterSelectController.CharacterSelectionResult.IsValid)
         {
-            Debug.LogWarning("[GameInputManager] CharacterSelectionResultが未設定です。" +
-                             "セレクト画面を経由せずに直接再生した場合などに発生します（fallbackPrefabを使用）。");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // 未選択時は自動生成せず、デバッグキー入力を待つ（Updateで処理）
+            Debug.LogWarning($"[GameInputManager] キャラが選択されていません。" +
+                             $"{debugSpawnKey}キーでデバッグ生成できます。");
+            return;
+#else
+            Debug.LogWarning("[GameInputManager] CharacterSelectionResultが未設定です" +
+                             "（fallbackPrefabを使用）。");
+#endif
         }
 
-        Player1Instance = SpawnFor(
-            CharacterSelectController.CharacterSelectionResult.Player1CharacterName,
-            player1SpawnPoint, "1P", 0, player1ControlScheme, GetP1Devices());
+        SpawnAll(false);
+    }
 
-        Player2Instance = SpawnFor(
-            CharacterSelectController.CharacterSelectionResult.Player2CharacterName,
-            player2SpawnPoint, "2P", 1, player2ControlScheme, GetP2Devices());
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    void Update()
+    {
+        if (spawned) return;
+        if (CharacterSelectController.CharacterSelectionResult.IsValid) return;
+
+        var kb = Keyboard.current;
+        if (kb != null && kb[debugSpawnKey].wasPressedThisFrame)
+            SpawnAll(true);
+    }
+#endif
+
+    // 1P/2Pの生成から、相互参照・シーン連携・通知までをまとめて行う
+    void SpawnAll(bool debugSpawn)
+    {
+        if (spawned) return;
+        spawned = true;
+
+        if (debugSpawn)
+        {
+            Debug.Log("[GameInputManager] デバッグ生成を実行します。");
+
+            Player1Instance = SpawnPrefab(
+                debugPlayer1Prefab != null ? debugPlayer1Prefab : fallbackPrefab,
+                player1SpawnPoint, "1P", 0, player1ControlScheme, GetP1Devices());
+
+            Player2Instance = SpawnPrefab(
+                debugPlayer2Prefab != null ? debugPlayer2Prefab : fallbackPrefab,
+                player2SpawnPoint, "2P", 1, player2ControlScheme, GetP2Devices());
+        }
+        else
+        {
+            Player1Instance = SpawnFor(
+                CharacterSelectController.CharacterSelectionResult.Player1CharacterName,
+                player1SpawnPoint, "1P", 0, player1ControlScheme, GetP1Devices());
+
+            Player2Instance = SpawnFor(
+                CharacterSelectController.CharacterSelectionResult.Player2CharacterName,
+                player2SpawnPoint, "2P", 1, player2ControlScheme, GetP2Devices());
+        }
 
         LinkOpponents(Player1Instance, Player2Instance);
         SetupSceneLinks(Player1Instance, Player2Instance);
@@ -176,15 +231,10 @@ public class GameInputManager : MonoBehaviour
 
     // ---- 生成 ----
 
+    // キャラ名からプレハブを解決して生成する（通常のセレクト経由）
     GameObject SpawnFor(string characterName, Transform spawnPoint, string label,
                         int playerIndex, string controlScheme, InputDevice[] devices)
     {
-        if (spawnPoint == null)
-        {
-            Debug.LogWarning($"[GameInputManager] {label} 用のspawnPointが設定されていません。");
-            return null;
-        }
-
         var prefab = FindPrefab(characterName);
         if (prefab == null)
         {
@@ -192,7 +242,25 @@ public class GameInputManager : MonoBehaviour
                              "見つかりません。fallbackPrefabを使用します。");
             prefab = fallbackPrefab;
         }
-        if (prefab == null) return null;
+
+        return SpawnPrefab(prefab, spawnPoint, label, playerIndex, controlScheme, devices);
+    }
+
+    // 指定されたプレハブを実際に生成する（通常・デバッグ共通）
+    GameObject SpawnPrefab(GameObject prefab, Transform spawnPoint, string label,
+                           int playerIndex, string controlScheme, InputDevice[] devices)
+    {
+        if (spawnPoint == null)
+        {
+            Debug.LogWarning($"[GameInputManager] {label} 用のspawnPointが設定されていません。");
+            return null;
+        }
+
+        if (prefab == null)
+        {
+            Debug.LogWarning($"[GameInputManager] {label} 用のプレハブが設定されていません。");
+            return null;
+        }
 
         if (prefab.GetComponent<PlayerInput>() == null)
         {
