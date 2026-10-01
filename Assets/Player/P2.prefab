@@ -1689,7 +1689,7 @@ MonoBehaviour:
   enableF8DebugKey: 1
   PlayerName: P2
   PLayerTagName: 
-  moveSpeed: 5
+  moveSpeed: 2.5
   turnSpeed: 180
   moveInputThreshold: 0.03
   crouchInputThreshold: -0.43
