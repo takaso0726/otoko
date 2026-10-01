@@ -4774,27 +4774,22 @@ MonoBehaviour:
   reactions:
   - situation: 0
     clipReactions: 03000000
-    seClips:
-    - {fileID: 8300000, guid: 021e3f4d89c1de9449a0682d3f3c2663, type: 3}
+    seClips: []
   - situation: 1
     clipReactions: 01000000
-    seClips:
-    - {fileID: 8300000, guid: 58006699823331a4c9a175d7833e49aa, type: 3}
+    seClips: []
   - situation: 2
     clipReactions: 01000000
-    seClips:
-    - {fileID: 8300000, guid: eba69aa654ee9b843bcd1eba06f88807, type: 3}
+    seClips: []
   - situation: 3
     clipReactions: 01000000
     seClips: []
   - situation: 4
     clipReactions: 0a00000009000000
-    seClips:
-    - {fileID: 8300000, guid: aed08a397486c8f4ba6e09fe028445b8, type: 3}
+    seClips: []
   - situation: 5
     clipReactions: 03000000
-    seClips:
-    - {fileID: 8300000, guid: 9b55e4768b577174399dd5e41851e504, type: 3}
+    seClips: []
   - situation: 6
     clipReactions: 0300000002000000
     seClips: []
