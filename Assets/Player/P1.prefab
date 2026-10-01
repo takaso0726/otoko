@@ -1789,8 +1789,8 @@ MonoBehaviour:
   gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
   enableKankiChargeEffect: 1
-  kankiChargeEffectPrefab: {fileID: 6396199705279390725, guid: 3033e5beaf41edf45b102dad69361753, type: 3}
-  kankiChargeEffectOffset: {x: 0, y: 1, z: 0}
+  kankiChargeEffectPrefab: {fileID: 6046942235736284670, guid: c955c1bd7f5e0414eb1e53986ad00eea, type: 3}
+  kankiChargeEffectOffset: {x: 0, y: 0, z: 0}
   kankiChargeEffectFollowLocal: 1
   specialRequiredGauge: 100
   specialGaugeCost: 100
