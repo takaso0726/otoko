@@ -200,6 +200,9 @@ public class Player : MonoBehaviour
     [SerializeField] float grabFailHorizontalSpeed = 3f;
     [Tooltip("★追加：投げ不成立時に、お互いを後方へ吹き飛ばす上方向の初速。大きいほど放物線の弧が高くなる。")]
     [SerializeField] float grabFailUpSpeed = 3f;
+    [Tooltip("★追加：掴みが成立してから、掴みモーション(Throw-start)を再生し続ける時間。この時間が過ぎたらアニメーションを一時停止し、" +
+             "投げ成立(Throw-release)／投げ不成立(Throw-whiff)の瞬間まで掴んだポーズで止め続ける。")]
+    [SerializeField] float throwStartPlayTime = 0.2f;
 
     //=====================================================
     // ★ガード（仁王立ち）成功時の攻撃力上昇設定
@@ -399,7 +402,7 @@ public class Player : MonoBehaviour
     [Tooltip("ゲージが1本以上たまっている間、出し続けるパーティクル（Loopオン推奨・未設定なら出さない）")]
     [SerializeField] ParticleSystem kankiChargeEffectPrefab;
     [Tooltip("プレイヤー基準の生成位置。キャラクターの体の中心あたりになるよう調整してください。")]
-    [SerializeField] Vector3 kankiChargeEffectOffset = new Vector3(0f, 1.0f, 0f);
+    [SerializeField] Vector3 kankiChargeEffectOffset = new Vector3(0f, 0.0f, 0f);
 
     [Tooltip("ONにすると、パーティクルの発生位置がプレイヤーと一緒に動く（Local）。OFFだと発生済みの粒は移動時にその場へ置き去りになる（World）。")]
     [SerializeField] bool kankiChargeEffectFollowLocal = true;
@@ -481,6 +484,9 @@ public class Player : MonoBehaviour
     // ★追加：投げ（掴み）仕様変更用の相互参照・タイマー
     Player grabbedTarget;            // 自分が今掴んでいる相手（掴む側の時だけ使用。掴んでいなければnull）
     Player grabbingPlayer;           // 自分を今掴んでいる相手（掴まれる側の時だけ使用。掴まれていなければnull）
+    float grabHoldTimer;             // 掴み成立後、掴みモーションを再生し続ける残り時間（0になったら一時停止）
+    bool grabHoldFrozen;             // 掴みモーションを一時停止中か（trueの間animator.speed=0）
+    bool grabStickWasActive;         // 掴まれ中、前フレームでスティックが倒れていたか（押しっぱなしを連打扱いにしないための判定用）
     float escapeTimer;               // 掴まれている間の、脱出に必要な残り時間（0になったら脱出成功）
 
     int rebornCount = 1;             // 復活回数のカウント
@@ -936,6 +942,9 @@ public class Player : MonoBehaviour
     // そうでなければ現在の状態に応じて「拘束中のタイマー消化」か「新しい行動の受付」を行う。
     void Update()
     {
+        // ★追加：掴みポーズで止めている最中に、被弾やダウン等でThrow状態から外れた場合の保険として必ず再生を再開する
+        if (grabHoldFrozen && currentState != PlayerState.Throw) ResumeGrabHoldAnimation();
+
         MaintainKankiChargeEffect(); // ★追加：漢気ゲージ1本以上の間、追従エフェクトを出し続ける
         ResolveOpponentIfMissing();  // ★追加：プレハブ化・再配置等で相手(enemyPlayer/enemy)の参照が切れていたら自動で探し直す
         // ★修正：しゃがみの見た目（コライダー・アニメーター）は、
@@ -1390,7 +1399,8 @@ public class Player : MonoBehaviour
     {
         if (freezeAnimatorDuringHitStop && animator != null)
         {
-            animator.speed = 1f;
+            // ★追加：掴みポーズで止めている最中は、ヒットストップが終わっても止めたままにする
+            animator.speed = grabHoldFrozen ? 0f : 1f;
 
             // ヒットストップで一瞬止めていたぶん、止まった直後に被弾（HeadHit）アニメーションを再生する。
             // ガード成功時のヒットストップ（pendingHeadHitAnimation=false）ではここは実行されない。
@@ -1840,6 +1850,10 @@ public class Player : MonoBehaviour
             grabbedTarget = target;
             target.transform.Translate(0f, 0f, -0.0025f);      // 敵を少し引き寄せる（既存の演出を踏襲）
             target.EnterGrabbed(this);                         // 相手を掴まれ状態へ移行させる（脱出タイマーは相手のHPから決まる）
+
+            // ★追加：掴みモーションをthrowStartPlayTime秒だけ再生したら、掴んでいる間は止める（TickBusyStateで監視）
+            grabHoldTimer = throwStartPlayTime;
+            grabHoldFrozen = false;
         }
         else
         {
@@ -1869,7 +1883,10 @@ public class Player : MonoBehaviour
     //   実際の行動状態であるcurrentStateを基準に判定する。
     public bool CanBeGrabbed()
     {
+        // ★追加：ジャンプ中（空中）の相手は掴めない。Jumpflag==true が「接地している」状態を表す。
+        //   （通常ジャンプ・被弾ノックバックで浮いている間はfalseになる）
         return HP > 0
+            && Jumpflag
             && currentState != PlayerState.Grabbed
             && currentState != PlayerState.Thrown
             && currentState != PlayerState.KnockedDown
@@ -1896,6 +1913,9 @@ public class Player : MonoBehaviour
         currentState = PlayerState.Grabbed;
         grabbingPlayer = grabber;
         escapeTimer = CalculateEscapeTime();
+        // 掴まれた瞬間にスティックを倒していても、それを「抵抗入力」とは数えない
+        grabStickWasActive = Mathf.Abs(moveInput.x) >= moveInputThreshold
+                          || Mathf.Abs(moveInput.y) >= moveInputThreshold;
 
         animator.SetTrigger("Grabbed"); // ★要Animator追加：掴まれ中（もがき）専用のアニメーション。"Thrown"（飛んでいる間）とは別にする
 
@@ -1908,9 +1928,16 @@ public class Player : MonoBehaviour
     {
         escapeTimer -= Time.deltaTime;
 
+        // ★修正：スティックは「倒した瞬間」だけを入力として数える。
+        //   以前は倒している間ずっと毎フレーム短縮されていたため、押しっぱなしで一瞬で脱出でき、
+        //   HPによる脱出時間の差がほぼ意味を持たなくなっていた。
+        bool stickActive = Mathf.Abs(moveInput.x) >= moveInputThreshold
+                        || Mathf.Abs(moveInput.y) >= moveInputThreshold;
+        bool stickPressedNow = stickActive && !grabStickWasActive;
+        grabStickWasActive = stickActive;
+
         bool mashed = wantPunch || wantKick || wantGuard || wantJump || wantThrow || wantSpecial
-                   || Mathf.Abs(moveInput.x) >= moveInputThreshold
-                   || Mathf.Abs(moveInput.y) >= moveInputThreshold;
+                   || stickPressedNow;
         if (mashed)
         {
             escapeTimer -= escapeReductionPerInput;
@@ -1950,7 +1977,8 @@ public class Player : MonoBehaviour
         isGuarding = false;
         canThrow = true;
         currentState = PlayerState.Idle;
-        animator.SetTrigger("Throw-whiff"); // ★要Animator追加（任意）：掴み失敗（逃げられた）演出用トリガー
+        ResumeGrabHoldAnimation();           // ★追加：止めていたアニメーションを再開してからトリガーを上げる（速度0のままだと遷移しないため）
+        animator.SetTrigger("Throw-whiff"); // 投げ失敗（逃げられた）演出用トリガー
     }
 
     // ★追加：掴み拘束(throwDuration)が時間切れになった＝相手が脱出できなかった時に、
@@ -1969,9 +1997,10 @@ public class Player : MonoBehaviour
             //   ダメージは発生させないが、お互いを相手から離れる方向へ放物線を描いて吹き飛ばす。
             DLog($"[{PlayerName}] 方向入力が無いまま拘束時間切れ。投げ不成立扱いで{grabbedTarget.PlayerName}と共に後方へ吹き飛ぶ");
 
-            // ★変更：自分（掴んでいた側）もこの後PushBackFromGrabFailure()で放物線へ吹き飛ぶため、
-            //   ここでは専用の「投げ不成立」トリガーは発火させない（吹き飛び用のトリガーと競合するため）。
-            //   吹き飛ぶ際のモーションはPushBackFromGrabFailure→LaunchByThrow内の"Grab-fail-fly"トリガーに任せる。
+            // ★変更：止めていた掴みモーションを再開する（速度0のままだとThrow-whiffへ遷移できない）。
+            //   投げ失敗のトリガー"Throw-whiff"は、掴んでいた側・掴まれていた側とも
+            //   PushBackFromGrabFailure()→LaunchByThrow()の中で上げる（二重にトリガーを立てて競合しないため）。
+            ResumeGrabHoldAnimation();
 
             grabbedTarget.ReleaseFromGrabWithoutThrow(this); // 相手側もGrabbedを終了させ、放物線で後方へ吹き飛ばす
             PushBackFromGrabFailure(grabbedTarget);          // 自分も相手から離れる方向へ放物線で後方へ吹き飛ぶ
@@ -1982,12 +2011,26 @@ public class Player : MonoBehaviour
 
         DLog($"[{PlayerName}] 投げ成立！{grabbedTarget.PlayerName}を投げ飛ばす");
 
-        animator.SetTrigger("Throw-release"); // 掴みモーションとは別の「投げ飛ばす」モーション
+        ResumeGrabHoldAnimation();            // ★追加：止めていた掴みモーションを再開してからトリガーを上げる
+        animator.SetTrigger("Throw-release"); // 投げ成立時だけ上げる「投げ飛ばす」モーション用トリガー
 
         grabbedTarget.damege(throwAtk); // ダメージは掴み成立時ではなく、実際に投げが決まった瞬間に与える
 
         Vector3 launchDir = GetThrowDirectionFromStick();
+
+        // ★追加：後ろ投げ（自分の向きと逆方向へ投げ飛ばした場合）は、お互いの向きを反転させる。
+        //   相手が自分の背後へ飛んでいくため、そのままだと背中を向け合ったままになってしまう。
+        //   向きの判定は投げる前の自分の向き(transform.forward)で行う。
+        bool isBackThrow = Vector3.Dot(launchDir, transform.forward) < 0f;
+
         grabbedTarget.LaunchByThrow(launchDir, throwHorizontalSpeed, throwUpSpeed);
+
+        if (isBackThrow)
+        {
+            DLog($"[{PlayerName}] 後ろ投げのため、{grabbedTarget.PlayerName}と互いの向きを反転");
+            FlipFacing();
+            grabbedTarget.FlipFacing();
+        }
 
         grabbedTarget = null;
     }
@@ -2017,9 +2060,9 @@ public class Player : MonoBehaviour
     {
         Vector3 awayDirection = GetAwayDirectionFrom(other);
 
-        // "Grab-fail-fly"：★要Animator追加（任意）：投げ不成立で後方へ吹き飛ぶ専用モーション。
-        //   未設定の場合、Animator側にトリガーが無いと警告が出るだけで動作（物理的な吹き飛び）には支障はない。
-        LaunchByThrow(awayDirection, grabFailHorizontalSpeed, grabFailUpSpeed, "Grab-fail-fly");
+        // ★変更：投げ不成立時は、掴んでいた側・掴まれていた側ともに"Throw-whiff"トリガーを上げる
+        //   （以前は専用の"Grab-fail-fly"を使っていた。Animator側でThrow-whiffから吹き飛びモーションへ遷移させること）。
+        LaunchByThrow(awayDirection, grabFailHorizontalSpeed, grabFailUpSpeed, "Throw-whiff");
     }
 
     // ★追加：相手(other)から見て自分が離れるべき方向（Z軸、±Vector3.forward）を返すヘルパー。
@@ -2076,6 +2119,25 @@ public class Player : MonoBehaviour
         }
 
         DLog($"[{PlayerName}] 投げられて吹き飛んだ！（trigger={animTrigger}）");
+    }
+
+    // ★追加：向きをその場で180度反転させる（後ろ投げの後、お互いが再び向かい合うようにするため）。
+    //   通常の向き変更(FaceDirection)は徐々に回るが、こちらは投げの瞬間に即座に反転させる。
+    //   相手(grabbedTarget)側からも呼ぶため public。
+    public void FlipFacing()
+    {
+        Vector3 flipped = -transform.forward;
+        flipped.y = 0f;
+        if (flipped.sqrMagnitude < 0.0001f) return;
+        transform.rotation = Quaternion.LookRotation(flipped.normalized, Vector3.up);
+    }
+
+    // ★追加：掴みポーズで止めていたアニメーションを再開する。
+    //   animator.speedが0のままだとトリガーを上げても遷移しないため、Throw-release／Throw-whiffを上げる直前に必ず呼ぶ。
+    void ResumeGrabHoldAnimation()
+    {
+        grabHoldFrozen = false;
+        if (animator != null && hitStopTimer <= 0f) animator.speed = 1f; // ヒットストップ中ならEndHitStopが戻す
     }
 
     // ★追加：投げで吹き飛ばされた後、地面に着地した瞬間にOnCollisionEnterから呼ばれる。
@@ -2215,6 +2277,17 @@ public class Player : MonoBehaviour
         if (currentState == PlayerState.Special)
         {
             MoveDuringSpecial();
+        }
+
+        // ★追加：掴み成立後、throwStartPlayTime秒だけ掴みモーションを再生したら、そのポーズで止める
+        if (currentState == PlayerState.Throw && grabbedTarget != null && !grabHoldFrozen)
+        {
+            grabHoldTimer -= Time.deltaTime;
+            if (grabHoldTimer <= 0f)
+            {
+                grabHoldFrozen = true;
+                if (animator != null) animator.speed = 0f;
+            }
         }
 
         stateTimer -= Time.deltaTime;
@@ -2745,7 +2818,7 @@ public class Player : MonoBehaviour
             activeKankiChargeEffect = Instantiate(
                 kankiChargeEffectPrefab,
                 transform.position + kankiChargeEffectOffset,
-                Quaternion.Euler(-90f, 0f, 0f),
+                Quaternion.Euler(90f, 0f, 0f),
                 transform); // プレイヤーに追従させるため子オブジェクトにする
             activeKankiChargeEffect.transform.localPosition = kankiChargeEffectOffset;
 

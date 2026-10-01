@@ -1707,17 +1707,17 @@ MonoBehaviour:
   Player_status: 0
   guardDuration: 0.3
   throwDuration: 0.75
-  throwAtk: 5
-  grabRange: 1.75
+  throwAtk: 200
+  grabRange: 3
   escapeTimeAtZeroHp: 10
   escapeTimeAtFullHp: 2
   escapeReductionPerInput: 0.15
-  throwHorizontalSpeed: 6
+  throwHorizontalSpeed: 10
   throwUpSpeed: 5
   grabFailHorizontalSpeed: 3
   grabFailUpSpeed: 3
   guardAtkBonusMultiplier: 10.5
-  rebornTimeLimit: 3
+  rebornTimeLimit: 4
   rebornHpRatio: 0.5
   mashThresholdBase: 10
   mashThresholdStep: 5
