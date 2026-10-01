@@ -20,6 +20,16 @@ public enum GuardImpactCameraSide
     PlayerBack,     // 常にキャラクターの背後側
 }
 
+/// <summary>
+/// キャラクターがジャンプしている間のカメラ演出の種類（設定画面のドロップダウン順 0/1/2 と対応）
+/// </summary>
+public enum JumpCameraMode
+{
+    Off = 0,      // 何もしない（従来どおり）
+    ZoomOut = 1,  // カメラ距離を引く
+    Overhead = 2, // 俯瞰視点（カメラが上がり、見下ろす角度になる）
+}
+
 public class FightingCameraController : MonoBehaviour
 {
     // ★追加：仁王立ちで攻撃を受け止めた瞬間に発火するイベント。
@@ -58,6 +68,35 @@ public class FightingCameraController : MonoBehaviour
 
     [Tooltip("ズーム変化のスムーズさ")]
     public float zoomSmoothTime = 0.3f;
+
+    [Header("ジャンプ時のカメラ演出（設定で切り替え可能）")]
+    [Tooltip("ジャンプ中のカメラ演出。Off=何もしない / ZoomOut=カメラを引く / Overhead=俯瞰視点。実行中は SetJumpCameraMode() で切り替える")]
+    public JumpCameraMode jumpCameraMode = JumpCameraMode.ZoomOut;
+
+    [Tooltip("ONなら、設定をPlayerPrefsに保存し、次回起動時に復元する（保存済みの値がある場合はインスペクターの値より優先される）")]
+    public bool persistJumpCameraSetting = true;
+
+    [Tooltip("ONなら、キャラクターの高さ（接地時のYからの上昇量）でジャンプを自動検出する。OFFなら SetTargetJumping() で通知した場合のみジャンプ扱いになる")]
+    public bool autoDetectJump = true;
+
+    [Tooltip("接地時のYからこの高さ（m）を超えたらジャンプ中とみなす（自動検出時）")]
+    public float jumpHeightThreshold = 0.6f;
+
+    [Tooltip("着地後、この時間（秒）は演出を維持してから元に戻す（小ジャンプ連打でのカメラのバタつき防止）")]
+    public float jumpEndDelay = 0.1f;
+
+    [Tooltip("ZoomOut時：通常のズーム距離に上乗せして引く距離（m）。maxZoomDistanceを超えて引いてよい")]
+    public float jumpZoomOutExtraDistance = 3f;
+
+    [Tooltip("Overhead時：俯瞰時のカメラの見下ろし角（度）。90に近いほど真上から見る。通常の角度がこれより大きい場合は通常の角度を使う")]
+    [Range(20f, 89f)]
+    public float jumpOverheadPitch = 60f;
+
+    [Tooltip("Overhead時：俯瞰時に追加で引く距離（m）。0なら角度だけが変わる")]
+    public float jumpOverheadExtraDistance = 2f;
+
+    [Tooltip("ジャンプ演出への切り替わり／復帰のスムーズさ（秒）")]
+    public float jumpBlendSmoothTime = 0.25f;
 
     [Header("注視点設定")]
     [Tooltip("キャラクターの足元ではなく少し上を見るためのYオフセット")]
@@ -217,6 +256,23 @@ public class FightingCameraController : MonoBehaviour
     private Coroutine _slowCoroutine;
     private float _normalTimeScale = 1f;
 
+    // ジャンプ時カメラ演出関連
+    private const string JumpModePrefsKey = "FightingCamera.JumpCameraMode";
+    private readonly Dictionary<Transform, float> _groundY = new Dictionary<Transform, float>(); // キャラごとの接地Y
+    private readonly HashSet<Transform> _manualJumpers = new HashSet<Transform>();                // 外部から「ジャンプ中」と通知されたキャラ
+    private readonly List<Transform> _tempRemoveList = new List<Transform>();
+    private float _jumpEndTimer;
+    private float _jumpBlend;          // 0=通常 / 1=ジャンプ演出が完全に効いている状態
+    private float _jumpBlendVelocity;
+
+    void Awake()
+    {
+        if (persistJumpCameraSetting && PlayerPrefs.HasKey(JumpModePrefsKey))
+        {
+            jumpCameraMode = (JumpCameraMode)Mathf.Clamp(PlayerPrefs.GetInt(JumpModePrefsKey), 0, 2);
+        }
+    }
+
     void Start()
     {
         _currentDistance = (maxZoomDistance + minZoomDistance) * 0.5f;
@@ -234,11 +290,59 @@ public class FightingCameraController : MonoBehaviour
     /// </summary>
     private Vector3 GetDesiredCameraPosition()
     {
+        float distance = _currentDistance + GetJumpExtraDistance();
+
         if (lockRotation)
         {
-            return _smoothedLookAt - (_lockedRotation * Vector3.forward) * _currentDistance;
+            return _smoothedLookAt - (GetEffectiveLockedRotation() * Vector3.forward) * distance;
         }
-        return _smoothedLookAt + baseOffset.normalized * _currentDistance;
+
+        // 回転固定OFF：オフセット方向を、俯瞰時は上向きへ寄せる
+        Vector3 dir = baseOffset.normalized;
+        float pitchBlend = GetOverheadBlend();
+        if (pitchBlend > 0.0001f)
+        {
+            Vector3 horizontal = baseOffset;
+            horizontal.y = 0f;
+            horizontal = horizontal.sqrMagnitude < 0.0001f ? Vector3.back : horizontal.normalized;
+
+            float basePitch = Mathf.Asin(Mathf.Clamp(dir.y, -1f, 1f)) * Mathf.Rad2Deg;
+            float rad = Mathf.Max(jumpOverheadPitch, basePitch) * Mathf.Deg2Rad;
+            Vector3 overheadDir = horizontal * Mathf.Cos(rad) + Vector3.up * Mathf.Sin(rad);
+            dir = Vector3.Slerp(dir, overheadDir, pitchBlend);
+        }
+        return _smoothedLookAt + dir * distance;
+    }
+
+    /// <summary>ジャンプ演出による追加のカメラ距離（ZoomOut / Overhead時のみ）</summary>
+    private float GetJumpExtraDistance()
+    {
+        switch (jumpCameraMode)
+        {
+            case JumpCameraMode.ZoomOut:   return jumpZoomOutExtraDistance * _jumpBlend;
+            case JumpCameraMode.Overhead:  return jumpOverheadExtraDistance * _jumpBlend;
+            default:                       return 0f;
+        }
+    }
+
+    /// <summary>俯瞰への傾き具合（Overhead以外は常に0）</summary>
+    private float GetOverheadBlend()
+    {
+        return jumpCameraMode == JumpCameraMode.Overhead ? _jumpBlend : 0f;
+    }
+
+    /// <summary>
+    /// 回転固定時の向き。俯瞰時は、固定回転の「ヨー（左右の向き）」はそのままに、ピッチだけを見下ろし角へ寄せる。
+    /// </summary>
+    private Quaternion GetEffectiveLockedRotation()
+    {
+        float pitchBlend = GetOverheadBlend();
+        if (pitchBlend <= 0.0001f) return _lockedRotation;
+
+        Vector3 e = _lockedRotation.eulerAngles;
+        float basePitch = Mathf.DeltaAngle(0f, e.x);
+        Quaternion overhead = Quaternion.Euler(Mathf.Max(jumpOverheadPitch, basePitch), e.y, e.z);
+        return Quaternion.Slerp(_lockedRotation, overhead, pitchBlend);
     }
 
     /// <summary>
@@ -250,7 +354,7 @@ public class FightingCameraController : MonoBehaviour
         if (lockRotation)
         {
             float t = 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(0.0001f, rotationSmoothTime));
-            transform.rotation = Quaternion.Slerp(transform.rotation, _lockedRotation, t);
+            transform.rotation = Quaternion.Slerp(transform.rotation, GetEffectiveLockedRotation(), t);
         }
         else
         {
@@ -287,6 +391,8 @@ public class FightingCameraController : MonoBehaviour
         // 勝敗が決まり、勝者へのフォーカス演出中の場合は専用の処理を行う
         if (_isFocusMode)
         {
+            // 勝利演出中はジャンプ演出を解除して、フォーカス距離を優先する
+            UpdateJumpBlend(false);
             UpdateFocusCamera();
             return;
         }
@@ -294,6 +400,9 @@ public class FightingCameraController : MonoBehaviour
         // 出場キャラクターがいない場合は何もしない
         CleanupNullTargets();
         if (targets.Count == 0) return;
+
+        // ジャンプ中ならズームアウト／俯瞰の度合いを更新（ここで決まった値が位置・回転の算出に反映される）
+        UpdateJumpBlend(true);
 
         // 1. 中心点（重心）を算出
         Vector3 centerPoint = CalculateCenterPoint();
@@ -384,6 +493,126 @@ public class FightingCameraController : MonoBehaviour
     private void CleanupNullTargets()
     {
         targets.RemoveAll(t => t == null);
+        _manualJumpers.RemoveWhere(t => t == null);
+
+        // 破棄されたキャラの接地Y記録も掃除する（毎フレームの無駄を避けるため、件数がずれたときだけ）
+        if (_groundY.Count > targets.Count)
+        {
+            _tempRemoveList.Clear();
+            foreach (var key in _groundY.Keys)
+            {
+                if (key == null || !targets.Contains(key)) _tempRemoveList.Add(key);
+            }
+            foreach (var key in _tempRemoveList) _groundY.Remove(key);
+            _tempRemoveList.Clear();
+        }
+    }
+
+    /// <summary>
+    /// 出場中のキャラクターのうち、誰か1人でもジャンプ中ならtrue。
+    /// 自動検出：接地時のYからjumpHeightThresholdを超えて浮いていればジャンプ中。
+    ///   接地Yは「しきい値以内にいる間は現在のYに追従」させるので、坂や段差でも誤検出しにくい。
+    /// 手動通知：SetTargetJumping()でtrueにされているキャラがいればジャンプ中。
+    /// </summary>
+    private bool DetectJumping()
+    {
+        bool jumping = _manualJumpers.Count > 0;
+
+        if (autoDetectJump)
+        {
+            foreach (var t in targets)
+            {
+                if (t == null) continue;
+
+                float y = t.position.y;
+                float ground;
+                if (!_groundY.TryGetValue(t, out ground)) ground = y;
+
+                if (y - ground > jumpHeightThreshold)
+                {
+                    jumping = true;      // 空中：接地Yは据え置き
+                }
+                else
+                {
+                    ground = y;          // 地上：接地Yを現在位置に追従
+                }
+                _groundY[t] = ground;
+            }
+        }
+
+        return jumping;
+    }
+
+    /// <summary>
+    /// ジャンプ演出の度合い（_jumpBlend：0〜1）を毎フレーム更新する
+    /// </summary>
+    /// <param name="allowJumpEffect">falseなら演出を強制的に解除方向へ戻す（勝利フォーカス中など）</param>
+    private void UpdateJumpBlend(bool allowJumpEffect)
+    {
+        // 設定がOffのときも接地Yの追従は続けておく（ONへ切り替えた瞬間の誤検出防止）
+        bool detected = DetectJumping();
+        bool active = allowJumpEffect && jumpCameraMode != JumpCameraMode.Off;
+
+        if (active && detected)
+        {
+            _jumpEndTimer = jumpEndDelay;
+        }
+        else
+        {
+            _jumpEndTimer = Mathf.Max(0f, _jumpEndTimer - Time.deltaTime);
+        }
+
+        float target = (active && _jumpEndTimer > 0f) ? 1f : 0f;
+        _jumpBlend = Mathf.SmoothDamp(
+            _jumpBlend,
+            target,
+            ref _jumpBlendVelocity,
+            Mathf.Max(0.0001f, jumpBlendSmoothTime)
+        );
+    }
+
+    /// <summary>
+    /// ジャンプ時のカメラ演出を切り替える（設定画面から呼び出す）。
+    /// persistJumpCameraSettingがONならPlayerPrefsへ保存する。
+    /// </summary>
+    public void SetJumpCameraMode(JumpCameraMode mode)
+    {
+        jumpCameraMode = mode;
+
+        if (persistJumpCameraSetting)
+        {
+            PlayerPrefs.SetInt(JumpModePrefsKey, (int)mode);
+            PlayerPrefs.Save();
+        }
+    }
+
+    /// <summary>
+    /// UIのDropdown等から呼ぶ用。0=Off / 1=ZoomOut / 2=Overhead
+    /// （DropdownのOn Value Changedに直接登録できる）
+    /// </summary>
+    public void SetJumpCameraModeByIndex(int index)
+    {
+        SetJumpCameraMode((JumpCameraMode)Mathf.Clamp(index, 0, 2));
+    }
+
+    /// <summary>現在のジャンプ演出設定を返す（Dropdownの初期値表示用に (int) キャストして使える）</summary>
+    public JumpCameraMode GetJumpCameraMode()
+    {
+        return jumpCameraMode;
+    }
+
+    /// <summary>
+    /// キャラクターのジャンプ開始／着地をカメラへ通知する。
+    /// autoDetectJumpをOFFにした場合や、高さ判定では拾えないジャンプ（高い足場からの飛び降り等）を
+    /// 明示したい場合に、キャラクターのスクリプトから呼ぶ。
+    /// 例）ジャンプ開始時：SetTargetJumping(transform, true) / 着地時：SetTargetJumping(transform, false)
+    /// </summary>
+    public void SetTargetJumping(Transform target, bool isJumping)
+    {
+        if (target == null) return;
+
+        if (isJumping) _manualJumpers.Add(target);
+        else _manualJumpers.Remove(target);
     }
 
     /// <summary>
@@ -815,6 +1044,12 @@ public class FightingCameraController : MonoBehaviour
         if (targets.Contains(t))
         {
             targets.Remove(t);
+        }
+
+        if (t != null)
+        {
+            _groundY.Remove(t);
+            _manualJumpers.Remove(t);
         }
     }
 
