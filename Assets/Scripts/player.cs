@@ -47,6 +47,7 @@ public class Player : MonoBehaviour
         Special,    // 必殺技（漢気ゲージ消費技）
         KnockedDown,// ダウン中（根性復活チャレンジ中）
         Dead,       // 死亡（復活失敗）
+        Stunned,    // ★追加：やられ状態（被弾後、攻撃ごとに設定した秒数だけ行動不能）
     }
 
     //=====================================================
@@ -73,6 +74,8 @@ public class Player : MonoBehaviour
     [SerializeField] bool enableF7DebugKey = false;
     [Tooltip("ONにすると、このキャラクターでF8キー（HPを最大値まで回復する）が使えます。")]
     [SerializeField] bool enableF8DebugKey = false;
+    [Tooltip("ONにすると、このキャラクターでF10キー（やられ状態中に連続で攻撃が当たった回数の画面表示ON/OFF）が使えます。")]
+    [SerializeField] bool enableF10DebugKey = false;
 
     // 本スクリプト内のDebug.Log呼び出しはすべてこのメソッド経由にする。
     // enableDebugLogをfalseにすればインスペクターから一括でログ出力を止められる。
@@ -176,6 +179,10 @@ public class Player : MonoBehaviour
     // ※パンチ／キック／上キック／下キック／必殺技の攻撃力は、下の「攻撃ごとの設定」（各技のヘッダー）へ移動した。
     [Header("投げの攻撃力")]
     [SerializeField] int throwAtk = 5;     // 投げ（つかみ）成立時の固定ダメージ
+    [Tooltip("投げ成立で飛ばされた相手が、着地した後に【やられ状態（行動不能）】になる時間（秒）。" +
+             "着地した瞬間から数え始める。0だとやられ状態にならない。\n" +
+             "※投げ不成立（掴みタイムアウト）で互いに吹き飛んだ場合は対象外。")]
+    [SerializeField] float throwStunDuration = 0.5f;
 
     //=====================================================
     // ★追加：投げ（掴み）仕様変更に伴う詳細設定
@@ -274,7 +281,8 @@ public class Player : MonoBehaviour
 //        どちらも「攻撃を出した瞬間からの合計時間」。命中した瞬間に、残り時間が命中時の値へ切り替わる。
     //     ③ ヒットストップ … この技を当てられた相手が止まる時間
     //     ④ ノックバック … この技を当てられた相手が飛ぶ量（攻撃者から離れる方向＋上方向）
-    //   ③④は「攻撃する側」のInspectorで調整する。
+    //     ⑤ やられ状態の時間 … この技を当てられた相手が行動不能になる時間（秒）。0ならやられ状態にならない。
+    //   ③④⑤は「攻撃する側」のInspectorで調整する。
     //   ※仁王立ちガードで防がれた時は、ヒットストップはguardHitStopDuration、ノックバックは無し。
     //   ※新しい技を追加する場合は、対応するフィールドを増やし、GetAttackPower() /
     //     GetCurrentHitStopDuration() / GetCurrentKnockbackSetting() / GetMultiHitSetting() の
@@ -298,10 +306,13 @@ public class Player : MonoBehaviour
     [SerializeField] float punchMissDuration = 0.5f;
     [Tooltip("② 攻撃後のクールダウン【命中時】（拘束時間・秒）。パンチを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
     [SerializeField] float punchHitDuration = 0.5f;
+    [Tooltip("⑤ パンチを当てた時の、相手の【やられ状態（行動不能）】の時間（秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [SerializeField] float punchStunDuration = 0.3f;
     [Tooltip("③ パンチを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
     [SerializeField] float punchHitStopDuration = 0.08f;
     [Tooltip("④ パンチを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting punchKnockback = new KnockbackSetting { horizontalSpeed = 2.5f, upSpeed = 0f };
+
 
     [Header("通常キック")]
     [Tooltip("① 通常キックの攻撃力（ダメージ量）")]
@@ -311,6 +322,8 @@ public class Player : MonoBehaviour
     [SerializeField] float kickMissDuration = 0.6f;
     [Tooltip("② 攻撃後のクールダウン【命中時】（拘束時間・秒）。キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
     [SerializeField] float kickHitDuration = 0.6f;
+    [Tooltip("⑤ 通常キックを当てた時の、相手の【やられ状態（行動不能）】の時間（秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [SerializeField] float kickStunDuration = 0.4f;
     [Tooltip("③ 通常キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
     [SerializeField] float kickHitStopDuration = 0.08f;
     [Tooltip("④ 通常キックを当てた時の、相手のノックバック量")]
@@ -324,6 +337,8 @@ public class Player : MonoBehaviour
     [SerializeField] float upKickMissDuration = 0.7f;
     [Tooltip("② 攻撃後のクールダウン【命中時】（拘束時間・秒）。上キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
     [SerializeField] float upKickHitDuration = 0.7f;
+    [Tooltip("⑤ 上キックを当てた時の、相手の【やられ状態（行動不能）】の時間（秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [SerializeField] float upKickStunDuration = 0.5f;
     [Tooltip("③ 上キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
     [SerializeField] float upKickHitStopDuration = 0.08f;
     [Tooltip("④ 上キックを当てた時の、相手のノックバック量")]
@@ -337,10 +352,13 @@ public class Player : MonoBehaviour
     [SerializeField] float downKickMissDuration = 0.5f;
     [Tooltip("② 攻撃後のクールダウン【命中時】（拘束時間・秒）。下キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
     [SerializeField] float downKickHitDuration = 0.5f;
+    [Tooltip("⑤ 下キックを当てた時の、相手の【やられ状態（行動不能）】の時間（秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [SerializeField] float downKickStunDuration = 0.4f;
     [Tooltip("③ 下キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
     [SerializeField] float downKickHitStopDuration = 0.08f;
     [Tooltip("④ 下キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting downKickKnockback = new KnockbackSetting { horizontalSpeed = 3f, upSpeed = 0f };
+
 
     [Header("必殺技（waza）")]
     [Tooltip("① 必殺技（左足の攻撃判定）が相手に命中した時のダメージ量。パンチ・キック等と同じ仕組みで、" +
@@ -351,6 +369,8 @@ public class Player : MonoBehaviour
     [SerializeField] float specialHitStopDuration = 0.08f;
     [Tooltip("④ 必殺技を当てた時の、相手のノックバック量。多段ヒットするため、既定は0（飛ばさない）。")]
     [SerializeField] KnockbackSetting specialKnockback = new KnockbackSetting { horizontalSpeed = 0f, upSpeed = 0f };
+    [Tooltip("⑤ 必殺技を当てた時の、相手の【やられ状態（行動不能）】の時間（秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [SerializeField] float specialStunDuration = 0.5f;
 
     //=====================================================
     // ★仁王立ち（ガード）成功エフェクト設定
@@ -693,6 +713,23 @@ public class Player : MonoBehaviour
         }
     }
 
+    // ★追加：被弾した相手側（OnTriggerEnter）から、「今出している技のやられ状態の時間（秒）」を問い合わせるための公開メソッド。
+    //   必殺技中はspecialStunDuration、それ以外はCurrentAttackTypeに応じた値を返す。攻撃中でない場合は0（やられ状態にしない）。
+    //   新しい技を追加した場合は、対応するフィールドを増やし、ここにもケースを追加すること。
+    public float GetCurrentStunDuration()
+    {
+        if (currentState == PlayerState.Special) return specialStunDuration;
+
+        switch (CurrentAttackType)
+        {
+            case AttackType.Punch: return punchStunDuration;
+            case AttackType.Kick: return kickStunDuration;
+            case AttackType.UpKick: return upKickStunDuration;
+            case AttackType.DownKick: return downKickStunDuration;
+            default: return 0f;
+        }
+    }
+
     // ★追加：被弾した相手側（OnTriggerEnter）から、「今回の接触を有効なヒットとして扱ってよいか」を
     //   攻撃側（自分＝このPlayerインスタンス）に問い合わせるための公開メソッド。
     //   現在出している技ごとのMultiHitSettingを参照して判定する。
@@ -1003,7 +1040,8 @@ public class Player : MonoBehaviour
         if (currentState != PlayerState.KnockedDown && currentState != PlayerState.Dead
             && currentState != PlayerState.Grabbed && currentState != PlayerState.Thrown)
         {
-            SyncCrouchVisual(moveInput.y <= crouchInputThreshold);
+            // ★変更：やられ状態中はスティック入力を無視する（しゃがみにしない）
+            SyncCrouchVisual(currentState != PlayerState.Stunned && moveInput.y <= crouchInputThreshold);
         }
 
         // F2キーで漢気ゲージ専用デバッグログのON/OFFを切り替える（対象キャラクターはenableF2DebugKeyで選択）
@@ -1141,6 +1179,21 @@ public class Player : MonoBehaviour
                 // 対象外のPlayerインスタンスでもF8押下自体は検知されるため、
                 // 意図的に無視していることが分かるようログを残す。
                 DLog($"[{PlayerName}] F8キーを検知しましたが、enableF8DebugKeyがOFFのため無視します。");
+            }
+        }
+
+        // ★デバッグ：F10キーで「やられ状態中に連続で攻撃が当たった回数」の画面表示をON/OFFする
+        //   対象キャラクターはInspectorのenableF10DebugKeyで選択する。
+        if (Keyboard.current != null && Keyboard.current.f10Key.wasPressedThisFrame)
+        {
+            if (enableF10DebugKey)
+            {
+                showStunComboDebug = !showStunComboDebug;
+                Debug.Log($"[{PlayerName}] [デバッグ]やられ連続ヒット数表示: {(showStunComboDebug ? "ON" : "OFF")}");
+            }
+            else
+            {
+                DLog($"[{PlayerName}] F10キーを検知しましたが、enableF10DebugKeyがOFFのため無視します。");
             }
         }
 
@@ -1348,6 +1401,8 @@ public class Player : MonoBehaviour
 
     void OnGUI()
     {
+        DrawStunComboDebug(); // ★追加：F10のやられ連続ヒット数表示
+
         if (!showMashPrompt && !showMashRemainingCount) return;
         if (currentState != PlayerState.KnockedDown) return;
 
@@ -1470,6 +1525,111 @@ public class Player : MonoBehaviour
         }
 
         DLog($"[{PlayerName}] ヒットストップ終了");
+    }
+
+    //-----------------------------------------------------
+    // やられ状態（行動不能）
+    //-----------------------------------------------------
+    // 被弾すると、攻撃側の「やられ状態の時間」の間だけ行動不能（Stunned）になる。
+    // この間は入力を一切受け付けない（Updateでisfree扱いにならず、TickBusyStateで時間だけ消化される）。
+    // やられ中に再度攻撃が当たると、連続ヒット数が増え、残り時間はmax(残り, 新しい攻撃の時間)に延長される。
+    private int stunComboCount = 0;          // 今のやられ状態中に連続で当たった回数（0=やられ中ではない）
+    private int lastStunComboCount = 0;      // 直前に終わったやられ状態での連続ヒット数
+    private bool showStunComboDebug = false; // F10で切り替える、連続ヒット数の画面表示ON/OFF
+
+    void StunDLog(string message)
+    {
+        if (showStunComboDebug) Debug.Log($"[STUN] {message}");
+    }
+
+    // 被弾時に呼ぶ。duration=やられ状態の秒数、willBeKnockedDown=この一撃でHPが0になるか
+    void ApplyStun(float duration, bool willBeKnockedDown)
+    {
+        // 掴み・投げ・ダウン・死亡・必殺技（無敵）中は、やられ状態に置き換えない
+        if (currentState == PlayerState.Grabbed || currentState == PlayerState.Thrown
+            || currentState == PlayerState.KnockedDown || currentState == PlayerState.Dead
+            || currentState == PlayerState.Special) return;
+        if (currentState == PlayerState.Throw && grabbedTarget != null) return; // 相手を掴んでいる最中
+
+        bool alreadyStunned = currentState == PlayerState.Stunned;
+
+        // この一撃でダウンする場合は、やられ状態にはせず、コンボだけ確定させる（以降はダウン処理に任せる）
+        if (willBeKnockedDown)
+        {
+            if (alreadyStunned) stunComboCount++;
+            FinishStunCombo();
+            return;
+        }
+
+        if (alreadyStunned)
+        {
+            stunComboCount++;
+            stateTimer = Mathf.Max(stateTimer, duration);
+        }
+        else
+        {
+            if (duration <= 0f) return; // 0秒設定の技はやられ状態にならない
+            stunComboCount = 1;
+            EnterStunned(duration);
+        }
+
+        StunDLog($"[{PlayerName}] 連続ヒット={stunComboCount} / やられ残り={stateTimer:F2}秒");
+    }
+
+    // 実行中の行動を中断してやられ状態に入る
+    void EnterStunned(float duration)
+    {
+        StopMoveAnimation();
+        ResetAttackTriggers();
+        DisableAllHitboxes();   // 攻撃中だった場合、その当たり判定を消す
+        isGuarding = false;
+        canThrow = true;
+        throwReaching = false;  // 掴み待ち（まだ掴めていない投げ動作）だった場合は中断
+
+        currentState = PlayerState.Stunned;
+        stateTimer = duration;
+
+        DLog($"[{PlayerName}] やられ状態に入りました（{duration:F2}秒）");
+    }
+
+    // やられ状態の連続ヒット数を確定する（やられ状態が終わった時・ダウンした時に呼ぶ）
+    void FinishStunCombo()
+    {
+        if (stunComboCount <= 0) return;
+        lastStunComboCount = stunComboCount;
+        StunDLog($"[{PlayerName}] やられ状態終了。連続ヒット数={lastStunComboCount}");
+        stunComboCount = 0;
+    }
+
+    // F10デバッグ表示：やられ状態中に連続で当たった回数を画面端に表示する
+    void DrawStunComboDebug()
+    {
+        if (!showStunComboDebug) return;
+
+        int index = playerInput != null ? playerInput.playerIndex : 0;
+        float width = 420f;
+        float height = 150f;
+        float x = index == 0 ? 20f : Screen.width - width - 20f;
+        Rect rect = new Rect(x, Screen.height * 0.3f, width, height);
+
+        string stateText = currentState == PlayerState.Stunned ? $"やられ中（残り{stateTimer:F2}秒）" : "通常";
+        string text = $"[{PlayerName}] やられ状態\n状態: {stateText}\n連続ヒット数: {stunComboCount}\n直前のコンボ: {lastStunComboCount} ヒット";
+
+        GUIStyle style = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 26,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.UpperLeft,
+        };
+        GUIStyle outline = new GUIStyle(style) { normal = { textColor = Color.black } };
+        style.normal.textColor = Color.yellow;
+
+        Vector2[] offsets = { new Vector2(-2, -2), new Vector2(2, -2), new Vector2(-2, 2), new Vector2(2, 2) };
+        foreach (var o in offsets)
+        {
+            GUI.Label(new Rect(rect.x + o.x, rect.y + o.y, rect.width, rect.height), text, outline);
+        }
+        GUI.Label(rect, text, style);
     }
 
     //-----------------------------------------------------
@@ -2137,7 +2297,7 @@ public class Player : MonoBehaviour
         //   向きの判定は投げる前の自分の向き(transform.forward)で行う。
         bool isBackThrow = Vector3.Dot(launchDir, transform.forward) < 0f;
 
-        grabbedTarget.LaunchByThrow(launchDir, throwHorizontalSpeed, throwUpSpeed);
+        grabbedTarget.LaunchByThrow(launchDir, throwHorizontalSpeed, throwUpSpeed, "Thrown", throwStunDuration);
 
         if (isBackThrow)
         {
@@ -2207,13 +2367,19 @@ public class Player : MonoBehaviour
         return transform.forward;
     }
 
+    private float pendingThrowStunDuration = 0f; // ★追加：投げで飛ばされた後、着地時に入るやられ状態の時間（秒）
+
     // ★追加：投げ技によって、放物線状に吹き飛ばされる処理。掴んでいた相手から呼び出される。
     //   Rigidbodyに初速を与えるだけで、あとは重力(既存のJump同様の物理設定)に任せて放物線を描かせる。
     //   ★変更：投げ成立時（相手を飛ばす）だけでなく、投げ不成立時にお互いが後方へ吹き飛ぶ演出
     //   （PushBackFromGrabFailure）でも共用できるよう、再生するアニメーショントリガーを引数化した。
     //   省略時は従来通り"Thrown"（通常の投げ成立で飛ばされる側のモーション）を使う。
-    public void LaunchByThrow(Vector3 horizontalDirection, float horizontalSpeed, float upSpeed, string animTrigger = "Thrown")
+    public void LaunchByThrow(Vector3 horizontalDirection, float horizontalSpeed, float upSpeed, string animTrigger = "Thrown", float stunAfterLanding = 0f)
     {
+        // ★追加：着地後にやられ状態へ移行する時間を記録する（0なら着地後は通常復帰）。
+        //   投げ不成立の吹き飛び(PushBackFromGrabFailure)は引数省略＝0なので、やられ状態にはならない。
+        pendingThrowStunDuration = stunAfterLanding;
+
         StopMoveAnimation();
         DisableAllHitboxes();
         isGuarding = false;
@@ -2260,6 +2426,18 @@ public class Player : MonoBehaviour
     {
         DLog($"[{PlayerName}] 投げから着地して復帰");
         currentState = PlayerState.Idle;
+
+        // ★追加：投げ成立で飛ばされていた場合、着地した瞬間からやられ状態（行動不能）に入る。
+        //   ダメージでHPが0になっている場合は、ダウン処理（HandleKnockedDown）に任せるため入らない。
+        float landStun = pendingThrowStunDuration;
+        pendingThrowStunDuration = 0f;
+        if (landStun > 0f && HP > 0)
+        {
+            stunComboCount = 1; // 投げを1ヒットとして数える（やられ中にさらに被弾すると加算される）
+            EnterStunned(landStun);
+            StunDLog($"[{PlayerName}] 投げ着地→やられ状態 {landStun:F2}秒");
+        }
+
         animator.SetTrigger("Thrown-land"); // ★要Animator追加（任意）：着地モーション用トリガー。未設定でも動作に支障はない
     }
 
@@ -2388,6 +2566,18 @@ public class Player : MonoBehaviour
             return;
         }
 
+        // ★追加：やられ状態（行動不能）。時間だけ消化して、終わったらIdleへ戻る。
+        if (currentState == PlayerState.Stunned)
+        {
+            stateTimer -= Time.deltaTime;
+            if (stateTimer > 0f) return;
+
+            FinishStunCombo();
+            currentState = PlayerState.Idle;
+            DLog($"[{PlayerName}] やられ状態が終わりました");
+            return;
+        }
+
         if (currentState == PlayerState.Special)
         {
             MoveDuringSpecial();
@@ -2466,6 +2656,7 @@ public class Player : MonoBehaviour
     // HPが0になった際に毎フレーム呼ばれる、根性復活（ボタン連打による復活）の処理
     void HandleKnockedDown()
     {
+        FinishStunCombo(); // ★追加：やられ中にダウンした場合、連続ヒット数を確定する
         currentState = PlayerState.KnockedDown;
 
         //gameMNG.PlayerUI(rebornTimer, mashCount);
@@ -2916,6 +3107,13 @@ public class Player : MonoBehaviour
                     Vector3 awayDirection = GetAwayDirectionFrom(enemyPlayer);
                     RequestKnockback(awayDirection * knockback.horizontalSpeed + Vector3.up * knockback.upSpeed, appliedHitStop);
                 }
+            }
+
+            // ★追加：やられ状態（行動不能）。攻撃者の技ごとの「やられ状態の時間」だけ動けなくする。
+            //   ※CPU(Enemy)の攻撃は未対応（Enemy.csにGetCurrentStunDuration()相当が必要）。
+            if (isEnemyPlayerAttack)
+            {
+                ApplyStun(enemyPlayer.GetCurrentStunDuration(), HP - attackerAtk <= 0);
             }
 
             Vector3 hitPoint = collision.ClosestPoint(collision.transform.position);

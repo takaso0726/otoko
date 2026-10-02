@@ -1692,6 +1692,7 @@ MonoBehaviour:
   enableF6DebugKey: 1
   enableF7DebugKey: 1
   enableF8DebugKey: 1
+  enableF10DebugKey: 1
   PlayerName: P1
   PLayerTagName: 
   moveSpeed: 3
@@ -1713,10 +1714,11 @@ MonoBehaviour:
   guardDuration: 0.3
   throwDuration: 0.75
   throwAtk: 200
+  throwStunDuration: 0.5
   escapeTimeAtZeroHp: 10
   escapeTimeAtFullHp: 2
   escapeReductionPerInput: 0.15
-  throwHorizontalSpeed: 10
+  throwHorizontalSpeed: 9
   throwUpSpeed: 10
   grabFailHorizontalSpeed: 3
   grabFailUpSpeed: 3
@@ -1743,39 +1745,44 @@ MonoBehaviour:
   hitStopDuration: 0.15
   guardHitStopDuration: 0.05
   freezeAnimatorDuringHitStop: 1
-  punchAtk: 15
-  punchMissDuration: 0.2
-  punchHitDuration: 0.5
+  punchAtk: 10
+  punchMissDuration: 0.55
+  punchHitDuration: 0.45
+  punchStunDuration: 0.4
   punchHitStopDuration: 0.08
   punchKnockback:
-    horizontalSpeed: 3
-    upSpeed: 8
-  kickAtk: 25
-  kickMissDuration: 0.3
+    horizontalSpeed: 1
+    upSpeed: 5
+  kickAtk: 30
+  kickMissDuration: 0.5
   kickHitDuration: 0.6
+  kickStunDuration: 0.67
   kickHitStopDuration: 0.08
   kickKnockback:
     horizontalSpeed: 5
     upSpeed: 5
-  upKickAtk: 50
+  upKickAtk: 40
   upKickMissDuration: 0.8
   upKickHitDuration: 0.5
+  upKickStunDuration: 0.3
   upKickHitStopDuration: 0.08
   upKickKnockback:
-    horizontalSpeed: 3
+    horizontalSpeed: 5
     upSpeed: 10
-  downKickAtk: 10
-  downKickMissDuration: 0.5
+  downKickAtk: 20
+  downKickMissDuration: 0.8
   downKickHitDuration: 0.5
+  downKickStunDuration: 0.505
   downKickHitStopDuration: 0.08
   downKickKnockback:
-    horizontalSpeed: 3
+    horizontalSpeed: 5
     upSpeed: 0
   specialAtk: 100
   specialHitStopDuration: 0.08
   specialKnockback:
     horizontalSpeed: 0
     upSpeed: 0
+  specialStunDuration: 0.1
   enableGuardSuccessEffect: 1
   guardSuccessEffectPrefab: {fileID: 4575220094214949160, guid: 2b606bf4bbf80c64585e8eed7a58d48d, type: 3}
   guardSuccessEffectOffset: {x: 0, y: 1.98, z: 0}

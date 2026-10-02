@@ -33,7 +33,7 @@ EditorBuildSettings:
     path: Assets/Scenes/1v1/Judgment.unity
     guid: 42f59c4ff9be14d48a43633beabcc71b
   - enabled: 1
-    path: Assets/Scenes/1v1/InGame1v1_TEST.unity
+    path: Assets/Player/InGame1v1_TEST.unity
     guid: 3232d36ab6017dd40842b24b327d720c
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
