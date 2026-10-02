@@ -34,7 +34,7 @@ ModelImporter:
       name: mixamo.com
       takeName: mixamo.com
       internalID: -203655887218126122
-      firstFrame: 11
+      firstFrame: 0
       lastFrame: 45
       wrapMode: 0
       orientationOffsetY: 0
@@ -69,15 +69,15 @@ ModelImporter:
             outWeight: 0
           - serializedVersion: 3
             time: 1
-            value: 0
+            value: 1
             inSlope: 0
             outSlope: 0
             tangentMode: 0
             weightedMode: 0
             inWeight: 0
             outWeight: 0
-          preInfinity: 3
-          postInfinity: 3
+          preInfinity: 2
+          postInfinity: 2
           rotationOrder: 4
       events: []
       transformMask: []

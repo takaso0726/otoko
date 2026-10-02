@@ -184,7 +184,6 @@ public class Player : MonoBehaviour
     //   （Animatorの"Throw-start"モーションの長さと合わせること）。
     //=====================================================
     [Header("投げ（掴み）詳細設定")]
-    [SerializeField] float grabRange = 1.75f; // 掴みが成立する間合い(Z軸の距離)。旧コードの固定値1.75fを変数化したもの
     [Tooltip("HPが0の時に脱出（掴みを振りほどく）までに必要な時間。値が大きいほど脱出しにくい＝投げられやすい。")]
     [SerializeField] float escapeTimeAtZeroHp = 1.5f;
     [Tooltip("HPが満タンの時に脱出（掴みを振りほどく）までに必要な時間。値が小さいほど脱出しやすい＝投げられにくい。")]
@@ -201,8 +200,12 @@ public class Player : MonoBehaviour
     [Tooltip("★追加：投げ不成立時に、お互いを後方へ吹き飛ばす上方向の初速。大きいほど放物線の弧が高くなる。")]
     [SerializeField] float grabFailUpSpeed = 3f;
     [Tooltip("★追加：掴みが成立してから、掴みモーション(Throw-start)を再生し続ける時間。この時間が過ぎたらアニメーションを一時停止し、" +
-             "投げ成立(Throw-release)／投げ不成立(Throw-whiff)の瞬間まで掴んだポーズで止め続ける。")]
+             "投げ成立(Throw-release)／投げ不成立(Throw-whiff)の瞬間まで掴んだポーズで止め続ける。" +
+             "※下のenableThrowStartPlayがONの時だけ使われる。OFFの時は、手が相手に接触した瞬間にアニメーションを即座に止める。")]
     [SerializeField] float throwStartPlayTime = 0.2f;
+    [Tooltip("★追加：ONにすると、手が相手に接触してから上のthrowStartPlayTime秒だけ掴みモーションを再生し続け、その後に止める。" +
+             "OFF（既定）の時は、手が相手に接触した瞬間にアニメーションを即座に止める。")]
+    [SerializeField] bool enableThrowStartPlay = false;
 
     //=====================================================
     // ★ガード（仁王立ち）成功時の攻撃力上昇設定
@@ -410,6 +413,38 @@ public class Player : MonoBehaviour
     private ParticleSystem activeKankiChargeEffect; // 生成中のエフェクト参照（多重生成防止・停止処理用）
 
     //=====================================================
+    // ★追加：漢気復活（ダウン中に漢気ゲージを消費して、連打せずに即座に復活する）設定
+    //   ダウン中（復活チャレンジの制限時間内）にL1ボタンを押すと、漢気ゲージを消費してその場で復活する。
+    //   復活後は一定時間（reviveAtkBuffDuration）、攻撃力が上昇し、その間は専用エフェクトを出し続ける。
+    //=====================================================
+    [Header("漢気復活設定（ゲージ消費の即時復活）")]
+    [Tooltip("ONにすると、ダウン中にL1ボタンで漢気ゲージを消費して即座に復活できる。")]
+    [SerializeField] bool enableKankiRevive = true;
+    [Tooltip("漢気復活で消費する漢気ゲージの本数。1ならゲージ1本分(kankiGaugePerBar)を消費する。消費分のゲージがたまっていない時は復活できない。")]
+    [SerializeField] int kankiReviveBarCost = 1;
+    [Tooltip("復活後の攻撃力の倍率。1.5なら攻撃力が1.5倍（+50%）、2なら2倍。1以下にすると上昇しない。漢気ゲージ本数による補正と掛け合わせて計算される。")]
+    [SerializeField] float reviveAtkMultiplier = 1.5f;
+    [Tooltip("復活後に攻撃力上昇が続く時間（秒）。この間は攻撃力上昇エフェクトも出続ける。")]
+    [SerializeField] float reviveAtkBuffDuration = 10f;
+
+    [Header("漢気復活エフェクト設定")]
+    [Tooltip("復活した瞬間に1回だけ出すパーティクル（未設定なら出さない）")]
+    [SerializeField] ParticleSystem kankiReviveEffectPrefab;
+    [Tooltip("プレイヤー基準の生成位置")]
+    [SerializeField] Vector3 kankiReviveEffectOffset = new Vector3(0f, 1.0f, 0f);
+    [Tooltip("生成した復活エフェクトを破棄するまでの時間（秒）")]
+    [SerializeField] float kankiReviveEffectLifetime = 2.0f;
+    [Tooltip("攻撃力上昇中に出し続けるパーティクル（未設定なら出さない）。Loopの設定に関わらず上昇中は自動でループさせ、上昇が終わると止まる。")]
+    [SerializeField] ParticleSystem reviveBuffEffectPrefab;
+    [Tooltip("プレイヤー基準の生成位置")]
+    [SerializeField] Vector3 reviveBuffEffectOffset = new Vector3(0f, 1.0f, 0f);
+
+    private bool wantKankiRevive = false;           // ダウン中にL1が押された（漢気復活の要求）
+    private bool isReviveBuffed = false;            // 漢気復活による攻撃力上昇中かどうか
+    private float reviveBuffTimer = 0f;             // 攻撃力上昇の残り時間（秒）
+    private ParticleSystem activeReviveBuffEffect;  // 生成中の攻撃力上昇エフェクトの参照（多重生成防止・停止処理用）
+
+    //=====================================================
     // ---- 必殺技（漢気ゲージ消費） ----
     //=====================================================
     [Header("必殺技設定")]
@@ -480,6 +515,7 @@ public class Player : MonoBehaviour
     private bool debugAlwaysGuard = false;
     bool rebornCamStarted;           // 根性復活のクローズアップカメラを開始済みか
     bool canThrow = true;            // 投げの多重発生を防ぐフラグ
+    bool throwReaching;              // ★追加：投げ動作中で、まだ掴みが成立しておらず手の当たり判定の接触を待っている間（接触した瞬間にfalseになる）
 
     // ★追加：投げ（掴み）仕様変更用の相互参照・タイマー
     Player grabbedTarget;            // 自分が今掴んでいる相手（掴む側の時だけ使用。掴んでいなければnull）
@@ -934,7 +970,17 @@ public class Player : MonoBehaviour
     //     コントローラーのL1ボタンを割り当てておく必要があります。
     public void OnL1(InputValue value)
     {
-        if (value.isPressed) wantSpecial = true;
+        if (!value.isPressed) return;
+
+        // ★追加：ダウン中（HP<=0）のL1は必殺技ではなく「漢気復活」の要求として扱う
+        //   （OnPunchがダウン中は連打カウントになるのと同じ仕組み）
+        if (HP <= 0)
+        {
+            wantKankiRevive = true;
+            return;
+        }
+
+        wantSpecial = true;
     }
 
     // Update is called once per frame
@@ -946,6 +992,7 @@ public class Player : MonoBehaviour
         if (grabHoldFrozen && currentState != PlayerState.Throw) ResumeGrabHoldAnimation();
 
         MaintainKankiChargeEffect(); // ★追加：漢気ゲージ1本以上の間、追従エフェクトを出し続ける
+        TickReviveBuff();            // ★追加：漢気復活後の攻撃力上昇の残り時間を消化する
         ResolveOpponentIfMissing();  // ★追加：プレハブ化・再配置等で相手(enemyPlayer/enemy)の参照が切れていたら自動で探し直す
         // ★修正：しゃがみの見た目（コライダー・アニメーター）は、
         //   currentState（状態機械）を経由せず、毎フレーム「スティック下入力の有無」だけで直接同期する。
@@ -1132,6 +1179,9 @@ public class Player : MonoBehaviour
                 }
             }
 
+            // ★追加：ダウンしたら漢気復活による攻撃力上昇は解除する（エフェクトも止める）
+            if (isReviveBuffed) EndReviveBuff();
+
             if (currentState != PlayerState.Dead)
             {
                 HandleKnockedDown();
@@ -1273,6 +1323,7 @@ public class Player : MonoBehaviour
         wantGuard = false;
         wantThrow = false;
         wantSpecial = false;
+        wantKankiRevive = false;
     }
 
     //-----------------------------------------------------
@@ -1430,6 +1481,11 @@ public class Player : MonoBehaviour
     //   appliedHitStopDuration: 今回の被弾で実際にStartHitStopへ渡したヒットストップ時間。
     void RequestKnockback(Vector3 velocity, float appliedHitStopDuration)
     {
+        // ★追加：攻撃が当たった瞬間に、相手(自分)の今の速度をXYZすべて0にする。
+        //   前の被弾の吹き飛び中・落下中・移動中の勢いが残ったまま、ノックバックが上乗せされるのを防ぐ。
+        //   （ヒットストップ中に前の勢いのまま滑ってしまうのも防ぐ。実際にノックバックを与えるのはその後）
+        ZeroRigidbodyVelocity();
+
         if (enableHitStop && appliedHitStopDuration > 0f)
         {
             hasPendingKnockback = true;
@@ -1441,6 +1497,19 @@ public class Player : MonoBehaviour
         }
     }
 
+    // ★追加：Rigidbodyの速度（線形速度）をXYZすべて0にする。
+    //   速度のプロパティ名がUnity 6以降はlinearVelocity、それ以前はvelocityで異なるため、バージョンで切り替える。
+    //   代入で直接0にするので、同じフレームに何度呼んでも結果は同じ（AddForceで打ち消す方式のような二重適用は起きない）。
+    void ZeroRigidbodyVelocity()
+    {
+        if (rb == null) return;
+#if UNITY_6000_0_OR_NEWER
+        rb.linearVelocity = Vector3.zero;
+#else
+        rb.velocity = Vector3.zero;
+#endif
+    }
+
     // 実際にRigidbodyへ初速を与える。LaunchByThrow()と同じくAddForce(VelocityChange)を使う
     // （rb.velocity / rb.linearVelocity のUnityバージョン差を避けるため）。
     // ★currentStateは変更しない（通常被弾は元々状態遷移しないため、それに合わせている）。
@@ -1448,6 +1517,9 @@ public class Player : MonoBehaviour
     {
         if (rb == null) return;
 
+        // ★追加：ノックバックを加える直前に、今の速度をすべて0にしてから加える。
+        //   ヒットストップ中に重力などで付いた速度が混ざらず、与えた初速そのものがノックバックになる。
+        ZeroRigidbodyVelocity();
         rb.AddForce(velocity, ForceMode.VelocityChange);
 
         // しっかり浮くほどの上方向速度がある場合は空中扱いにして、飛んでいる間の空中ジャンプを防ぐ。
@@ -1649,6 +1721,23 @@ public class Player : MonoBehaviour
         }
     }
 
+    // ★追加：指定した相手が、自分の向いている方向に対して前方にいるか（true）後方にいるか（false）を返す。
+    //   高さ(Y)は無視し、XZ平面上で自分の正面(transform.forward)と相手への方向の内積で判定する
+    //   （後退判定ApplyGaugeLossIfRetreating()や投げの向き判定と同じ考え方）。
+    //   ほぼ同じ位置に重なっていて方向が決められない場合は、前方として扱う。
+    bool IsOpponentInFront(Transform opponentTf)
+    {
+        Vector3 toOpponent = opponentTf.position - transform.position;
+        toOpponent.y = 0f;
+        if (toOpponent.sqrMagnitude < 0.0001f) return true;
+
+        Vector3 forward = transform.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.0001f) return true;
+
+        return Vector3.Dot(forward.normalized, toOpponent.normalized) >= 0f;
+    }
+
     // 対人戦(enemyPlayer)／対CPU戦(enemy)どちらの場合でも、相手のTransformを取得する
     Transform GetOpponentTransform()
     {
@@ -1711,6 +1800,7 @@ public class Player : MonoBehaviour
         //   ジャンプよりも移動が優先されているように見えてしまう不具合を解消する。
         StopMoveAnimation();
 
+        animator.ResetTrigger("Land"); // ★追加：前回の着地フラグが未消費で残っていた場合に、次の着地で誤再生しないよう消す
         animator.SetTrigger("Jump");
         rb.AddForce(force);
         Jumpflag = false; // 空中に出たので再度ジャンプできないようにする
@@ -1828,7 +1918,7 @@ public class Player : MonoBehaviour
     }
 
     // 投げ（掴み）処理。★仕様変更：この時点ではまだ投げ飛ばさず、
-    //   間合い・状態の条件を満たしていれば相手を「掴まれ状態(Grabbed)」へ移行させるだけにする。
+    //   手の当たり判定が接触した相手を「掴まれ状態(Grabbed)」へ移行させるだけにする。
     //   実際に相手を投げ飛ばす（放物線状に飛ばす）のは、この掴み拘束(throwDuration)が終わる瞬間
     //   （TickBusyState→ResolveThrowLaunch）であり、掴んでいる間の移動スティック入力で方向が決まる。
     void EnterThrow()
@@ -1842,40 +1932,64 @@ public class Player : MonoBehaviour
         animator.SetTrigger("Throw-start"); // 掴み（ホールド）モーション。飛ばす瞬間は別トリガー"Throw-release"を使う
         grabbedTarget = null;
 
-        Player target = GetGrabTarget();
-        if (target != null)
-        {
-            DLog($"[{PlayerName}] 掴み成立：{target.PlayerName}");
-            canThrow = false;                                  // 一度成立したら再度多重に発動しないようにする
-            grabbedTarget = target;
-            target.transform.Translate(0f, 0f, -0.0025f);      // 敵を少し引き寄せる（既存の演出を踏襲）
-            target.EnterGrabbed(this);                         // 相手を掴まれ状態へ移行させる（脱出タイマーは相手のHPから決まる）
+        // ★変更：掴みの成立を「間合い(Z距離)の判定」から「手の当たり判定の接触」へ変更した。
+        //   投げ動作の間、左手(P-LeftHand)・左前腕(P-LeftForeArm)の当たり判定をONにしておき、
+        //   相手の体に触れた瞬間に掴みが成立する（相手側のOnTriggerEnter → OnGrabHitboxContact）。
+        //   触れないまま投げ動作(throwDuration)が終われば空振りで、掴めなかった時と同じく何も起きずにIdleへ戻る。
+        throwReaching = true;
+        grabHoldFrozen = false;
+        if (LeftHand != null) LeftHand.enabled = true;
+        if (LeftForeArm != null) LeftForeArm.enabled = true;
+        DLog($"[{PlayerName}] 投げ開始：左手・左前腕の当たり判定をON（接触した相手を掴む）");
+    }
 
-            // ★追加：掴みモーションをthrowStartPlayTime秒だけ再生したら、掴んでいる間は止める（TickBusyStateで監視）
+    // ★追加：今が投げ動作中で、colliderが「掴み用の手の当たり判定（左手／左前腕）」かどうかを返す。
+    //   相手側のOnTriggerEnterから、「これは通常の攻撃ヒットではなく掴みの接触だ」と区別するために使う。
+    //   ※掴み成立後（throwReachingがfalse）でも、同じ物理フレームに残りの手のイベントが届くことがあるため、
+    //     throwReachingは見ずに、投げ状態(Throw)であることだけで判定する（ダメージ処理へ流れないようにするため）。
+    public bool IsGrabHitbox(Collider c)
+    {
+        return currentState == PlayerState.Throw && (c == LeftHand || c == LeftForeArm);
+    }
+
+    // ★追加：投げ動作中の手の当たり判定が相手(target)の体に接触した時に、相手側のOnTriggerEnterから呼ばれる。
+    //   ここで初めて掴みを成立させ、以降は従来どおりの投げ処理（相手をGrabbedへ→脱出判定→
+    //   拘束時間が終わったらResolveThrowLaunchで投げ飛ばす）に入る。
+    public void OnGrabHitboxContact(Player target)
+    {
+        // 既に掴んだ後の2つ目の手の接触や、掴めない状態（ジャンプ中等）の相手への接触は何もしない
+        if (currentState != PlayerState.Throw || !throwReaching || grabbedTarget != null) return;
+        if (!canThrow || target == null || !target.CanBeGrabbed()) return;
+
+        DLog($"[{PlayerName}] 掴み成立（手が接触）：{target.PlayerName}");
+        throwReaching = false;
+        canThrow = false;                      // 一度成立したら再度多重に発動しないようにする
+        grabbedTarget = target;
+
+        // 手の当たり判定は役目を終えたのでOFFにする（以降の接触でダメージ判定へ流れないようにする）
+        DisableAllHitboxes();
+
+        // 接触した瞬間から数えてthrowDuration後に投げ飛ばす（脱出判定の猶予もこの間）
+        stateTimer = throwDuration;
+
+        target.transform.Translate(0f, 0f, -0.0025f); // 敵を少し引き寄せる（既存の演出を踏襲）
+        target.EnterGrabbed(this);                    // 相手を掴まれ状態へ移行させる（脱出タイマーは相手のHPから決まる）
+
+        // ★アニメーションの止め方はInspectorのenableThrowStartPlayで切り替える。
+        //   止めたアニメーションは、投げ成立／不成立の瞬間にResumeGrabHoldAnimation()で再開される。
+        if (enableThrowStartPlay && throwStartPlayTime > 0f)
+        {
+            // ON：接触後throwStartPlayTime秒だけ再生を続け、その後に止める（TickBusyStateで残り時間を監視）
             grabHoldTimer = throwStartPlayTime;
             grabHoldFrozen = false;
         }
         else
         {
-            DLog($"[{PlayerName}] 掴み失敗（間合い外／相手が掴める状態でない／多重発生防止のいずれか）");
+            // OFF：接触した瞬間にアニメーションを止める
+            grabHoldTimer = 0f;
+            grabHoldFrozen = true;
+            if (animator != null) animator.speed = 0f;
         }
-    }
-
-    // ★追加：掴みが成立する相手を判定する。
-    //   対人戦(enemyPlayer)のみ対応。対CPU戦(enemy)は、本ファイルの他の機能（多段ヒット等）と同様に
-    //   現状未対応（Enemy.cs側に同等の仕組みが必要）。
-    Player GetGrabTarget()
-    {
-        if (enemyPlayer == null) return null;
-        if (!canThrow) return null;
-        if (!enemyPlayer.CanBeGrabbed()) return null;
-
-        // ★修正：以前は符号なしの差分だけを見ており、相手が逆側にいる場合に距離判定が正しく働かなかったため、
-        //   絶対値で間合いを判定するようにした。
-        float distance = Mathf.Abs(enemyPlayer.transform.position.z - transform.position.z);
-        if (distance >= grabRange) return null;
-
-        return enemyPlayer;
     }
 
     // ★追加：外部（掴んでくる相手）から「今、掴まれる（投げられる）ことができる状態か」を問い合わせるための公開メソッド。
@@ -2326,6 +2440,7 @@ public class Player : MonoBehaviour
         DisableAllHitboxes();
         isGuarding = false;
         canThrow = true;
+        throwReaching = false; // ★追加：掴めないまま投げ動作が終わった場合も、掴み待ちを終える
         currentState = PlayerState.Idle;
     }
 
@@ -2364,6 +2479,12 @@ public class Player : MonoBehaviour
         {
             fightingCamera.StartRebornCloseUp(transform);
             rebornCamStarted = true;
+        }
+
+        // ★追加：漢気復活。制限時間内にL1が押され、漢気ゲージが足りていれば、連打せずに即座に復活する
+        if (wantKankiRevive && rebornTimer < rebornTimeLimit && TryKankiRevive())
+        {
+            return;
         }
 
         // 復活に必要な連打回数のしきい値（復活回数が増えるほど厳しくなる）
@@ -2417,6 +2538,153 @@ public class Player : MonoBehaviour
         }
     }
 
+    //-----------------------------------------------------
+    // ★追加：漢気復活（ダウン中に漢気ゲージを消費して、連打せずに即座に復活する）
+    //-----------------------------------------------------
+    // 漢気ゲージが足りていればゲージを消費して復活し、trueを返す。足りなければ何もせずfalseを返す。
+    // 復活後の状態リセット・カメラ演出・UI更新は、通常の根性復活成功時（HandleKnockedDown）と同じ。
+    bool TryKankiRevive()
+    {
+        if (!enableKankiRevive) return false;
+
+        float cost = kankiGaugePerBar * Mathf.Max(1, kankiReviveBarCost);
+        if (kankiGauge < cost)
+        {
+            DLog($"[{PlayerName}] 漢気復活できません：ゲージ不足（必要={cost:F1} / 現在={kankiGauge:F1}）");
+            return false;
+        }
+
+        // 漢気ゲージを消費（UIの更新もこの中で行われる）
+        ReduceKankiGauge(cost);
+
+        // 最大HPのrebornHpRatio割合まで回復し、ダウン状態をリセットする
+        HP = Mathf.RoundToInt(maxHP * rebornHpRatio);
+        rebornCount++;
+        mashCount = 0;
+        rebornTimer = 0f;
+        currentState = PlayerState.Idle;
+        Player_status = Status.Live;
+
+        if (gameMNG != null)
+        {
+            gameMNG.Player_ReduceHP(HP, PlayerName);
+            gameMNG.SettestStatus(PlayerName, Status.Live);
+        }
+
+        // 咆哮して立ち上がる漢を中心に、カメラが回り込む（通常の復活成功時と同じ演出）
+        if (fightingCamera != null)
+        {
+            fightingCamera.SetRebornLevel(fightingCamera.rebornMaxLevel);
+            fightingCamera.TriggerRebornStandUpOrbit(transform);
+        }
+        rebornCamStarted = false; // 次回のダウンに備えてリセット
+
+        SpawnKankiReviveEffect(); // 復活した瞬間のエフェクト
+        StartReviveBuff();        // 攻撃力上昇（＋上昇中エフェクト）を開始
+
+        DLog($"[{PlayerName}] 漢気復活！（消費ゲージ={cost:F1} / 復活後HP={HP} / 攻撃力={atk} / 上昇時間={reviveAtkBuffDuration}秒）");
+        return true;
+    }
+
+    // 復活した瞬間に1回だけ出すエフェクト。プレイヤーの子オブジェクトとして生成し、一定時間後に破棄する。
+    void SpawnKankiReviveEffect()
+    {
+        if (kankiReviveEffectPrefab == null)
+        {
+            Debug.LogWarning($"[{PlayerName}] kankiReviveEffectPrefabが未設定のため、漢気復活エフェクトを出せません。Inspectorで設定してください。", this);
+            return;
+        }
+
+        ParticleSystem fx = Instantiate(
+            kankiReviveEffectPrefab,
+            transform.position + kankiReviveEffectOffset,
+            Quaternion.Euler(-90f, 0f, 0f),
+            transform);
+        fx.transform.localPosition = kankiReviveEffectOffset;
+        fx.Play();
+        Destroy(fx.gameObject, kankiReviveEffectLifetime);
+
+        EffectDLog($"[{PlayerName}] 漢気復活エフェクト発生 pos={fx.transform.position}");
+    }
+
+    // 攻撃力上昇を開始する（すでに上昇中なら残り時間を延ばし直す）
+    void StartReviveBuff()
+    {
+        isReviveBuffed = true;
+        reviveBuffTimer = reviveAtkBuffDuration;
+        UpdateAtkByGauge(); // 上昇倍率をatkへ反映
+        StartReviveBuffEffect();
+    }
+
+    // 攻撃力上昇を終了する（時間切れ・ダウン時に呼ばれる）
+    void EndReviveBuff()
+    {
+        if (!isReviveBuffed) return;
+
+        isReviveBuffed = false;
+        reviveBuffTimer = 0f;
+        UpdateAtkByGauge(); // 上昇倍率を外したatkへ戻す
+        StopReviveBuffEffect();
+
+        DLog($"[{PlayerName}] 漢気復活による攻撃力上昇が終了（攻撃力={atk}）");
+    }
+
+    // 毎フレームUpdateから呼ばれ、攻撃力上昇の残り時間を消化する
+    void TickReviveBuff()
+    {
+        if (!isReviveBuffed) return;
+
+        reviveBuffTimer -= Time.deltaTime;
+        if (reviveBuffTimer <= 0f) EndReviveBuff();
+    }
+
+    // 攻撃力上昇中のエフェクトを開始する。プレイヤーに追従し、上昇が終わるまでループし続ける。
+    void StartReviveBuffEffect()
+    {
+        if (reviveBuffEffectPrefab == null)
+        {
+            Debug.LogWarning($"[{PlayerName}] reviveBuffEffectPrefabが未設定のため、攻撃力上昇中のエフェクトを出せません。Inspectorで設定してください。", this);
+            return;
+        }
+
+        if (activeReviveBuffEffect != null)
+        {
+            if (!activeReviveBuffEffect.isPlaying) activeReviveBuffEffect.Play();
+            return;
+        }
+
+        activeReviveBuffEffect = Instantiate(
+            reviveBuffEffectPrefab,
+            transform.position + reviveBuffEffectOffset,
+            Quaternion.Euler(-90f, 0f, 0f),
+            transform); // プレイヤーに追従させるため子オブジェクトにする
+        activeReviveBuffEffect.transform.localPosition = reviveBuffEffectOffset;
+
+        // Prefab側のLoop設定に関係なく、上昇中は出し続けるようループを強制する
+        foreach (var ps in activeReviveBuffEffect.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var main = ps.main;
+            main.loop = true;
+            main.stopAction = ParticleSystemStopAction.None;
+        }
+
+        activeReviveBuffEffect.Play();
+
+        EffectDLog($"[{PlayerName}] 漢気復活の攻撃力上昇エフェクト開始 pos={activeReviveBuffEffect.transform.position}");
+    }
+
+    // 攻撃力上昇中のエフェクトを止める（新規発生だけ止め、出ている分は自然にフェードアウトさせる）
+    void StopReviveBuffEffect()
+    {
+        if (activeReviveBuffEffect == null) return;
+
+        activeReviveBuffEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        Destroy(activeReviveBuffEffect.gameObject, activeReviveBuffEffect.main.startLifetime.constantMax + 0.5f);
+        activeReviveBuffEffect = null;
+
+        EffectDLog($"[{PlayerName}] 漢気復活の攻撃力上昇エフェクト終了");
+    }
+
     // ★デバッグ用の強制復活処理（F4キー・対象はenableF4DebugKeyで選択）
     //   連打数や制限時間を無視して、通常の復活成功時と同じ処理を即座に実行する。
     void ForceRebornDebug()
@@ -2460,12 +2728,26 @@ public class Player : MonoBehaviour
     {
         if (other.gameObject.CompareTag("Ground"))
         {
+            // ★追加：着地アニメーション用に、「空中にいた(Jumpflag=false)状態からの着地か」を先に控えておく。
+            //   開始時にスポーンして床に触れただけ等、空中にいなかった場合はフラグを立てないため。
+            bool wasAirborne = !Jumpflag;
+
             Jumpflag = true;
 
             // ★追加：投げで放物線状に吹き飛ばされている最中に地面へ着地したら、Thrown状態を終えて復帰する
+            //   （この場合の着地アニメーションは、LandFromThrow内の"Thrown-land"が担当するので"Land"は立てない）
             if (currentState == PlayerState.Thrown)
             {
                 LandFromThrow();
+            }
+            // ★追加：ジャンプ・ノックバック等で空中にいた状態から地面に着地したら、
+            //   着地アニメーションを再生したいフラグ（Trigger "Land"）を立てる。
+            //   ダウン中／死亡中は倒れたポーズを崩さないよう対象外にする。
+            else if (wasAirborne && animator != null
+                     && currentState != PlayerState.KnockedDown && currentState != PlayerState.Dead)
+            {
+                animator.SetTrigger("Land"); // ★要Animator追加：Triggerパラメータ"Land"
+                DLog($"[{PlayerName}] 着地：Landフラグを立てました");
             }
         }
     }
@@ -2508,6 +2790,15 @@ public class Player : MonoBehaviour
         //   （＝自分のヒットボックスが相手の体に当たっただけの、攻撃側視点のイベント等）
         if (!isEnemyPlayerAttack && !isEnemyAttack)
         {
+            return;
+        }
+
+        // ★追加：相手が投げ動作中に、その左手・左前腕の当たり判定が自分の体に触れた場合は、
+        //   ダメージを与える通常の被弾ではなく「掴みの接触」として相手側に通知する（ダメージ・ヒットストップ等は発生させない）。
+        //   掴めない状態（ジャンプ中等）だった場合も、通知先で無視されるだけで、ここでは被弾扱いにしない。
+        if (isEnemyPlayerAttack && enemyPlayer.IsGrabHitbox(collision))
+        {
+            enemyPlayer.OnGrabHitboxContact(this);
             return;
         }
 
@@ -2588,6 +2879,19 @@ public class Player : MonoBehaviour
             // ガードしていない状態で被弾した場合の処理
             guardComboCount = 0;
             animator.SetTrigger("Hit");
+
+            // ★追加：攻撃者が自分の前方にいたか後方にいたかで、被弾アニメーション用のフラグを分けて立てる。
+            //   "Hit-front" = 前から攻撃された（相手が自分の正面にいる）／"Hit-back" = 後ろから攻撃された（相手が背後にいる）。
+            //   既存の"Hit"は従来どおり立てたまま、それに加えてどちらか一方だけを立てる。
+            Transform hitAttackerTf = isEnemyPlayerAttack ? enemyPlayer.transform : (enemy != null ? enemy.transform : null);
+            if (hitAttackerTf != null)
+            {
+                bool attackerInFront = IsOpponentInFront(hitAttackerTf);
+                // 反対側の未消費フラグが残っていると、次の被弾で誤ったアニメーションに遷移しうるので先に消す
+                animator.ResetTrigger(attackerInFront ? "Hit-back" : "Hit-front");
+                animator.SetTrigger(attackerInFront ? "Hit-front" : "Hit-back");
+                DLog($"[{PlayerName}] 被弾方向：攻撃者は{(attackerInFront ? "前方" : "後方")}（{(attackerInFront ? "Hit-front" : "Hit-back")}フラグを立てました）");
+            }
 
             // 通常被弾時のヒットストップ（少しだけ動けなくする）。
             // ★変更：対人戦では、攻撃者の「攻撃ごとの設定」のヒットストップ時間を使う。
@@ -2768,7 +3072,10 @@ public class Player : MonoBehaviour
     private void UpdateAtkByGauge()
     {
         int filledBars = Mathf.FloorToInt(kankiGauge / kankiGaugePerBar);
-        atk = Mathf.RoundToInt(baseAtk * (1f + atkPowerPerBar * filledBars));
+        // ★追加：漢気復活による攻撃力上昇中は倍率を掛ける（1未満にはならない）。
+        //   ここに組み込むことで、攻撃のたびにatkが再計算されても上昇が消えない。
+        float reviveMultiplier = isReviveBuffed ? Mathf.Max(1f, reviveAtkMultiplier) : 1f;
+        atk = Mathf.RoundToInt(baseAtk * (1f + atkPowerPerBar * filledBars) * reviveMultiplier);
 
         // ★追加：ゲージ量が変わるたびに、充填中エフェクトのON/OFFを判定し直す
         UpdateKankiChargeEffect(filledBars >= 1);

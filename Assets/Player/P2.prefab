@@ -1708,15 +1708,15 @@ MonoBehaviour:
   guardDuration: 0.3
   throwDuration: 0.75
   throwAtk: 200
-  grabRange: 3
   escapeTimeAtZeroHp: 10
   escapeTimeAtFullHp: 2
   escapeReductionPerInput: 0.15
-  throwHorizontalSpeed: 15
-  throwUpSpeed: 5
+  throwHorizontalSpeed: 10
+  throwUpSpeed: 10
   grabFailHorizontalSpeed: 3
   grabFailUpSpeed: 3
   throwStartPlayTime: 0.2
+  enableThrowStartPlay: 0
   guardAtkBonusMultiplier: 10.5
   rebornTimeLimit: 4
   rebornHpRatio: 0.5
@@ -1753,12 +1753,12 @@ MonoBehaviour:
     horizontalSpeed: 5
     upSpeed: 5
   upKickAtk: 50
-  upKickMissDuration: 0.7
-  upKickHitDuration: 0.7
+  upKickMissDuration: 0.8
+  upKickHitDuration: 0.5
   upKickHitStopDuration: 0.08
   upKickKnockback:
-    horizontalSpeed: 3
-    upSpeed: 10
+    horizontalSpeed: 0
+    upSpeed: 12
   downKickAtk: 10
   downKickMissDuration: 0.5
   downKickHitDuration: 0.5
@@ -1780,14 +1780,23 @@ MonoBehaviour:
   guardBuffEffectOffset: {x: 0, y: 0.68, z: 0}
   kankiGaugePerBar: 100
   kankiGaugeBarCount: 2
-  gaugeGainOnHit: 15
-  gaugeGainOnGuard: 10
+  gaugeGainOnHit: 5
+  gaugeGainOnGuard: 25
   gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
   enableKankiChargeEffect: 1
   kankiChargeEffectPrefab: {fileID: 6046942235736284670, guid: c955c1bd7f5e0414eb1e53986ad00eea, type: 3}
   kankiChargeEffectOffset: {x: 0, y: 0, z: 0}
   kankiChargeEffectFollowLocal: 1
+  enableKankiRevive: 1
+  kankiReviveBarCost: 1
+  reviveAtkMultiplier: 1.5
+  reviveAtkBuffDuration: 10
+  kankiReviveEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
+  kankiReviveEffectOffset: {x: 0, y: 0, z: 0}
+  kankiReviveEffectLifetime: 3
+  reviveBuffEffectPrefab: {fileID: 4071785266033440036, guid: 3e8e5f6985c3f4c419ef9c6176185b7f, type: 3}
+  reviveBuffEffectOffset: {x: 0, y: 0, z: 0}
   specialRequiredGauge: 100
   specialGaugeCost: 100
   specialDuration: 2.25
@@ -1819,7 +1828,7 @@ MonoBehaviour:
   pushSkinWidth: 0.02
   maxPushSpeed: 1.29
   showMashPrompt: 1
-  mashPromptText: "B\u30DC\u30BF\u30F3\u3092\u9023\u6253\u3057\u308D\uFF01"
+  mashPromptText: "\u9F13\u52D5\u3092\u9AD8\u3081\u308D\uFF01\uFF01"
   mashPromptFontSize: 64
   mashPromptColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   showMashRemainingCount: 1
