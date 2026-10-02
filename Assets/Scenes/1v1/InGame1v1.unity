@@ -3530,8 +3530,8 @@ Transform:
   m_GameObject: {fileID: 1272488099}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.00008, y: 1.93365, z: -7}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: -0.5978, y: 1.78, z: -6.1775}
+  m_LocalScale: {x: 0.89393, y: 0.89393, z: 0.89393}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 169560333}
@@ -4754,19 +4754,13 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   audienceAnimators:
-  - {fileID: 169560332}
+  - {fileID: 1353086076}
   - {fileID: 1013387588}
-  - {fileID: 367276194}
+  - {fileID: 898583919}
   - {fileID: 1428549206}
   - {fileID: 48376420}
-  - {fileID: 882329911}
   - {fileID: 1329311778}
-  - {fileID: 1353086076}
   - {fileID: 1165408657}
-  - {fileID: 898583919}
-  - {fileID: 1501275452}
-  - {fileID: 1294861285}
-  - {fileID: 104230641}
   - {fileID: 1069653822}
   - {fileID: 304834763}
   cameraController: {fileID: 330585548}
