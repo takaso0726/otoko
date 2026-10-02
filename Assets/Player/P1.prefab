@@ -1694,7 +1694,7 @@ MonoBehaviour:
   enableF8DebugKey: 1
   PlayerName: P1
   PLayerTagName: 
-  moveSpeed: 2.5
+  moveSpeed: 3
   turnSpeed: 180
   moveInputThreshold: 0.03
   crouchInputThreshold: -0.73
@@ -1704,7 +1704,7 @@ MonoBehaviour:
   minMoveSpeedRatio: 0.4
   minPosition: {x: -10, y: 0.2, z: -10}
   maxPosition: {x: 10, y: 10, z: 10}
-  force: {x: 0, y: 400, z: 0}
+  force: {x: 0, y: 500, z: 0}
   Jumpflag: 0
   HP: 1000
   maxHP: 1000
@@ -1717,10 +1717,11 @@ MonoBehaviour:
   escapeTimeAtZeroHp: 10
   escapeTimeAtFullHp: 2
   escapeReductionPerInput: 0.15
-  throwHorizontalSpeed: 10
+  throwHorizontalSpeed: 15
   throwUpSpeed: 5
   grabFailHorizontalSpeed: 3
   grabFailUpSpeed: 3
+  throwStartPlayTime: 0.2
   guardAtkBonusMultiplier: 10.5
   rebornTimeLimit: 4
   rebornHpRatio: 0.5
