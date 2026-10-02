@@ -4755,15 +4755,23 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   audienceAnimators:
-  - {fileID: 1353086076}
   - {fileID: 1013387588}
+  - {fileID: 1329311778}
   - {fileID: 898583919}
   - {fileID: 1428549206}
   - {fileID: 48376420}
-  - {fileID: 1329311778}
+  - {fileID: 1353086076}
   - {fileID: 1165408657}
   - {fileID: 1069653822}
   - {fileID: 304834763}
+  staticAudiences:
+  - {fileID: 367276195}
+  - {fileID: 882329912}
+  - {fileID: 1501275453}
+  - {fileID: 1294861286}
+  - {fileID: 104230642}
+  - {fileID: 169560333}
+  staticAudiencesFaceCamera: 1
   cameraController: {fileID: 330585548}
   bigCheerComboThreshold: 3
   reactions:
@@ -4814,6 +4822,13 @@ MonoBehaviour:
   enableIdleVariations: 1
   idleVariationIntervalRange: {x: 2, y: 5}
   reactionSafetyTimeout: 10
+  faceCamera: 1
+  cameraTarget: {fileID: 330585546}
+  facingMode: 0
+  yawOnly: 1
+  faceCameraTurnSpeed: 180
+  faceCameraYawOffset: 0
+  faceCameraRandomYaw: 0
   enableDebugLog: 0
 --- !u!4 &1569311133
 Transform:

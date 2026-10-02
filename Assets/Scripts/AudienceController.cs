@@ -93,6 +93,15 @@ public enum AudienceSituation
     Retreat,          // プレイヤーが一定時間、相手から離れる方向へ移動し続けた（消極的な展開への野次）
 }
 
+// 観客がカメラのどこを基準に向くか
+public enum AudienceFacingMode
+{
+    [InspectorName("カメラの位置を向く")]
+    CameraPosition,   // 各観客からカメラ位置へ向く（観客ごとに微妙に角度が違う。立体感が出る）
+    [InspectorName("カメラの画面方向を向く")]
+    CameraViewPlane,  // カメラの向きの逆方向（画面に正対する向き）へ全員が向く。カメラが横移動すると全員が同じ角度だけ回る
+}
+
 // PeopleAnimController.controller が実際に持っているアニメーション反応。
 // 待機（Idle）＝Noneは「何も再生せず、Idleのまま反応しない」ことを表す。
 // SituationReaction.clipReactions に他の反応と一緒に登録しておくと、
@@ -150,6 +159,15 @@ public class AudienceController : MonoBehaviour
              "複数登録した場合、各キャラは完全に独立して状態管理され、同じ状況が起きても" +
              "反応できるタイミングも再生される反応の種類もバラバラになる（客席らしい自然な見た目になる）")]
     public Animator[] audienceAnimators;
+
+    [Header("アニメーションしない観客（向きだけカメラに追従）")]
+    [Tooltip("Animatorを使わない（反応アニメを再生しない）観客のTransformを登録する。\n" +
+             "ここに登録した観客は、Clap/Cool/Call等の反応は一切再生せず、向きのカメラ追従だけを行う。\n" +
+             "Animatorを持っていてもここに登録すれば「アニメしない観客」として扱える（Audience Animatorsには入れないこと）")]
+    public Transform[] staticAudiences;
+
+    [Tooltip("ONなら、アニメしない観客もカメラの方を向かせる。OFFなら配置したままの向きで固定する")]
+    public bool staticAudiencesFaceCamera = true;
 
     [Header("カメラ連携（仁王立ち反応に必須）")]
     [Tooltip("仁王立ちで実際に攻撃を受け止めた瞬間(ガードインパクト)を検知するために使う")]
@@ -235,6 +253,30 @@ public class AudienceController : MonoBehaviour
     [Tooltip("Idleに戻らなかった場合の保険（秒）。この時間が経ったら強制的にパラメータをリセットする")]
     public float reactionSafetyTimeout = 10f;
 
+    [Header("カメラ追従（向き）設定")]
+    [Tooltip("ONにすると、観客キャラクターの向きをカメラの方向へ追従させる")]
+    public bool faceCamera = true;
+
+    [Tooltip("向きの基準にするカメラ。未設定ならCamera Controllerのカメラ→Camera.mainの順で自動取得する")]
+    public Transform cameraTarget;
+
+    [Tooltip("カメラのどこを基準に向くか。\n" +
+             "カメラの位置を向く：各観客からカメラ位置へ向く（遠いとカメラ移動による角度変化が小さい）\n" +
+             "カメラの画面方向を向く：カメラの向きの逆方向へ全員が向く（カメラが動いた分だけ確実に向きが変わる）")]
+    public AudienceFacingMode facingMode = AudienceFacingMode.CameraPosition;
+
+    [Tooltip("ONなら水平方向（Y軸回転）のみ追従する。観客が上下に傾かないので通常はONのままでよい")]
+    public bool yawOnly = true;
+
+    [Tooltip("向きを変える速さ（度/秒）。0以下にすると即座にカメラの方を向く")]
+    public float faceCameraTurnSpeed = 180f;
+
+    [Tooltip("モデルの正面がZ+方向でない場合の補正角（度）。背中を向けてしまう場合は180を入れる")]
+    public float faceCameraYawOffset = 0f;
+
+    [Tooltip("全員が同じ向きにならないよう、キャラごとにランダムで加える角度のばらつき（±度）。起動時に1回だけ抽選される")]
+    public float faceCameraRandomYaw = 0f;
+
     [Header("デバッグ")]
     [Tooltip("反応の発火状況をConsoleに出力する（原因調査用）")]
     public bool enableDebugLog = false;
@@ -248,7 +290,17 @@ public class AudienceController : MonoBehaviour
         public Animator animator;
         public Coroutine currentReactionCoroutine;
         public AudienceSituation? pendingPrioritySituation;
+        public float facingYawJitter; // カメラ向きのキャラ別ばらつき（度）
     }
+
+    // アニメしない観客1体分の状態（向きのばらつきだけを持つ）
+    private class StaticUnit
+    {
+        public Transform transform;
+        public float facingYawJitter;
+    }
+
+    private List<StaticUnit> staticUnits = new List<StaticUnit>();
 
     // audienceAnimators(Inspector設定)から、null除外の上で構築されるキャラごとの状態リスト
     private List<AudienceUnit> audienceUnits = new List<AudienceUnit>();
@@ -356,7 +408,32 @@ public class AudienceController : MonoBehaviour
             foreach (var animator in audienceAnimators)
             {
                 if (animator == null) continue;
-                audienceUnits.Add(new AudienceUnit { animator = animator });
+                audienceUnits.Add(new AudienceUnit
+                {
+                    animator = animator,
+                    facingYawJitter = UnityEngine.Random.Range(-faceCameraRandomYaw, faceCameraRandomYaw),
+                });
+            }
+        }
+
+        // アニメしない観客（向きのカメラ追従のみ）を構築する。
+        // Audience Animatorsと重複して登録されていたら、反応アニメを優先して除外する。
+        staticUnits = new List<StaticUnit>();
+        if (staticAudiences != null)
+        {
+            foreach (var tf in staticAudiences)
+            {
+                if (tf == null) continue;
+                if (IsAnimatedAudience(tf))
+                {
+                    Debug.LogWarning($"[AudienceController] {tf.name} はAudience Animatorsにも登録されているため、Static Audiencesの登録は無視します。({gameObject.name})");
+                    continue;
+                }
+                staticUnits.Add(new StaticUnit
+                {
+                    transform = tf,
+                    facingYawJitter = UnityEngine.Random.Range(-faceCameraRandomYaw, faceCameraRandomYaw),
+                });
             }
         }
 
@@ -433,6 +510,81 @@ public class AudienceController : MonoBehaviour
             }
 
             UpdateRetreatDetection(i, p);
+        }
+    }
+
+    //-----------------------------------------------------------------------
+    // 観客の向きをカメラへ追従させる
+    //-----------------------------------------------------------------------
+
+    // アニメーション適用後に向きを上書きするため、LateUpdateで処理する
+    void LateUpdate()
+    {
+        if (!faceCamera) return;
+
+        Transform cam = ResolveCameraTransform();
+        if (cam == null) return;
+
+        // アニメする観客（Audience Animators）
+        if (audienceUnits != null)
+        {
+            foreach (var unit in audienceUnits)
+            {
+                if (unit == null || unit.animator == null) continue;
+                FaceCameraTransform(unit.animator.transform, unit.facingYawJitter, cam);
+            }
+        }
+
+        // アニメしない観客（Static Audiences）
+        if (staticAudiencesFaceCamera && staticUnits != null)
+        {
+            foreach (var unit in staticUnits)
+            {
+                if (unit == null || unit.transform == null) continue;
+                FaceCameraTransform(unit.transform, unit.facingYawJitter, cam);
+            }
+        }
+    }
+
+    // 指定のTransformが、Audience Animatorsのいずれかのキャラ（またはその子/親）かどうか
+    bool IsAnimatedAudience(Transform tf)
+    {
+        if (audienceUnits == null) return false;
+        foreach (var unit in audienceUnits)
+        {
+            if (unit != null && unit.animator != null && unit.animator.transform == tf) return true;
+        }
+        return false;
+    }
+
+    // 向きの基準となるカメラのTransformを返す（毎回nullチェックして、シーン切替等にも耐える）
+    Transform ResolveCameraTransform()
+    {
+        if (cameraTarget != null) return cameraTarget;
+        if (cameraController != null) return cameraController.transform;
+        return Camera.main != null ? Camera.main.transform : null;
+    }
+
+    // 1体の観客を、カメラの方向へ向ける（アニメする／しないの両方で共通）
+    void FaceCameraTransform(Transform tf, float yawJitter, Transform cam)
+    {
+        Vector3 toCamera = facingMode == AudienceFacingMode.CameraViewPlane
+            ? -cam.forward                    // カメラの向きの逆＝画面に正対する方向
+            : cam.position - tf.position;     // 観客からカメラ位置への方向
+        if (yawOnly) toCamera.y = 0f;
+        if (toCamera.sqrMagnitude < 0.0001f) return; // 真上・真下などで向きが定まらない場合は何もしない
+
+        Quaternion target = Quaternion.LookRotation(toCamera.normalized, Vector3.up)
+                          * Quaternion.Euler(0f, faceCameraYawOffset + yawJitter, 0f);
+
+        if (faceCameraTurnSpeed <= 0f)
+        {
+            tf.rotation = target;
+        }
+        else
+        {
+            // Time.deltaTimeを使うため、ガード成功時のスロー演出(timeScale低下)中は向き変更もゆっくりになる
+            tf.rotation = Quaternion.RotateTowards(tf.rotation, target, faceCameraTurnSpeed * Time.deltaTime);
         }
     }
 
