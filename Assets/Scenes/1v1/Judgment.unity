@@ -394,36 +394,44 @@ MonoBehaviour:
   hitAnyButtonText: {fileID: 0}
   crackEffect: {fileID: 0}
   crackStageSprites:
-  - {fileID: -465808875, guid: df66e15d33cbbe846a294f3db93b82e1, type: 3}
-  - {fileID: -1690190287, guid: 795d0dc7c1b78494ba71b10b157c43ab, type: 3}
-  - {fileID: -1561207974, guid: 227f2d5c1bc089943afdefba72639d97, type: 3}
-  - {fileID: 579918714, guid: 777a18be51e2c1441bed4e186d65c067, type: 3}
-  - {fileID: 292587653, guid: 9ddac532e37c7a049bdbd8faf238668e, type: 3}
-  - {fileID: -1716486635, guid: a7f420c6cdbdbf6408bce8e2dc6f0d39, type: 3}
-  - {fileID: 848025262, guid: 23e883fb3fd88e0478d389086ac5a04a, type: 3}
-  - {fileID: -2072630609, guid: bbbd6dd23dba52843b5cf7b807e2ddcb, type: 3}
+  - {fileID: 21300000, guid: df66e15d33cbbe846a294f3db93b82e1, type: 3}
+  - {fileID: 21300000, guid: 795d0dc7c1b78494ba71b10b157c43ab, type: 3}
+  - {fileID: 21300000, guid: 227f2d5c1bc089943afdefba72639d97, type: 3}
+  - {fileID: 21300000, guid: 777a18be51e2c1441bed4e186d65c067, type: 3}
+  - {fileID: 21300000, guid: 9ddac532e37c7a049bdbd8faf238668e, type: 3}
+  - {fileID: 21300000, guid: a7f420c6cdbdbf6408bce8e2dc6f0d39, type: 3}
+  - {fileID: 21300000, guid: 23e883fb3fd88e0478d389086ac5a04a, type: 3}
+  - {fileID: 21300000, guid: bbbd6dd23dba52843b5cf7b807e2ddcb, type: 3}
+  crackStageSEs:
+  - {fileID: 8300000, guid: e9674cbe5a007a649911c57b3ac9565e, type: 3}
+  - {fileID: 8300000, guid: e9674cbe5a007a649911c57b3ac9565e, type: 3}
+  - {fileID: 8300000, guid: c79674b2a5365484e954cd6fdbbefdf0, type: 3}
+  - {fileID: 8300000, guid: a7d0a4ea0beb52f4d8dd2e40d9466a4e, type: 3}
+  - {fileID: 8300000, guid: 7dccb4d17649e8249a87ebe885421f83, type: 3}
   crackSpriteParent: {fileID: 1255295552}
   crackSortingLayerName: Default
   crackBaseSortingOrder: 0
-  crackStageInterval: 0.2
-  crackFadeDuration: 0.15
+  crackStageInterval: 0.5
+  slowStageCount: 4
+  crackStageIntervalFast: 0.23
+  crackFadeDuration: 0.1
   crackFadeCurve:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 1
+      time: -0.000233353
+      value: -0.00014953758
+      inSlope: -0.38627955
+      outSlope: -0.38627955
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
-      outWeight: 0
+      outWeight: 0.03837648
     - serializedVersion: 3
       time: 1
       value: 1
-      inSlope: 1
-      outSlope: 0
+      inSlope: 2
+      outSlope: 2
       tangentMode: 0
       weightedMode: 0
       inWeight: 0
@@ -478,7 +486,7 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 8300000, guid: 7dccb4d17649e8249a87ebe885421f83, type: 3}
+  m_Resource: {fileID: 0}
   m_PlayOnAwake: 1
   m_Volume: 1
   m_Pitch: 1
