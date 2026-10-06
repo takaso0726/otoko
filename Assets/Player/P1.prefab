@@ -1612,9 +1612,6 @@ PrefabInstance:
       addedObject: {fileID: 5091781670017210879}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 8059615893565065440}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 1263398157810198849}
   m_SourcePrefab: {fileID: 100100000, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
 --- !u!4 &66523863092381484 stripped
@@ -1711,7 +1708,7 @@ MonoBehaviour:
   maxHP: 1000
   atk: 10
   Player_status: 0
-  guardDuration: 0.3
+  guardDuration: 0.6
   throwDuration: 0.75
   throwAtk: 20
   throwStunDuration: 0.5
@@ -1725,11 +1722,12 @@ MonoBehaviour:
   throwStartPlayTime: 0.2
   enableThrowStartPlay: 0
   guardAtkBonusMultiplier: 100
-  guardSuccessStunDuration: 1
+  guardSuccessStunDuration: 1.4
   rebornTimeLimit: 4
   rebornHpRatio: 0.5
   mashThresholdBase: 10
-  mashThresholdStep: 5
+  mashWithAnyButton: 0
+  mashThresholdStep: 7
   standHeight: 1.93
   standCenter: {x: 0, y: 0.82, z: 0}
   crouchHeight: 1.15
@@ -1849,13 +1847,22 @@ MonoBehaviour:
   mashRemainingColor: {r: 1, g: 1, b: 1, a: 1}
   mashRemainingYRatio: 0.42
   showMashButtonImage: 1
-  mashButtonNormalImage: {fileID: 2800000, guid: 252576c28c75a7f4f99964946c62997e, type: 3}
-  mashButtonPressedImage: {fileID: 2800000, guid: c3a4f25883c8d0549877dde7d3e52035, type: 3}
+  mashButtonNormalImage: {fileID: 2800000, guid: dede202d74af2c1408440f73c14f79b2, type: 3}
+  mashButtonPressedImage: {fileID: 2800000, guid: 2d6f0bf8549ca4f44acdcfeaab20dc1f, type: 3}
   mashButtonPressedDuration: 0.08
   mashButtonReleaseMinDuration: 0.05
   mashButtonSizeRatio: 0.22
   mashButtonXRatio: 0.5
   mashButtonYRatio: 0.72
+  showRebornTimeLimit: 1
+  rebornTimeLabel: "\u5FA9\u6D3B\u307E\u3067"
+  rebornTimeFontSize: 56
+  rebornTimeColor: {r: 1, g: 1, b: 1, a: 1}
+  rebornTimeLowThreshold: 1.5
+  rebornTimeLowColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  showRebornTimeBar: 1
+  rebornTimeBarWidthRatio: 0.4
+  rebornTimeYRatio: 0.03
 --- !u!54 &2376428352566718438
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -2025,18 +2032,6 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!114 &8059615893565065440
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6758519040437653269}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9bdf7386e4b1da14bbdab4b6a20ea870, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: '::'
 --- !u!114 &1263398157810198849
 MonoBehaviour:
   m_ObjectHideFlags: 0

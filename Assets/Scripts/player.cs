@@ -77,6 +77,35 @@ public class Player : MonoBehaviour
     [Tooltip("ONにすると、このキャラクターでF10キー（やられ状態中に連続で攻撃が当たった回数の画面表示ON/OFF）が使えます。")]
     [SerializeField] bool enableF10DebugKey = false;
 
+    //=====================================================
+    // ★追加：矢印キー（↑←→↓）で任意のアニメーションを再生する設定
+    //   ・各キーを押した瞬間に、Inspectorで指定したアニメーションを1回再生する。
+    //   ・「Use Trigger」ON：AnimatorのTriggerパラメータ名を指定（例：Punch / Kick / UpKick / DownKick / waza）
+    //   ・「Use Trigger」OFF：Animatorのステート名を指定して直接再生（例：HeadHit）
+    //   ・currentState（状態機械）は変更しないので、あくまで見た目の再生・確認用。当たり判定やダメージは発生しない。
+    //   ・ダウン中／ヒットストップ中／掴まれ中／やられ中など、自由に動けない状態では再生しない。
+    //=====================================================
+    [System.Serializable]
+    public class ArrowAnimationSetting
+    {
+        [Tooltip("再生するアニメーション名。Use TriggerがONならTriggerパラメータ名、OFFならAnimatorのステート名。空なら何もしない。")]
+        public string animationName = "";
+        [Tooltip("ON：animationNameをTriggerとして発火する／OFF：animationNameのステートを頭から直接再生する")]
+        public bool useTrigger = true;
+    }
+
+    [Header("矢印キーでアニメーション再生")]
+    [Tooltip("ONにすると、このキャラクターで矢印キー（↑←→↓）によるアニメーション再生が使えます。\n" +
+             "※PlayerInputのキーボード操作で矢印キーを移動(Move)に割り当てている場合、移動も同時に入力される点に注意。")]
+    [SerializeField] bool enableArrowKeyAnimation = false;
+    [Tooltip("ONにすると、このキャラクターに割り当てられたゲームパッドの十字キー（上下左右）でも、下の同じ設定のアニメーションを再生できます。\n" +
+             "※PlayerInputで十字キーをMoveに割り当てている場合、移動も同時に入力される点に注意。")]
+    [SerializeField] bool enableDpadAnimation = false;
+    [SerializeField] ArrowAnimationSetting upArrowAnimation = new ArrowAnimationSetting { animationName = "Anim-Up", useTrigger = true };       // ↑キー
+    [SerializeField] ArrowAnimationSetting leftArrowAnimation = new ArrowAnimationSetting { animationName = "Anim-Left", useTrigger = true };       // ←キー
+    [SerializeField] ArrowAnimationSetting rightArrowAnimation = new ArrowAnimationSetting { animationName = "Anim-Right", useTrigger = true };     // →キー
+    [SerializeField] ArrowAnimationSetting downArrowAnimation = new ArrowAnimationSetting { animationName = "Anim-Down", useTrigger = true };   // ↓キー
+
     // 本スクリプト内のDebug.Log呼び出しはすべてこのメソッド経由にする。
     // enableDebugLogをfalseにすればインスペクターから一括でログ出力を止められる。
     void DLog(string message)
@@ -239,6 +268,10 @@ public class Player : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] float rebornHpRatio = 0.3f;    // 復活成功時に回復するHPの割合（maxHPに対する割合。0.3なら最大HPの3割まで回復）
     [SerializeField] int mashThresholdBase = 11;    // 必要連打数の基準値
+    [Tooltip("ダウン中の連打に使えるボタンの切り替え。\n" +
+             "ON：どのボタン（ジャンプ・パンチ・キック・仁王立ち・投げ・L1）を押しても連打1回として数える。\n" +
+             "OFF：パンチボタン（Bボタン）だけを連打として数える（他のボタンは無視）。")]
+    [SerializeField] bool mashWithAnyButton = true;  // ★追加：ONならどのボタンでも連打OK／OFFならBボタン（パンチ）のみ
     [SerializeField] int mashThresholdStep = 3;     // 復活回数が増えるごとに必要連打数が増える量
 
     //=====================================================
@@ -990,7 +1023,7 @@ public class Player : MonoBehaviour
 
         if (HP <= 0)
         {
-            RegisterMash();
+            if (mashWithAnyButton) RegisterMash(); // ★どのボタンでもOKの設定がONの時だけ連打として数える
             return;
         }
 
@@ -1020,7 +1053,7 @@ public class Player : MonoBehaviour
 
         if (HP <= 0)
         {
-            RegisterMash();
+            if (mashWithAnyButton) RegisterMash(); // ★どのボタンでもOKの設定がONの時だけ連打として数える
             return;
         }
 
@@ -1035,7 +1068,7 @@ public class Player : MonoBehaviour
 
         if (HP <= 0)
         {
-            RegisterMash();
+            if (mashWithAnyButton) RegisterMash(); // ★どのボタンでもOKの設定がONの時だけ連打として数える
             return;
         }
 
@@ -1050,7 +1083,7 @@ public class Player : MonoBehaviour
 
         if (HP <= 0)
         {
-            RegisterMash();
+            if (mashWithAnyButton) RegisterMash(); // ★どのボタンでもOKの設定がONの時だけ連打として数える
             return;
         }
 
@@ -1069,7 +1102,8 @@ public class Player : MonoBehaviour
         if (HP <= 0)
         {
             wantKankiRevive = true;
-            RegisterMash(); // ★追加：L1も他のボタンと同じく連打1回分として数える（ゲージが足りなければ連打で復活を目指せる）
+            // ★追加：L1も他のボタンと同じく連打1回分として数える（どのボタンでもOKの設定がONの時だけ。ゲージが足りなければ連打で復活を目指せる）
+            if (mashWithAnyButton) RegisterMash();
             return;
         }
 
@@ -1315,6 +1349,7 @@ public class Player : MonoBehaviour
             return;
         }
 
+        HandleArrowKeyAnimation(); // ★追加：矢印キーによるアニメーション再生（自由に動ける状態の時のみ）
         bool isFree = currentState == PlayerState.Idle
                    || currentState == PlayerState.Move
                    || currentState == PlayerState.Crouch;
@@ -1424,6 +1459,61 @@ public class Player : MonoBehaviour
         transform.position = pos;
     }
 
+    // ★追加：矢印キーが押された瞬間に、対応するアニメーションを再生する（Updateから毎フレーム呼ばれる）
+    void HandleArrowKeyAnimation()
+    {
+        if (animator == null) return;
+
+        // キーボードの矢印キー
+        if (enableArrowKeyAnimation && Keyboard.current != null)
+        {
+            Keyboard kb = Keyboard.current;
+            if (kb.upArrowKey.wasPressedThisFrame) PlayArrowAnimation(upArrowAnimation, "↑");
+            if (kb.leftArrowKey.wasPressedThisFrame) PlayArrowAnimation(leftArrowAnimation, "←");
+            if (kb.rightArrowKey.wasPressedThisFrame) PlayArrowAnimation(rightArrowAnimation, "→");
+            if (kb.downArrowKey.wasPressedThisFrame) PlayArrowAnimation(downArrowAnimation, "↓");
+        }
+
+        // ゲームパッドの十字キー（このPlayerInputに紐づいているパッドだけを見る。1P/2Pで混ざらない）
+        if (enableDpadAnimation && playerInput != null)
+        {
+            foreach (InputDevice device in playerInput.devices)
+            {
+                Gamepad pad = device as Gamepad;
+                if (pad == null) continue;
+
+                if (pad.dpad.up.wasPressedThisFrame) PlayArrowAnimation(upArrowAnimation, "十字↑");
+                if (pad.dpad.left.wasPressedThisFrame) PlayArrowAnimation(leftArrowAnimation, "十字←");
+                if (pad.dpad.right.wasPressedThisFrame) PlayArrowAnimation(rightArrowAnimation, "十字→");
+                if (pad.dpad.down.wasPressedThisFrame) PlayArrowAnimation(downArrowAnimation, "十字↓");
+            }
+        }
+    }
+
+    void PlayArrowAnimation(ArrowAnimationSetting setting, string keyLabel)
+    {
+        if (setting == null || string.IsNullOrEmpty(setting.animationName))
+        {
+            DLog($"[{PlayerName}] {keyLabel}キー：再生するアニメーション名が未設定です。");
+            return;
+        }
+
+        // 移動アニメーションが残っていると、再生したアニメーションより移動が優先されてしまうので先に止める
+        StopMoveAnimation();
+        ResetAttackTriggers();
+
+        if (setting.useTrigger)
+        {
+            animator.SetTrigger(setting.animationName);
+        }
+        else
+        {
+            animator.Play(setting.animationName, 0, 0f);
+        }
+
+        DLog($"[{PlayerName}] {keyLabel}キー：アニメーション再生 {setting.animationName}（{(setting.useTrigger ? "Trigger" : "State")}）");
+    }
+
     // 1フレームで消費しなかった意図フラグを毎フレーム末尾でクリアする
     void ClearInputIntents()
     {
@@ -1481,6 +1571,84 @@ public class Player : MonoBehaviour
     float mashButtonStateEndTime;   // 今の見た目（押した／押していない）を最低限維持する終了時刻（Time.unscaledTime）
     bool mashButtonPendingPress;    // 押された要求が溜まっている（押していない画像を挟んでから、次の押した画像にする）
 
+    // ★追加：ダウン中（復活チャレンジ中）に、復活の制限時間（残り秒数）を画面上部に表示するための設定。
+    //   制限時間は上の「復活（根性）設定」のrebornTimeLimitで、残り時間 = rebornTimeLimit - rebornTimer。
+    [Header("復活制限時間表示設定")]
+    [Tooltip("ダウン中に、復活の制限時間（残り秒数）を画面上部に表示するか")]
+    [SerializeField] bool showRebornTimeLimit = true;
+    [Tooltip("残り秒数の前に付ける文言")]
+    [SerializeField] string rebornTimeLabel = "復活まで";
+    [SerializeField] int rebornTimeFontSize = 56;                        // 文字サイズ
+    [SerializeField] Color rebornTimeColor = Color.white;                // 通常時の色
+    [Tooltip("残り時間がこの秒数以下になったら、色を変えて点滅させる")]
+    [SerializeField] float rebornTimeLowThreshold = 1.5f;
+    [SerializeField] Color rebornTimeLowColor = new Color(1f, 0.2f, 0.2f, 1f); // 残りわずかの時の色
+    [Tooltip("文字の下に、残り時間に応じて短くなるバーを表示するか")]
+    [SerializeField] bool showRebornTimeBar = true;
+    [Tooltip("バーの長さ（画面幅に対する割合）")]
+    [SerializeField] float rebornTimeBarWidthRatio = 0.4f;
+    [Tooltip("表示する位置（画面上端からの距離。画面高さに対する割合）。大きくしすぎると連打メッセージと重なる。")]
+    [SerializeField] float rebornTimeYRatio = 0.03f;
+
+    // ★追加：復活の制限時間（残り秒数）を画面上部に表示する。OnGUIから、ダウン中だけ呼ばれる。
+    void DrawRebornTimeLimit(float blink)
+    {
+        float remaining = Mathf.Max(rebornTimeLimit - rebornTimer, 0f);
+        float ratio = rebornTimeLimit > 0f ? Mathf.Clamp01(remaining / rebornTimeLimit) : 0f;
+        bool isLow = remaining <= rebornTimeLowThreshold;
+
+        // 残りわずかの時は色を変えて、明滅させる
+        Color baseColor = isLow ? rebornTimeLowColor : rebornTimeColor;
+        float alpha = isLow ? blink : 1f;
+        Color textColor = new Color(baseColor.r, baseColor.g, baseColor.b, alpha);
+
+        string text = $"{rebornTimeLabel} {remaining:F1}";
+
+        GUIStyle style = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = rebornTimeFontSize,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter,
+        };
+        style.normal.textColor = textColor;
+
+        float width = 800f;
+        float height = rebornTimeFontSize * 1.4f;
+        float top = Screen.height * rebornTimeYRatio;
+        Rect rect = new Rect((Screen.width - width) / 2f, top, width, height);
+
+        // 縁取り（黒）を少しずらして重ね描きし、背景が明るくても読めるようにする
+        GUIStyle outlineStyle = new GUIStyle(style)
+        {
+            normal = { textColor = new Color(0f, 0f, 0f, alpha) }
+        };
+        Vector2[] offsets = { new Vector2(-2, -2), new Vector2(2, -2), new Vector2(-2, 2), new Vector2(2, 2) };
+        foreach (var offset in offsets)
+        {
+            GUI.Label(new Rect(rect.x + offset.x, rect.y + offset.y, rect.width, rect.height), text, outlineStyle);
+        }
+        GUI.Label(rect, text, style);
+
+        // 残り時間に応じて右から短くなるバー
+        if (showRebornTimeBar)
+        {
+            float barWidth = Screen.width * rebornTimeBarWidthRatio;
+            float barHeight = Mathf.Max(Screen.height * 0.015f, 8f);
+            float barX = (Screen.width - barWidth) / 2f;
+            float barY = top + height + 4f;
+
+            Color prevColor = GUI.color;
+
+            GUI.color = new Color(0f, 0f, 0f, 0.6f); // 背景（枠）
+            GUI.DrawTexture(new Rect(barX - 3f, barY - 3f, barWidth + 6f, barHeight + 6f), Texture2D.whiteTexture);
+
+            GUI.color = textColor;                    // 残り時間分のバー
+            GUI.DrawTexture(new Rect(barX, barY, barWidth * ratio, barHeight), Texture2D.whiteTexture);
+
+            GUI.color = prevColor;
+        }
+    }
+
     // ★追加：連打ボタン画像の「押した／押していない」を毎フレーム切り替える。
     //   押した画像は mashButtonPressedDuration で必ず終わらせ、
     //   その後に mashButtonReleaseMinDuration だけ「押していない画像」を必ず挟む。
@@ -1522,11 +1690,17 @@ public class Player : MonoBehaviour
     {
         DrawStunComboDebug(); // ★追加：F10のやられ連続ヒット数表示
 
-        if (!showMashPrompt && !showMashRemainingCount && !showMashButtonImage) return;
+        if (!showMashPrompt && !showMashRemainingCount && !showMashButtonImage && !showRebornTimeLimit) return;
         if (currentState != PlayerState.KnockedDown) return;
 
         // 明滅させて視認性・緊張感を出す
         float blink = 0.6f + 0.4f * Mathf.Sin(Time.time * 10f);
+
+        // ★追加：復活の制限時間（残り秒数）を画面上部に表示する
+        if (showRebornTimeLimit)
+        {
+            DrawRebornTimeLimit(blink);
+        }
 
         if (showMashPrompt)
         {

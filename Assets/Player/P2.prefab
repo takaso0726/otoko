@@ -1612,9 +1612,6 @@ PrefabInstance:
       addedObject: {fileID: 8428984270238312136}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 6190281087729866915}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 4004333460661939853}
   m_SourcePrefab: {fileID: 100100000, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
 --- !u!4 &328901518628524443 stripped
@@ -1706,7 +1703,7 @@ MonoBehaviour:
   maxHP: 1000
   atk: 10
   Player_status: 0
-  guardDuration: 0.3
+  guardDuration: 1.4
   throwDuration: 0.75
   throwAtk: 20
   throwStunDuration: 0.5
@@ -1724,7 +1721,8 @@ MonoBehaviour:
   rebornTimeLimit: 4
   rebornHpRatio: 0.5
   mashThresholdBase: 10
-  mashThresholdStep: 5
+  mashWithAnyButton: 0
+  mashThresholdStep: 7
   standHeight: 1.93
   standCenter: {x: 0, y: 0.82, z: 0}
   crouchHeight: 1.15
@@ -1851,6 +1849,15 @@ MonoBehaviour:
   mashButtonSizeRatio: 0.22
   mashButtonXRatio: 0.5
   mashButtonYRatio: 0.72
+  showRebornTimeLimit: 1
+  rebornTimeLabel: "\u5FA9\u6D3B\u307E\u3067"
+  rebornTimeFontSize: 56
+  rebornTimeColor: {r: 1, g: 1, b: 1, a: 1}
+  rebornTimeLowThreshold: 1.5
+  rebornTimeLowColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  showRebornTimeBar: 1
+  rebornTimeBarWidthRatio: 0.4
+  rebornTimeYRatio: 0.03
 --- !u!54 &2130424214686890801
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -2020,18 +2027,6 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!114 &6190281087729866915
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5939530159737485577}
-  m_Enabled: 0
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9bdf7386e4b1da14bbdab4b6a20ea870, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: '::'
 --- !u!114 &4004333460661939853
 MonoBehaviour:
   m_ObjectHideFlags: 0

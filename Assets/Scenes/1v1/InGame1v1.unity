@@ -1278,14 +1278,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0, b: 0, a: 1}
+  m_Color: {r: 0.7924528, g: 0.15325737, b: 0.15325737, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: fc07dcd2832ebbe449c8cf8cb2495569, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 99a9aa8447833b544b9cb786edf42733, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1476,14 +1476,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.4490565, g: 0.42279094, b: 0.42279094, a: 1}
+  m_Color: {r: 1, g: 0.9858491, b: 0.9858491, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 5262904ee5c20d346b56991c553bd9e7, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 6642e213406535747a41ab22038bc8f0, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -2922,14 +2922,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 1, b: 0.92489046, a: 1}
+  m_Color: {r: 0.16620687, g: 0.2270455, b: 0.7830189, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: fc07dcd2832ebbe449c8cf8cb2495569, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 99a9aa8447833b544b9cb786edf42733, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -3293,7 +3293,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 5262904ee5c20d346b56991c553bd9e7, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 6642e213406535747a41ab22038bc8f0, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -4804,6 +4804,7 @@ MonoBehaviour:
   retreatMinSpeed: 0.05
   retreatRetriggerCooldown: 0
   enableSpecialDetection: 1
+  specialSeClips: []
   enableIdleVariations: 1
   idleVariationIntervalRange: {x: 2, y: 5}
   reactionSafetyTimeout: 10
