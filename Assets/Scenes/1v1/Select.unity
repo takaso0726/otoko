@@ -1184,8 +1184,8 @@ MonoBehaviour:
   cursorMoveSpeed: 12
   se: {fileID: 1841750655}
   moveSE: {fileID: 8300000, guid: 43301a7900b4a194185c4ebf8caac99b, type: 3}
-  decideSE: {fileID: 8300000, guid: 3a2df26007a98a94d98eb89c9f9835a5, type: 3}
-  bothReadySE: {fileID: 8300000, guid: 9b55e4768b577174399dd5e41851e504, type: 3}
+  decideSE: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
+  bothReadySE: {fileID: 8300000, guid: d2398eb2952b80e43958f313530e2286, type: 3}
   nextSceneName: InGame1v1
   transitionDelay: 0.7
 --- !u!1 &1231234380

@@ -70,6 +70,12 @@ using UnityEngine;
 //      設定されていれば自動的に動作する。発火までの連続後退秒数は
 //      Retreat Detection Duration、ノイズ除去用の最低速度はRetreat Min Speedで調整できる。
 //
+// ★必殺技（Special）の検知について：
+//   Player.cs内の必殺技発動(EnterSpecial)は外部へ通知されず、状態(currentState)もprivateなので、
+//   Player.cs既存のpublicメンバー（GetKankiGauge / specialRequiredGauge / specialGaugeCost）から
+//   「漢気ゲージが必殺技の消費量ぶん1フレームで一括して減った」ことを検知して発火している。
+//   （漢気復活もゲージを一括消費するが、ダウン中(Reborn)のため除外している）
+//
 // 注意：
 //   ・仁王立ちの「構えに入った瞬間」自体はPlayer.cs内部のprivateな状態
 //     （isGuarding）でしか管理されておらず、Player.cs非変更の制約上は
@@ -91,6 +97,7 @@ public enum AudienceSituation
     Revive,           // 根性復活に成功
     Waiting,          // 仁王立ち・ダメージ等、他の状況が何も起きていない待機時間（一定間隔で発火）
     Retreat,          // プレイヤーが一定時間、相手から離れる方向へ移動し続けた（消極的な展開への野次）
+    Special,          // 必殺技を出した（漢気ゲージを消費して必殺技を発動した瞬間）
 }
 
 // 観客がカメラのどこを基準に向くか
@@ -187,14 +194,27 @@ public class AudienceController : MonoBehaviour
         new SituationReaction { situation = AudienceSituation.Dead,         clipReactions = new[] { AudienceClipReaction.Cool } },
         new SituationReaction { situation = AudienceSituation.Revive,       clipReactions = new[] { AudienceClipReaction.Call } },
         new SituationReaction { situation = AudienceSituation.Waiting,     clipReactions = new[] { AudienceClipReaction.Cool, AudienceClipReaction.None } },
+        new SituationReaction { situation = AudienceSituation.Special,     clipReactions = new[] { AudienceClipReaction.Cheers } },
         new SituationReaction { situation = AudienceSituation.Retreat,     clipReactions = new[] { AudienceClipReaction.BadSign, AudienceClipReaction.Sadness } },
     };
 
     [Header("SE設定")]
     [Tooltip("状況ごとのSE(効果音)を再生するためのAudioSource。ここに1つセットする。" +
-             "常に1本だけ再生する仕様で、新しいSEが発生すると再生中の前のSEを打ち切って差し替える" +
-             "（どんな状況でもSEが重ねて鳴ることはない。BGMは別のAudioSourceで管理すること）。")]
+             "SEの再生中に別のSEが発生した場合は、再生中のSEを徐々に小さくしながら(フェードアウト)、" +
+             "新しいSEをすぐに再生する。フェードアウト用に、実行時にこのAudioSourceと同じ設定の" +
+             "AudioSourceが同じGameObjectへ1つ自動追加される。" +
+             "（BGMは別のAudioSourceで管理すること）。")]
     public AudioSource seAudioSource;
+
+    [Min(0f)]
+    [Tooltip("SEの再生中に別のSEが発生したとき、直前のSEが完全に消えるまでの秒数。0なら即座に止める。")]
+    public float seFadeOutDuration = 0.5f;
+
+    [Tooltip("ここに登録した状況のSEは、再生中に「ここに登録されていない状況」のSEで中断（フェードアウト）されない。\n" +
+             "そのSEの再生が終わるまで、登録されていない状況のSEは鳴らさずスキップする。\n" +
+             "登録された状況どうしのSEは、通常どおり新しい方に切り替わる（前の方がフェードアウト）。\n" +
+             "例：必殺技(Special)のSEが、直後の攻撃ヒット(AttackHit)のSEにかき消されるのを防ぐ。")]
+    public AudienceSituation[] seProtectedSituations = new[] { AudienceSituation.Special };
 
     [Range(0f, 1f)]
     [Tooltip("SE再生時の音量スケール(0〜1)。AudioSource自体のVolumeとは別に、SEだけをまとめて音量調整したい場合に使用する。")]
@@ -212,6 +232,7 @@ public class AudienceController : MonoBehaviour
         AudienceSituation.AttackHit,
         AudienceSituation.GuardBlock,
         AudienceSituation.GuardBlockBig,
+        AudienceSituation.Special,
     };
 
     [Header("PeopleAnimController側のパラメータ名（通常は変更不要）")]
@@ -242,6 +263,12 @@ public class AudienceController : MonoBehaviour
 
     [Tooltip("Retreat状況を再発火させるまでのクールダウン(秒)。0にすると、条件を満たすたびdetectionDuration分の連続後退のみで即座に再発火する")]
     public float retreatRetriggerCooldown = 0f;
+
+    [Header("必殺技（Special）検知設定")]
+    [Tooltip("ONなら、プレイヤーが必殺技を出した瞬間にAudienceSituation.Specialを発生させる。\n" +
+             "Player.csは変更できないため、漢気ゲージが必殺技の消費量(Special Gauge Cost)ぶん一気に減った瞬間を" +
+             "必殺技の発動として検知している（漢気復活によるゲージ消費は除外する）。")]
+    public bool enableSpecialDetection = true;
 
     [Header("待機中（Waiting）演出の間隔設定")]
     [Tooltip("何も状況が起きていない待機中に、AudienceSituation.Waitingの反応をランダム再生する機能を有効にするか")]
@@ -322,6 +349,9 @@ public class AudienceController : MonoBehaviour
     private float[] retreatTimers;
     private float[] retreatCooldownTimers;
 
+    // targetPlayers[i]ごとの「直前フレームでの漢気ゲージ量」。必殺技発動（ゲージの一括消費）の検知に使う。
+    private float[] previousKankiGauges;
+
     // 直近でガードインパクト(仁王立ちブロック)が発生したフレーム番号。
     // GameMNG.OnPlayerHpReduced由来のダメージイベントが同じフレームで来た場合、
     // それはガードで減ったHPなので「攻撃ヒット」の反応とは重複させない。
@@ -335,6 +365,12 @@ public class AudienceController : MonoBehaviour
     // スケール値なので、Play()に切り替えた後も同じ意味を保てるよう起動時の値を控えておく。
     private float seAudioSourceBaseVolume = 1f;
 
+    // SEのクロスフェード用。seAudioSource（A）と、実行時に自動追加する2本目（B）を交互に使う。
+    private AudioSource seAudioSourceB;
+    private AudioSource seCurrentSource;                       // 今鳴っている（直近に再生した）側
+    private AudienceSituation seCurrentSituation;              // 今鳴っている（直近に再生した）SEの状況
+    private readonly Dictionary<AudioSource, Coroutine> seFadeCoroutines = new Dictionary<AudioSource, Coroutine>();
+
     void Awake()
     {
         BuildReactionMap();
@@ -345,6 +381,46 @@ public class AudienceController : MonoBehaviour
         {
             seAudioSourceBaseVolume = seAudioSource.volume;
         }
+    }
+
+    // ★Inspectorで保存済みのReactionsリストには、後から追加した状況(例：Special)の行が存在しないため、
+    //   そのままではSEや反応を登録できない（登録先の行が無い）。
+    //   このメソッドは、AudienceSituationの中でReactionsに行が無いものを末尾へ追加する。
+    //   ・自動では実行されない（行を「－」で消しても勝手に復活しないようにするため）。
+    //   ・使い方：Inspector上でこのコンポーネントの右上「︙」メニュー →
+    //     「Reactionsに足りない状況の行を追加」を実行する。
+    //   ・既存の行・設定内容には一切触れない。追加される行の反応は空（何も再生しない）。
+    //     ただしSpecialだけは歓声(Cheers)を初期値にする。
+    [ContextMenu("Reactionsに足りない状況の行を追加")]
+    void AddMissingSituationRows()
+    {
+        if (reactions == null) reactions = new List<SituationReaction>();
+
+        int added = 0;
+        foreach (AudienceSituation sit in Enum.GetValues(typeof(AudienceSituation)))
+        {
+            bool exists = false;
+            foreach (var r in reactions)
+            {
+                if (r != null && r.situation == sit) { exists = true; break; }
+            }
+            if (exists) continue;
+
+            reactions.Add(new SituationReaction
+            {
+                situation = sit,
+                clipReactions = sit == AudienceSituation.Special
+                    ? new[] { AudienceClipReaction.Cheers }
+                    : Array.Empty<AudienceClipReaction>(),
+                seClips = Array.Empty<AudioClip>(),
+            });
+            added++;
+        }
+
+        Debug.Log($"[AudienceController] Reactionsに足りない状況の行を{added}件追加しました。({gameObject.name})");
+#if UNITY_EDITOR
+        UnityEditor.EditorUtility.SetDirty(this);
+#endif
     }
 
     // reactionsリスト(Inspector設定)からDictionaryを構築する
@@ -391,10 +467,12 @@ public class AudienceController : MonoBehaviour
         previousPlayerPositions = new Vector3[targetPlayers.Length];
         retreatTimers = new float[targetPlayers.Length];
         retreatCooldownTimers = new float[targetPlayers.Length];
+        previousKankiGauges = new float[targetPlayers.Length];
         for (int i = 0; i < targetPlayers.Length; i++)
         {
             if (targetPlayers[i] != null)
             {
+                previousKankiGauges[i] = targetPlayers[i].GetKankiGauge();
                 previousStatus[i] = targetPlayers[i].Player_status;
                 previousPlayerPositions[i] = targetPlayers[i].transform.position;
             }
@@ -502,6 +580,9 @@ public class AudienceController : MonoBehaviour
             Player.Status current = p.Player_status;
             Player.Status prev = previousStatus[i];
 
+            // 必殺技の発動検知（previousStatusを更新する前に行う）
+            UpdateSpecialDetection(i, p, prev, current);
+
             // ステータスが変化した瞬間だけ反応させる（毎フレーム連打しないようにするため）
             if (current != prev)
             {
@@ -586,6 +667,54 @@ public class AudienceController : MonoBehaviour
             // Time.deltaTimeを使うため、ガード成功時のスロー演出(timeScale低下)中は向き変更もゆっくりになる
             tf.rotation = Quaternion.RotateTowards(tf.rotation, target, faceCameraTurnSpeed * Time.deltaTime);
         }
+    }
+
+    //-----------------------------------------------------------------------
+    // 必殺技の発動検知 → Special反応
+    //-----------------------------------------------------------------------
+
+    // Player.csには必殺技の発動を通知するイベントが無く、変更もできないため、
+    // 既存のpublicメンバー(GetKankiGauge / specialRequiredGauge / specialGaugeCost)だけで判定する。
+    // 必殺技を出すと、漢気ゲージがspecialGaugeCostぶん1フレームで一括して減る。
+    // ・直前フレームのゲージがspecialRequiredGauge以上だった
+    // ・今フレームで「消費量ぶん」減った（後退によるじわじわした減少は1フレームでは小さいので該当しない）
+    // ・直前/現在がダウン中(Reborn)・死亡ではない（漢気復活もゲージを一括消費するため、それは除外する）
+    // を満たしたときだけ AudienceSituation.Special を発火する。
+    void UpdateSpecialDetection(int index, Player p, Player.Status prevStatus, Player.Status currentStatus)
+    {
+        float before = previousKankiGauges[index];
+        float now = p.GetKankiGauge();
+        previousKankiGauges[index] = now;
+
+        if (!enableSpecialDetection) return;
+        if (p.specialGaugeCost <= 0f) return;
+
+        float drop = before - now;
+        if (drop <= 0.5f) return;
+
+        // ここから先は「ゲージが1フレームで0.5以上減った」ケース（必殺技・漢気復活など）。
+        // 必殺技として扱わなかった場合は、原因調査用に理由をログへ出す。
+        if (before < p.specialRequiredGauge - 0.01f)
+        {
+            DLog($"[AudienceController] {p.name}：ゲージが{drop:F1}減ったが、直前のゲージ({before:F1})がSpecial Required Gauge({p.specialRequiredGauge:F1})未満のため必殺技とみなしません。");
+            return;
+        }
+        if (drop < Mathf.Min(p.specialGaugeCost, before) - 0.5f)
+        {
+            DLog($"[AudienceController] {p.name}：ゲージが{drop:F1}減ったが、必殺技の消費量(Special Gauge Cost={p.specialGaugeCost:F1})に満たないため必殺技とみなしません。");
+            return;
+        }
+
+        // 漢気復活（ダウン中のゲージ消費）は必殺技ではない
+        if (prevStatus == Player.Status.Reborn || prevStatus == Player.Status.Dead
+            || currentStatus == Player.Status.Reborn || currentStatus == Player.Status.Dead)
+        {
+            DLog($"[AudienceController] {p.name}：ゲージが{drop:F1}減ったが、ダウン/死亡中(Status {prevStatus}→{currentStatus})のため必殺技とみなしません（漢気復活など）。");
+            return;
+        }
+
+        DLog($"[AudienceController] 必殺技の発動を検知: {p.name}（ゲージ {before:F1} → {now:F1}）");
+        PlayReaction(AudienceSituation.Special);
     }
 
     //-----------------------------------------------------------------------
@@ -763,17 +892,19 @@ public class AudienceController : MonoBehaviour
     //   観客キャラクター全員が反応中で今すぐアニメを再生できない場合でも、
     //   SE自体は状況が発生するたびに毎回再生される（客席の歓声・どよめきに相当するため）。
     // ・候補が複数ある場合はランダムで1つ再生する。候補にNone(未設定)を混ぜておくと、
-    //   その抽選の回だけ「あえてSEを鳴らさない」という結果にもできる。
-    // ・SEはどんな状況でも重ねて再生しない：seAudioSourceは常に1本のクリップしか鳴らさず、
-    //   新しいSEが発生した場合は再生中の前のSEを打ち切って即座に差し替える
+    //   その抽選の回だけ「あえてSEを鳴らさない」という結果にもできる
+    //   （この場合、再生中の前のSEはそのまま鳴り続ける）。
+    // ・SEの再生中に別のSEが発生した場合は、再生中のSEをseFadeOutDuration秒かけて徐々に小さくし、
+    //   新しいSEは待たずにそのまま再生する（2本のAudioSourceを交互に使ってクロスフェードする）。
     //   （BGMは別のAudioSourceで管理する想定のため、このルールの対象外）。
     void PlaySituationSE(AudienceSituation situation)
     {
         if (seMap == null) BuildSeMap();
-        if (!seMap.TryGetValue(situation, out var clips) || clips == null || clips.Length == 0) return;
-
-        var chosen = clips[UnityEngine.Random.Range(0, clips.Length)];
-        if (chosen == null) return; // 「あえて鳴らさない」が選ばれた場合
+        if (!seMap.TryGetValue(situation, out var clips) || clips == null || clips.Length == 0)
+        {
+            DLog($"[AudienceController] SE({situation})：Reactionsにこの状況の行が無い、またはSe Clipsが空のため鳴らしません。");
+            return;
+        }
 
         if (seAudioSource == null)
         {
@@ -781,15 +912,117 @@ public class AudienceController : MonoBehaviour
             return;
         }
 
-        // PlayOneShotだと複数のSEが同時に重なって再生されてしまうため、
-        // 単一クリップの再生に切り替えて重複を防ぐ。
-        // 既にSEが再生中でも一旦止めて、新しい方をすぐ再生する（後勝ち・割り込み方式）。
-        seAudioSource.Stop();
-        seAudioSource.volume = seAudioSourceBaseVolume * seVolume;
-        seAudioSource.clip = chosen;
-        seAudioSource.Play();
+        // 保護対象の状況のSEが再生中で、新しいSEが保護対象外の状況なら、再生中のSEを守るためこのSEはスキップする
+        if (seCurrentSource != null && seCurrentSource.isPlaying
+            && IsSeProtected(seCurrentSituation) && !IsSeProtected(situation))
+        {
+            DLog($"[AudienceController] SE({situation})：保護対象のSE({seCurrentSituation})が再生中のためスキップしました。");
+            return;
+        }
 
-        DLog($"[AudienceController] SE再生: {situation} -> {chosen.name}");
+        var chosen = clips[UnityEngine.Random.Range(0, clips.Length)];
+        if (chosen == null)
+        {
+            DLog($"[AudienceController] SE({situation})：抽選の結果「鳴らさない(None)」が選ばれました。");
+            return; // 「あえて鳴らさない」が選ばれた場合
+        }
+
+        EnsureSeSources();
+
+        var previous = seCurrentSource != null ? seCurrentSource : seAudioSource;
+        var prevSituation = seCurrentSituation;
+        var next = (previous == seAudioSource) ? seAudioSourceB : seAudioSource;
+
+        // 直前のSEは徐々に小さくする
+        if (previous.isPlaying)
+        {
+            StartSeFadeOut(previous);
+        }
+
+        // 次に使う側がまだ前々回のSEをフェード中なら、そのフェードを打ち切って再利用する
+        StopSeFade(next);
+        next.Stop();
+
+        next.volume = seAudioSourceBaseVolume * seVolume;
+        next.clip = chosen;
+        next.Play();
+        seCurrentSource = next;
+        seCurrentSituation = situation;
+
+        DLog($"[AudienceController] SE再生: {situation} -> {chosen.name}" +
+             (previous.isPlaying ? $"（直前のSE({prevSituation})はフェードアウト）" : ""));
+    }
+
+    // 指定した状況が、seProtectedSituations（他のSEに中断されない状況）に登録されているか
+    bool IsSeProtected(AudienceSituation situation)
+    {
+        return seProtectedSituations != null && Array.IndexOf(seProtectedSituations, situation) >= 0;
+    }
+
+    // フェード用の2本目のAudioSourceを（まだ無ければ）seAudioSourceと同じ設定で作る
+    void EnsureSeSources()
+    {
+        if (seAudioSourceB != null) return;
+
+        seAudioSourceB = seAudioSource.gameObject.AddComponent<AudioSource>();
+        seAudioSourceB.playOnAwake = false;
+        seAudioSourceB.loop = false;
+        seAudioSourceB.outputAudioMixerGroup = seAudioSource.outputAudioMixerGroup;
+        seAudioSourceB.mute = seAudioSource.mute;
+        seAudioSourceB.bypassEffects = seAudioSource.bypassEffects;
+        seAudioSourceB.bypassListenerEffects = seAudioSource.bypassListenerEffects;
+        seAudioSourceB.bypassReverbZones = seAudioSource.bypassReverbZones;
+        seAudioSourceB.ignoreListenerPause = seAudioSource.ignoreListenerPause;
+        seAudioSourceB.priority = seAudioSource.priority;
+        seAudioSourceB.pitch = seAudioSource.pitch;
+        seAudioSourceB.panStereo = seAudioSource.panStereo;
+        seAudioSourceB.spatialBlend = seAudioSource.spatialBlend;
+        seAudioSourceB.reverbZoneMix = seAudioSource.reverbZoneMix;
+        seAudioSourceB.dopplerLevel = seAudioSource.dopplerLevel;
+        seAudioSourceB.spread = seAudioSource.spread;
+        seAudioSourceB.rolloffMode = seAudioSource.rolloffMode;
+        seAudioSourceB.minDistance = seAudioSource.minDistance;
+        seAudioSourceB.maxDistance = seAudioSource.maxDistance;
+    }
+
+    void StartSeFadeOut(AudioSource source)
+    {
+        StopSeFade(source);
+
+        if (seFadeOutDuration <= 0f)
+        {
+            source.Stop();
+            return;
+        }
+
+        seFadeCoroutines[source] = StartCoroutine(SeFadeOutRoutine(source, seFadeOutDuration));
+    }
+
+    void StopSeFade(AudioSource source)
+    {
+        if (source == null) return;
+        if (seFadeCoroutines.TryGetValue(source, out var co))
+        {
+            if (co != null) StopCoroutine(co);
+            seFadeCoroutines.Remove(source);
+        }
+    }
+
+    // 指定したAudioSourceのVolumeを現在値から0へ徐々に下げ、0になったらStopする。
+    // （ポーズ(timeScale=0)中でも止まらないようunscaledDeltaTimeを使う）
+    IEnumerator SeFadeOutRoutine(AudioSource source, float duration)
+    {
+        float startVolume = source.volume;
+        float t = 0f;
+        while (t < duration && source.isPlaying)
+        {
+            t += Time.unscaledDeltaTime;
+            source.volume = Mathf.Lerp(startVolume, 0f, t / duration);
+            yield return null;
+        }
+
+        source.Stop();
+        seFadeCoroutines.Remove(source);
     }
 
     // ★外部からも呼べる公開メソッド。
