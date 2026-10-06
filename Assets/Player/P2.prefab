@@ -1708,18 +1708,19 @@ MonoBehaviour:
   Player_status: 0
   guardDuration: 0.3
   throwDuration: 0.75
-  throwAtk: 100
+  throwAtk: 20
   throwStunDuration: 0.5
   escapeTimeAtZeroHp: 10
   escapeTimeAtFullHp: 2
   escapeReductionPerInput: 0.15
   throwHorizontalSpeed: 9
-  throwUpSpeed: 10
+  throwUpSpeed: 15
   grabFailHorizontalSpeed: 3
   grabFailUpSpeed: 3
   throwStartPlayTime: 0.2
   enableThrowStartPlay: 0
-  guardAtkBonusMultiplier: 10.5
+  guardAtkBonusMultiplier: 100
+  guardSuccessStunDuration: 1
   rebornTimeLimit: 4
   rebornHpRatio: 0.5
   mashThresholdBase: 10
@@ -1743,7 +1744,7 @@ MonoBehaviour:
   punchAtk: 10
   punchMissDuration: 0.55
   punchHitDuration: 0.45
-  punchStunDuration: 0.4
+  punchStunDuration: 0.3
   punchHitStopDuration: 0.08
   punchKnockback:
     horizontalSpeed: 1
@@ -1764,10 +1765,10 @@ MonoBehaviour:
   upKickKnockback:
     horizontalSpeed: 5
     upSpeed: 10
-  downKickAtk: 20
+  downKickAtk: 10
   downKickMissDuration: 0.8
   downKickHitDuration: 0.5
-  downKickStunDuration: 0.505
+  downKickStunDuration: 0.3
   downKickHitStopDuration: 0.08
   downKickKnockback:
     horizontalSpeed: 5
@@ -1792,7 +1793,7 @@ MonoBehaviour:
   gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
   enableKankiChargeEffect: 1
-  kankiChargeEffectPrefab: {fileID: 6046942235736284670, guid: c955c1bd7f5e0414eb1e53986ad00eea, type: 3}
+  kankiChargeEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
   kankiChargeEffectOffset: {x: 0, y: 0, z: 0}
   kankiChargeEffectFollowLocal: 1
   enableKankiRevive: 1
@@ -1808,8 +1809,8 @@ MonoBehaviour:
   specialGaugeCost: 100
   specialDuration: 2.25
   specialSe: {fileID: 0}
-  specialEffectPrefab: {fileID: 4575220094214949160, guid: 2b606bf4bbf80c64585e8eed7a58d48d, type: 3}
-  specialEffectOffset: {x: 0, y: 1.54, z: 0}
+  specialEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
+  specialEffectOffset: {x: 0, y: 0, z: 0}
   specialEffectLifetime: 2.45
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
@@ -1842,6 +1843,14 @@ MonoBehaviour:
   mashRemainingFontSize: 150
   mashRemainingColor: {r: 1, g: 1, b: 1, a: 1}
   mashRemainingYRatio: 0.42
+  showMashButtonImage: 1
+  mashButtonNormalImage: {fileID: 2800000, guid: 252576c28c75a7f4f99964946c62997e, type: 3}
+  mashButtonPressedImage: {fileID: 2800000, guid: c3a4f25883c8d0549877dde7d3e52035, type: 3}
+  mashButtonPressedDuration: 0.08
+  mashButtonReleaseMinDuration: 0.05
+  mashButtonSizeRatio: 0.22
+  mashButtonXRatio: 0.5
+  mashButtonYRatio: 0.72
 --- !u!54 &2130424214686890801
 Rigidbody:
   m_ObjectHideFlags: 0

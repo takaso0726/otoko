@@ -223,6 +223,15 @@ public class Player : MonoBehaviour
     [SerializeField] float guardAtkBonusMultiplier = 1.0f;
 
     //=====================================================
+    // ★ガード（仁王立ち）成功時の、相手へのスタン設定
+    //=====================================================
+    [Header("ガード成功時の相手スタン設定")]
+    [Tooltip("仁王立ちでガードに成功した時、攻撃してきた相手を行動不能（スタン）にする時間（秒）。" +
+             "この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。0だとスタンさせない。\n" +
+             "※相手が必殺技・投げ（掴み中）・ダウン中などの場合はスタンさせない。")]
+    [SerializeField] float guardSuccessStunDuration = 0.5f;
+
+    //=====================================================
     // ★根性復活（ダウン後の復活チャレンジ）設定
     //=====================================================
     [Header("復活（根性）設定")]
@@ -953,10 +962,39 @@ public class Player : MonoBehaviour
         moveInput = value.Get<Vector2>();
     }
 
+    // ★追加：ダウン中（HP<=0）の「根性復活」の連打を1回分カウントする。
+    //   どのボタンが押されても同じ処理になるよう、各ボタンのコールバックから呼ぶ共通処理。
+    void RegisterMash()
+    {
+        // 復活チャレンジの連打カウントとして加算するだけ
+        mashCount++;
+
+        // 連打ボタン画像に「押された」ことを伝える。
+        // 押した画像の延長はせず、TickMashButtonVisual()が「押していない画像」を必ず挟んでから次の押下として表示する。
+        mashButtonPendingPress = true;
+
+        // 連打1回ごとの擬音演出（「グッ！」「ンン！」等）。
+        // 攻撃者がいないので、常にプレイヤーの正面方向を基準にHitEffectData側のBase Angleで散らす。
+        if (HitEffectSpawner.Instance != null && mashHitEffectData != null)
+        {
+            HitEffectSpawner.Instance.SpawnAtDirection(mashHitEffectData, transform.position, transform.forward);
+            EffectDLog($"[{PlayerName}] 連打擬音エフェクト発生 pos={transform.position}");
+        }
+    }
+
     // ジャンプボタン押下時のコールバック
+    // ※HP<=0のダウン中は「根性復活」の連打としてカウントする（どのボタンでも同じ）
     public void OnJump(InputValue value)
     {
-        if (value.isPressed) wantJump = true;
+        if (!value.isPressed) return;
+
+        if (HP <= 0)
+        {
+            RegisterMash();
+            return;
+        }
+
+        wantJump = true;
     }
 
     // パンチボタン押下時のコールバック
@@ -967,17 +1005,7 @@ public class Player : MonoBehaviour
 
         if (HP <= 0)
         {
-            // ダウン中は復活チャレンジの連打カウントとして加算するだけ
-            mashCount++;
-
-            // 連打1回ごとの擬音演出（「グッ！」「ンン！」等）。
-            // 攻撃者がいないので、常にプレイヤーの正面方向を基準にHitEffectData側のBase Angleで散らす。
-            if (HitEffectSpawner.Instance != null && mashHitEffectData != null)
-            {
-                HitEffectSpawner.Instance.SpawnAtDirection(mashHitEffectData, transform.position, transform.forward);
-                EffectDLog($"[{PlayerName}] 連打擬音エフェクト発生 pos={transform.position}");
-            }
-
+            RegisterMash(); // ダウン中は復活チャレンジの連打としてカウントするだけ
             return;
         }
 
@@ -985,21 +1013,48 @@ public class Player : MonoBehaviour
     }
 
     // キックボタン押下時のコールバック（通常／上／下の分岐はUpdate側で行う）
+    // ※HP<=0のダウン中は「根性復活」の連打としてカウントする
     public void OnKick(InputValue value)
     {
-        if (value.isPressed) wantKick = true;
+        if (!value.isPressed) return;
+
+        if (HP <= 0)
+        {
+            RegisterMash();
+            return;
+        }
+
+        wantKick = true;
     }
 
     // 仁王立ちボタン押下時のコールバック
+    // ※HP<=0のダウン中は「根性復活」の連打としてカウントする
     public void OnStand(InputValue value)
     {
-        if (value.isPressed) wantGuard = true;
+        if (!value.isPressed) return;
+
+        if (HP <= 0)
+        {
+            RegisterMash();
+            return;
+        }
+
+        wantGuard = true;
     }
 
     // 投げボタン押下時のコールバック
+    // ※HP<=0のダウン中は「根性復活」の連打としてカウントする
     public void OnThrow(InputValue value)
     {
-        if (value.isPressed) wantThrow = true;
+        if (!value.isPressed) return;
+
+        if (HP <= 0)
+        {
+            RegisterMash();
+            return;
+        }
+
+        wantThrow = true;
     }
 
     // ★追加：L1ボタン（必殺技）押下時のコールバック
@@ -1014,6 +1069,7 @@ public class Player : MonoBehaviour
         if (HP <= 0)
         {
             wantKankiRevive = true;
+            RegisterMash(); // ★追加：L1も他のボタンと同じく連打1回分として数える（ゲージが足りなければ連打で復活を目指せる）
             return;
         }
 
@@ -1030,6 +1086,7 @@ public class Player : MonoBehaviour
 
         MaintainKankiChargeEffect(); // ★追加：漢気ゲージ1本以上の間、追従エフェクトを出し続ける
         TickReviveBuff();            // ★追加：漢気復活後の攻撃力上昇の残り時間を消化する
+        TickMashButtonVisual();      // ★追加：連打ボタン画像の押した／押していない切り替え
         ResolveOpponentIfMissing();  // ★追加：プレハブ化・再配置等で相手(enemyPlayer/enemy)の参照が切れていたら自動で探し直す
         // ★修正：しゃがみの見た目（コライダー・アニメーター）は、
         //   currentState（状態機械）を経由せず、毎フレーム「スティック下入力の有無」だけで直接同期する。
@@ -1387,7 +1444,7 @@ public class Player : MonoBehaviour
     //   表示位置が重なる可能性がある。その場合はCanvas+UI Textでの実装に置き換えること。
     [Header("復活連打メッセージ設定")]
     [SerializeField] bool showMashPrompt = true;               // ダウン中に連打メッセージを表示するか
-    [SerializeField] string mashPromptText = "Bボタンを連打しろ！"; // 表示する文言
+    [SerializeField] string mashPromptText = "ボタンを連打しろ！"; // 表示する文言（どのボタンでもOK）
     [SerializeField] int mashPromptFontSize = 64;               // 文字サイズ
     [SerializeField] Color mashPromptColor = Color.yellow;      // 文字色
 
@@ -1399,11 +1456,73 @@ public class Player : MonoBehaviour
     [SerializeField] Color mashRemainingColor = Color.white;    // 数字の色
     [SerializeField] float mashRemainingYRatio = 0.42f;         // 数字を表示するY位置（画面高さに対する割合。中央付近）
 
+    // ★追加：連打を促すボタン画像（押していない時／押した時の2枚）を差し込むための設定。
+    //   ダウン中に何かボタンを押すたびに「押した画像」へ切り替わり、少し経つと「押していない画像」へ戻る。
+    //   ※Inspectorに画像（Texture）を割り当てると表示される。未設定なら何も表示しない。
+    //   ※画像のImport Settingsは「Sprite (2D and UI)」のままでも、「Default」でもよい。
+    [Header("復活連打ボタン画像設定")]
+    [SerializeField] bool showMashButtonImage = true;            // 連打ボタン画像を表示するか
+    [Tooltip("ボタンを押していない時の画像（mash_button_normal.png）をここに入れる")]
+    [SerializeField] Texture2D mashButtonNormalImage;            // ★画像の差し込み口①：押していない時
+    [Tooltip("ボタンを押した時の画像（mash_button_pressed.png）をここに入れる")]
+    [SerializeField] Texture2D mashButtonPressedImage;           // ★画像の差し込み口②：押した時
+    [Tooltip("「押した画像」を出す時間（秒）。1回出したら、連打がどれだけ速くてもこの時間で必ず終わらせる。")]
+    [SerializeField] float mashButtonPressedDuration = 0.06f;
+    [Tooltip("「押していない画像」を最低限出す時間（秒）。押した画像の後に必ずこの時間だけ挟むので、連打中でも押しっぱなしに見えない。")]
+    [SerializeField] float mashButtonReleaseMinDuration = 0.05f;
+    [Tooltip("画像の大きさ（画面の高さに対する割合）。0.22なら画面高さの22%の正方形で表示する。")]
+    [SerializeField] float mashButtonSizeRatio = 0.22f;
+    [Tooltip("画像を表示するX位置（画面幅に対する割合。0.5で中央）")]
+    [SerializeField] float mashButtonXRatio = 0.5f;
+    [Tooltip("画像を表示するY位置（画面高さに対する割合。数字より下に出すため0.72付近）")]
+    [SerializeField] float mashButtonYRatio = 0.72f;
+
+    bool mashButtonVisualPressed;   // 今「押した画像」を出しているか
+    float mashButtonStateEndTime;   // 今の見た目（押した／押していない）を最低限維持する終了時刻（Time.unscaledTime）
+    bool mashButtonPendingPress;    // 押された要求が溜まっている（押していない画像を挟んでから、次の押した画像にする）
+
+    // ★追加：連打ボタン画像の「押した／押していない」を毎フレーム切り替える。
+    //   押した画像は mashButtonPressedDuration で必ず終わらせ、
+    //   その後に mashButtonReleaseMinDuration だけ「押していない画像」を必ず挟む。
+    //   連打が速くて押下要求が溜まっていても、その間は押していない画像を見せるので、押しっぱなしに見えない。
+    void TickMashButtonVisual()
+    {
+        // ダウン中以外は状態をリセットしておく（次のダウン時に前回の押下が残らないようにする）
+        if (currentState != PlayerState.KnockedDown)
+        {
+            mashButtonVisualPressed = false;
+            mashButtonPendingPress = false;
+            return;
+        }
+
+        float now = Time.unscaledTime;
+
+        if (mashButtonVisualPressed)
+        {
+            // 押した画像は決められた時間で必ず終わらせ、押していない画像へ戻す
+            if (now >= mashButtonStateEndTime)
+            {
+                mashButtonVisualPressed = false;
+                mashButtonStateEndTime = now + mashButtonReleaseMinDuration;
+            }
+        }
+        else
+        {
+            // 押していない画像を最低限の時間出し終えていて、押された要求があれば、次の「押した画像」にする
+            if (mashButtonPendingPress && now >= mashButtonStateEndTime)
+            {
+                mashButtonPendingPress = false;
+                mashButtonVisualPressed = true;
+                mashButtonStateEndTime = now + mashButtonPressedDuration;
+            }
+        }
+    }
+
     void OnGUI()
     {
         DrawStunComboDebug(); // ★追加：F10のやられ連続ヒット数表示
 
-        if (!showMashPrompt && !showMashRemainingCount) return;
+        if (!showMashPrompt && !showMashRemainingCount && !showMashButtonImage) return;
         if (currentState != PlayerState.KnockedDown) return;
 
         // 明滅させて視認性・緊張感を出す
@@ -1471,6 +1590,24 @@ public class Player : MonoBehaviour
             }
 
             GUI.Label(rect, remainingText, numberStyle);
+        }
+
+        // ★追加：連打ボタン画像（押した瞬間だけ「押した画像」、それ以外は「押していない画像」）
+        if (showMashButtonImage)
+        {
+            bool pressed = mashButtonVisualPressed;
+            Texture2D tex = (pressed && mashButtonPressedImage != null) ? mashButtonPressedImage : mashButtonNormalImage;
+
+            if (tex != null)
+            {
+                float size = Screen.height * mashButtonSizeRatio;
+                Rect rect = new Rect(
+                    Screen.width * mashButtonXRatio - size / 2f,
+                    Screen.height * mashButtonYRatio - size / 2f,
+                    size, size);
+
+                GUI.DrawTexture(rect, tex, ScaleMode.ScaleToFit, true);
+            }
         }
     }
 
@@ -1574,6 +1711,32 @@ public class Player : MonoBehaviour
         }
 
         StunDLog($"[{PlayerName}] 連続ヒット={stunComboCount} / やられ残り={stateTimer:F2}秒");
+    }
+
+    // ★追加：自分の攻撃が相手の仁王立ち（ガード）に防がれた時に、相手側から呼ばれる。
+    //   ガードされた側（攻撃者＝自分）を、指定秒数だけ行動不能（Stunned）にする。
+    //   通常の被弾（ApplyStun）と違い「連続ヒット数」は増やさない（被弾コンボではないため）。
+    //   すでにやられ状態の場合は、残り時間と指定秒数の長い方に延長する。
+    public void ApplyGuardedStun(float duration)
+    {
+        if (duration <= 0f) return; // 0秒設定ならスタンさせない
+
+        // 掴み・投げ・ダウン・死亡・必殺技（無敵）中は、やられ状態に置き換えない（ApplyStunと同じ除外条件）
+        if (currentState == PlayerState.Grabbed || currentState == PlayerState.Thrown
+            || currentState == PlayerState.KnockedDown || currentState == PlayerState.Dead
+            || currentState == PlayerState.Special) return;
+        if (currentState == PlayerState.Throw && grabbedTarget != null) return; // 相手を掴んでいる最中
+
+        if (currentState == PlayerState.Stunned)
+        {
+            stateTimer = Mathf.Max(stateTimer, duration);
+        }
+        else
+        {
+            EnterStunned(duration);
+        }
+
+        DLog($"[{PlayerName}] 相手の仁王立ちガードに防がれ、{duration:F2}秒スタン（残り{stateTimer:F2}秒）");
     }
 
     // 実行中の行動を中断してやられ状態に入る
@@ -2049,6 +2212,7 @@ public class Player : MonoBehaviour
             currentAttackMissDuration = upKickMissDuration;
             animator.SetTrigger("UpKick");
             DLog($"[{PlayerName}] UpKick発動：Triggerを立てました（moveInput.y={moveInput.y:F2}）");
+            DebugUpKickAnimator(); // ★デバッグ：Animatorが実際にどのステートへ遷移したかを確認する
             RightFoot.enabled = true;
             RightLeg.enabled = true;
 
@@ -2070,6 +2234,41 @@ public class Player : MonoBehaviour
             baseAtk = GetAttackPower(AttackType.Kick);
             UpdateAtkByGauge();
         }
+    }
+
+    // ★デバッグ：UpKickのTriggerを立てた後、Animatorが実際に何を再生しているかをログに出す。
+    //   ・"UpKick"パラメータがAnimatorに存在するか／Trigger型か
+    //   ・0.15秒後に再生されているクリップ名、遷移中かどうか、animator.speed、レイヤー数
+    //   enableDebugLogがONの時だけ動く。原因が分かったら呼び出しごと削除してよい。
+    void DebugUpKickAnimator()
+    {
+        if (!enableDebugLog || animator == null) return;
+
+        bool found = false;
+        foreach (var p in animator.parameters)
+        {
+            if (p.name == "UpKick")
+            {
+                found = true;
+                DLog($"[{PlayerName}] UpKickパラメータ確認：型={p.type}（Triggerなら正常）");
+            }
+        }
+        if (!found)
+        {
+            Debug.LogError($"[{PlayerName}] AnimatorにUpKickというパラメータが存在しません。名前の変更・削除がないか確認してください。", this);
+        }
+
+        StartCoroutine(LogAnimatorStateAfter(0.15f));
+    }
+
+    System.Collections.IEnumerator LogAnimatorStateAfter(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        var clips = animator.GetCurrentAnimatorClipInfo(0);
+        string clipName = clips.Length > 0 ? clips[0].clip.name : "(なし)";
+        float clipLength = clips.Length > 0 ? clips[0].clip.length : 0f;
+        var st = animator.GetCurrentAnimatorStateInfo(0);
+        DLog($"[{PlayerName}] UpKick発動{delay}秒後：再生中クリップ={clipName}（クリップ長={clipLength:F2}秒） / ステートのSpeed={st.speed} / Multiplier(パラメータ)の現在値={st.speedMultiplier} / 遷移中={animator.IsInTransition(0)} / animator.speed={animator.speed} / レイヤー数={animator.layerCount}");
     }
 
     // 仁王立ち（ガード）処理。ガードフラグを立て、演出用パーティクルを再生する
@@ -3081,6 +3280,11 @@ public class Player : MonoBehaviour
             // ガードされてもヒットはヒット（空振りではない）なので攻撃側に通知
             if (isEnemyPlayerAttack) enemyPlayer.NotifyAttackLanded();
             else if (enemy != null) enemy.NotifyAttackLanded();
+
+            // ★追加：ガード成功で、攻撃してきた相手を guardSuccessStunDuration 秒だけスタン（行動不能）にする。
+            //   ※NotifyAttackLanded()の後に呼ぶこと（命中によるクールダウン切替の後で、やられ状態へ上書きするため）。
+            //   ※CPU(Enemy)が攻撃者の場合は未対応（Enemy.cs側にApplyGuardedStun()相当が必要）。
+            if (isEnemyPlayerAttack) enemyPlayer.ApplyGuardedStun(guardSuccessStunDuration);
         }
         else
         {

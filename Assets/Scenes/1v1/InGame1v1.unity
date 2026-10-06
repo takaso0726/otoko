@@ -1278,14 +1278,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 1, g: 0, b: 0, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 29b21748313849c4d9f6bfb85ceba2ab, type: 3}
+  m_Sprite: {fileID: 21300000, guid: fc07dcd2832ebbe449c8cf8cb2495569, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1483,7 +1483,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 63dd1dbecefaf944588b6acdb1939498, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 5262904ee5c20d346b56991c553bd9e7, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -2922,14 +2922,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 0, g: 1, b: 0.92489046, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: e465424c6f57b264a89c50146b3cb2c1, type: 3}
+  m_Sprite: {fileID: 21300000, guid: fc07dcd2832ebbe449c8cf8cb2495569, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -3293,7 +3293,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 63dd1dbecefaf944588b6acdb1939498, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 5262904ee5c20d346b56991c553bd9e7, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -4802,6 +4802,8 @@ MonoBehaviour:
     - {fileID: 8300000, guid: 13fcb6648715d994ba42a6e4954aeba2, type: 3}
     - {fileID: 8300000, guid: 2ea70a91006a0a249bec395ad064cf7c, type: 3}
   seAudioSource: {fileID: 905618911}
+  seFadeOutDuration: 0.5
+  seProtectedSituations: 08000000
   seVolume: 1
   prioritySituations: 000000000100000002000000
   isChangebleParamName: isChangeble
@@ -4819,6 +4821,7 @@ MonoBehaviour:
   retreatDetectionDuration: 2.5
   retreatMinSpeed: 0.05
   retreatRetriggerCooldown: 0
+  enableSpecialDetection: 1
   enableIdleVariations: 1
   idleVariationIntervalRange: {x: 2, y: 5}
   reactionSafetyTimeout: 10
