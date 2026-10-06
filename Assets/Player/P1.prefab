@@ -1713,7 +1713,7 @@ MonoBehaviour:
   Player_status: 0
   guardDuration: 0.3
   throwDuration: 0.75
-  throwAtk: 200
+  throwAtk: 100
   throwStunDuration: 0.5
   escapeTimeAtZeroHp: 10
   escapeTimeAtFullHp: 2
