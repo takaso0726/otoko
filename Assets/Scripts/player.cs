@@ -1918,6 +1918,14 @@ public class Player : MonoBehaviour
     // ★追加：しゃがみの見た目（コライダー・アニメーター）を、スティック下入力の有無だけで同期する。
     //   currentStateが何であっても（攻撃中・ガード中等でも）この判定だけで見た目が決まるため、
     //   「入力を離したのにしゃがみっぱなしになる」不具合が起きなくなる。
+    // ★追加：右向き(+Z)か左向き(-Z)かを返す。
+    //   右入力＝Move(Vector3.forward)なので、+Z側を向いていれば右向きとみなす。
+    //   Slerpで回転途中でもZ成分の符号で判定できる。
+    bool IsFacingRight()
+    {
+        return transform.forward.z >= 0f;
+    }
+
     void SyncCrouchVisual(bool isCrouchInput)
     {
         if (isCrouchInput == isCrouchVisual) return; // 前フレームから変化なし
@@ -1926,6 +1934,12 @@ public class Player : MonoBehaviour
         {
             Player_Collider.height = crouchHeight;
             Player_Collider.center = crouchCenter;
+
+            // ★追加：しゃがむ瞬間の向きをAnimatorへ渡す（"Crouch"より先にセットすること）。
+            //   Animator側で CrouchFacingRight の値によって右向き/左向きのしゃがみアニメーションへ分岐させる。
+            bool facingRight = IsFacingRight();
+            animator.SetBool("CrouchFacingRight", facingRight);
+            DLog($"[{PlayerName}] しゃがみ開始：{(facingRight ? "右向き" : "左向き")}");
         }
         else
         {
@@ -2034,6 +2048,7 @@ public class Player : MonoBehaviour
             stateTimer = upKickMissDuration;
             currentAttackMissDuration = upKickMissDuration;
             animator.SetTrigger("UpKick");
+            DLog($"[{PlayerName}] UpKick発動：Triggerを立てました（moveInput.y={moveInput.y:F2}）");
             RightFoot.enabled = true;
             RightLeg.enabled = true;
 
@@ -2514,6 +2529,8 @@ public class Player : MonoBehaviour
         animator.ResetTrigger("Punch");
         animator.ResetTrigger("Flying-kick");
         animator.ResetTrigger("Kick");
+        animator.ResetTrigger("UpKick");   // ★追加：上キック/下キックのトリガー予約も消す
+        animator.ResetTrigger("DownKick");
         animator.ResetTrigger("Jump");
     }
 
