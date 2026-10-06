@@ -270,6 +270,11 @@ public class AudienceController : MonoBehaviour
              "必殺技の発動として検知している（漢気復活によるゲージ消費は除外する）。")]
     public bool enableSpecialDetection = true;
 
+    [Tooltip("必殺技を検知した瞬間に再生するSE。ここに1つ以上登録すると、Reactionsの「Special」行のSe Clipsより優先して使われる。\n" +
+             "複数登録した場合はランダムで1つ再生する（空要素=None を混ぜると、その回だけ鳴らさない）。\n" +
+             "空のままなら、Reactionsの「Special」行のSe Clipsを使う。")]
+    public AudioClip[] specialSeClips;
+
     [Header("待機中（Waiting）演出の間隔設定")]
     [Tooltip("何も状況が起きていない待機中に、AudienceSituation.Waitingの反応をランダム再生する機能を有効にするか")]
     public bool enableIdleVariations = false;
@@ -351,6 +356,10 @@ public class AudienceController : MonoBehaviour
 
     // targetPlayers[i]ごとの「直前フレームでの漢気ゲージ量」。必殺技発動（ゲージの一括消費）の検知に使う。
     private float[] previousKankiGauges;
+
+    // 監視対象Playerの再チェック用（Playerがゲーム開始後に生成・差し替えされても追従するため）
+    private float targetResolveTimer;
+    private bool autoFindWarned;
 
     // 直近でガードインパクト(仁王立ちブロック)が発生したフレーム番号。
     // GameMNG.OnPlayerHpReduced由来のダメージイベントが同じフレームで来た場合、
@@ -453,30 +462,8 @@ public class AudienceController : MonoBehaviour
 
     void Start()
     {
-        // GameMNGが設定されていれば、p1・p2を自動的に監視対象へ加える
-        // （targetPlayersに直接手動登録したものがあればそちらも維持しつつ重複は避ける）
-        if (gameMNG != null)
-        {
-            var list = new List<Player>(targetPlayers ?? new Player[0]);
-            if (gameMNG.p1 != null && !list.Contains(gameMNG.p1)) list.Add(gameMNG.p1);
-            if (gameMNG.p2 != null && !list.Contains(gameMNG.p2)) list.Add(gameMNG.p2);
-            targetPlayers = list.ToArray();
-        }
-
-        previousStatus = new Player.Status[targetPlayers.Length];
-        previousPlayerPositions = new Vector3[targetPlayers.Length];
-        retreatTimers = new float[targetPlayers.Length];
-        retreatCooldownTimers = new float[targetPlayers.Length];
-        previousKankiGauges = new float[targetPlayers.Length];
-        for (int i = 0; i < targetPlayers.Length; i++)
-        {
-            if (targetPlayers[i] != null)
-            {
-                previousKankiGauges[i] = targetPlayers[i].GetKankiGauge();
-                previousStatus[i] = targetPlayers[i].Player_status;
-                previousPlayerPositions[i] = targetPlayers[i].transform.position;
-            }
-        }
+        // 監視対象のPlayerを確定する（prefabアセットは除外し、シーン上の実体だけを使う）
+        ResolveTargetPlayers(true);
 
         // audienceAnimators(Inspector設定)から、キャラごとの状態管理オブジェクトを構築する。
         // nullが混ざっていても無視して続行する。
@@ -512,6 +499,46 @@ public class AudienceController : MonoBehaviour
                     transform = tf,
                     facingYawJitter = UnityEngine.Random.Range(-faceCameraRandomYaw, faceCameraRandomYaw),
                 });
+            }
+        }
+
+        // ★起動時に1回だけ、SE・必殺技まわりの設定状況をConsoleへ出す（Enable Debug LogがOFFでも出る）。
+        //   「最新のスクリプトが動いているか」「SEの設定が読み込まれているか」の確認用。
+        {
+            int specialRowSeCount = 0;
+            bool hasSpecialRow = false;
+            if (reactions != null)
+            {
+                foreach (var r in reactions)
+                {
+                    if (r != null && r.situation == AudienceSituation.Special)
+                    {
+                        hasSpecialRow = true;
+                        specialRowSeCount += r.seClips != null ? r.seClips.Length : 0;
+                    }
+                }
+            }
+            Debug.Log($"[AudienceController] 起動確認({gameObject.name}): targetPlayers={targetPlayers.Length}体 / " +
+                      $"SE AudioSource={(seAudioSource != null ? seAudioSource.name : "未設定")} / " +
+                      $"Special検知={(enableSpecialDetection ? "ON" : "OFF")} / Special Se Clips={(specialSeClips != null ? specialSeClips.Length : 0)}個 / " +
+                      $"Reactionsのspecial行={(hasSpecialRow ? "あり(Se Clips " + specialRowSeCount + "個)" : "なし")} / " +
+                      $"Enable Debug Log={(enableDebugLog ? "ON" : "OFF")}");
+
+            // 監視対象の各Playerについて、必殺技の検知に使う値を出す。
+            // ・シーン上のオブジェクトか（Projectビューのprefabそのものを登録していると、動かない別物を見てしまい検知できない）
+            // ・Special Required Gauge / Special Gauge Cost（検知の判定に使う値）
+            for (int i = 0; i < targetPlayers.Length; i++)
+            {
+                var tp = targetPlayers[i];
+                if (tp == null)
+                {
+                    Debug.Log($"[AudienceController] 起動確認: targetPlayers[{i}] は未設定(None)です。");
+                    continue;
+                }
+                Debug.Log($"[AudienceController] 起動確認: targetPlayers[{i}] = {tp.name} / " +
+                          $"シーン上のオブジェクト={(tp.gameObject.scene.IsValid() ? "はい" : "いいえ(prefab等。これだと検知できません)")} / " +
+                          $"Special Required Gauge={tp.specialRequiredGauge:F1} / Special Gauge Cost={tp.specialGaugeCost:F1} / " +
+                          $"現在のゲージ={tp.GetKankiGauge():F1}");
             }
         }
 
@@ -570,8 +597,121 @@ public class AudienceController : MonoBehaviour
         }
     }
 
+    //-----------------------------------------------------------------------
+    // 監視対象Playerの確定
+    //-----------------------------------------------------------------------
+
+    // ProjectビューのprefabアセットをInspectorに登録してしまうと、ゲーム中に動いている実体とは別物なので
+    // ゲージ・状態・位置が一切変化せず、必殺技などの検知が働かない。そのため、シーン上の実体だけを使う。
+    static bool IsSceneObject(Player p)
+    {
+        return p != null && p.gameObject.scene.IsValid();
+    }
+
+    // 優先順位：
+    //  1. targetPlayersに登録された、シーン上のPlayer（prefabアセットやNoneは除外）
+    //  2. gameMNG.p1 / p2（シーン上の実体のとき）
+    //  3. 上記で1体も無ければ、シーン上のPlayerを自動検出
+    // 結果が前回と変わった時だけ、targetPlayersを置き換えて追跡用の配列を作り直す。
+    void ResolveTargetPlayers(bool isStart)
+    {
+        var list = new List<Player>();
+
+        if (targetPlayers != null)
+        {
+            foreach (var tp in targetPlayers)
+            {
+                if (tp == null) continue;
+                if (!IsSceneObject(tp))
+                {
+                    if (isStart)
+                    {
+                        Debug.LogWarning($"[AudienceController] Target Playersの「{tp.name}」はProjectビューのprefabアセットで、ゲーム中に動く実体ではないため除外しました。" +
+                                         $"({gameObject.name}) HierarchyにあるPlayerオブジェクトを登録してください。");
+                    }
+                    continue;
+                }
+                if (!list.Contains(tp)) list.Add(tp);
+            }
+        }
+
+        if (gameMNG != null)
+        {
+            if (IsSceneObject(gameMNG.p1) && !list.Contains(gameMNG.p1)) list.Add(gameMNG.p1);
+            if (IsSceneObject(gameMNG.p2) && !list.Contains(gameMNG.p2)) list.Add(gameMNG.p2);
+        }
+
+        if (list.Count == 0)
+        {
+#if UNITY_2022_2_OR_NEWER
+            var found = FindObjectsByType<Player>(FindObjectsSortMode.None);
+#else
+            var found = FindObjectsOfType<Player>();
+#endif
+            foreach (var f in found)
+            {
+                if (IsSceneObject(f) && !list.Contains(f)) list.Add(f);
+            }
+
+            if (list.Count > 0 && !autoFindWarned)
+            {
+                autoFindWarned = true;
+                Debug.LogWarning($"[AudienceController] Target Players/Game MNGに有効なPlayerが無いため、シーン上のPlayerを自動検出しました（{list.Count}体）。" +
+                                 $"({gameObject.name}) Inspectorで Target Players にHierarchyのPlayerを設定してください。");
+            }
+        }
+
+        // 前回と同じ構成なら何もしない
+        if (targetPlayers != null && targetPlayers.Length == list.Count)
+        {
+            bool same = true;
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (targetPlayers[i] != list[i]) { same = false; break; }
+            }
+            if (same) return;
+        }
+
+        targetPlayers = list.ToArray();
+        InitTargetTracking();
+
+        if (!isStart)
+        {
+            var names = new List<string>();
+            foreach (var tp in targetPlayers) names.Add(tp != null ? tp.name : "None");
+            DLog($"[AudienceController] 監視対象のPlayerを更新しました: {targetPlayers.Length}体 ({string.Join(", ", names)})");
+        }
+    }
+
+    // targetPlayersの構成に合わせて、状態・位置・ゲージなどの追跡用配列を作り直す
+    void InitTargetTracking()
+    {
+        previousStatus = new Player.Status[targetPlayers.Length];
+        previousPlayerPositions = new Vector3[targetPlayers.Length];
+        retreatTimers = new float[targetPlayers.Length];
+        retreatCooldownTimers = new float[targetPlayers.Length];
+        previousKankiGauges = new float[targetPlayers.Length];
+        for (int i = 0; i < targetPlayers.Length; i++)
+        {
+            if (targetPlayers[i] != null)
+            {
+                previousKankiGauges[i] = targetPlayers[i].GetKankiGauge();
+                previousStatus[i] = targetPlayers[i].Player_status;
+                previousPlayerPositions[i] = targetPlayers[i].transform.position;
+            }
+        }
+    }
+
     void Update()
     {
+        // 監視対象Playerを0.5秒ごとに再チェックする（変化があった時だけ内部状態を作り直す）
+        targetResolveTimer -= Time.unscaledDeltaTime;
+        if (targetResolveTimer <= 0f)
+        {
+            targetResolveTimer = 0.5f;
+            ResolveTargetPlayers(false);
+        }
+
         for (int i = 0; i < targetPlayers.Length; i++)
         {
             Player p = targetPlayers[i];
@@ -900,9 +1040,17 @@ public class AudienceController : MonoBehaviour
     void PlaySituationSE(AudienceSituation situation)
     {
         if (seMap == null) BuildSeMap();
-        if (!seMap.TryGetValue(situation, out var clips) || clips == null || clips.Length == 0)
+        seMap.TryGetValue(situation, out var clips);
+
+        // 必殺技専用のSE欄に登録があれば、Reactionsの「Special」行よりそちらを優先する
+        if (situation == AudienceSituation.Special && specialSeClips != null && specialSeClips.Length > 0)
         {
-            DLog($"[AudienceController] SE({situation})：Reactionsにこの状況の行が無い、またはSe Clipsが空のため鳴らしません。");
+            clips = specialSeClips;
+        }
+
+        if (clips == null || clips.Length == 0)
+        {
+            DLog($"[AudienceController] SE({situation})：Reactionsにこの状況の行が無い、またはSe Clips(必殺技はSpecial Se Clipsも)が空のため鳴らしません。");
             return;
         }
 

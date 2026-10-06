@@ -4775,37 +4775,19 @@ MonoBehaviour:
   cameraController: {fileID: 330585548}
   bigCheerComboThreshold: 3
   reactions:
-  - situation: 0
-    clipReactions: 03000000
-    seClips: []
   - situation: 1
-    clipReactions: 01000000
-    seClips: []
-  - situation: 2
-    clipReactions: 01000000
-    seClips: []
-  - situation: 3
-    clipReactions: 01000000
-    seClips: []
-  - situation: 4
-    clipReactions: 0a00000009000000
-    seClips: []
-  - situation: 5
     clipReactions: 03000000
-    seClips: []
-  - situation: 6
-    clipReactions: 0300000002000000
-    seClips: []
-  - situation: 7
-    clipReactions: 080000000400000007000000
     seClips:
-    - {fileID: 8300000, guid: 13fcb6648715d994ba42a6e4954aeba2, type: 3}
-    - {fileID: 8300000, guid: 2ea70a91006a0a249bec395ad064cf7c, type: 3}
+    - {fileID: 8300000, guid: 9b55e4768b577174399dd5e41851e504, type: 3}
+  - situation: 1
+    clipReactions: 03000000
+    seClips:
+    - {fileID: 8300000, guid: 9b55e4768b577174399dd5e41851e504, type: 3}
   seAudioSource: {fileID: 905618911}
   seFadeOutDuration: 0.5
   seProtectedSituations: 08000000
   seVolume: 1
-  prioritySituations: 000000000100000002000000
+  prioritySituations: 0800000001000000
   isChangebleParamName: isChangeble
   goClapParamName: goClap
   goCoolParamName: goCool
@@ -4832,7 +4814,7 @@ MonoBehaviour:
   faceCameraTurnSpeed: 180
   faceCameraYawOffset: 0
   faceCameraRandomYaw: 0
-  enableDebugLog: 0
+  enableDebugLog: 1
 --- !u!4 &1569311133
 Transform:
   m_ObjectHideFlags: 0
