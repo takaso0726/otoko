@@ -457,9 +457,10 @@ MonoBehaviour:
   faceCameraYawOffset: 0
   debugForceWinner: 0
   requiredHits: 3
+  blockOtherInput: 1
   blinkInterval: 0.4
   hitAnyButtonTextDuration: 5
-  transitionDelay: 60
+  transitionDelay: 10
   nextSceneName: Title
 --- !u!4 &119570595
 Transform:
