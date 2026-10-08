@@ -144,6 +144,13 @@ public class GameInputManager : MonoBehaviour
             Player2Instance = SpawnPrefab(
                 debugPlayer2Prefab != null ? debugPlayer2Prefab : fallbackPrefab,
                 player2SpawnPoint, "2P", 1, player2ControlScheme, GetP2Devices());
+
+            // 結果画面で「勝者が使っていたキャラ」を出せるよう、実際に生成したキャラ名を記録する
+            // （デバッグ生成ではセレクト結果が無いため、プレハブから逆引きする）
+            MatchCharacters.Player1Name =
+                ResolveCharacterName(debugPlayer1Prefab != null ? debugPlayer1Prefab : fallbackPrefab);
+            MatchCharacters.Player2Name =
+                ResolveCharacterName(debugPlayer2Prefab != null ? debugPlayer2Prefab : fallbackPrefab);
         }
         else
         {
@@ -154,6 +161,11 @@ public class GameInputManager : MonoBehaviour
             Player2Instance = SpawnFor(
                 CharacterSelectController.CharacterSelectionResult.Player2CharacterName,
                 player2SpawnPoint, "2P", 1, player2ControlScheme, GetP2Devices());
+
+            MatchCharacters.Player1Name =
+                CharacterSelectController.CharacterSelectionResult.Player1CharacterName;
+            MatchCharacters.Player2Name =
+                CharacterSelectController.CharacterSelectionResult.Player2CharacterName;
         }
 
         LinkOpponents(Player1Instance, Player2Instance);
@@ -294,6 +306,22 @@ public class GameInputManager : MonoBehaviour
         return pi.gameObject;
     }
 
+    // プレハブからキャラ名を逆引きする（対応表に無ければプレハブ名を返す）
+    string ResolveCharacterName(GameObject prefab)
+    {
+        if (prefab == null) return "";
+
+        if (characterPrefabs != null)
+        {
+            foreach (var entry in characterPrefabs)
+            {
+                if (entry != null && entry.prefab == prefab)
+                    return entry.characterName;
+            }
+        }
+        return prefab.name;
+    }
+
     GameObject FindPrefab(string characterName)
     {
         if (string.IsNullOrEmpty(characterName) || characterPrefabs == null) return null;
@@ -359,4 +387,14 @@ public class GameInputManager : MonoBehaviour
             ? new InputDevice[] { Gamepad.all[1] }
             : new InputDevice[0];
     }
+}
+
+/// <summary>
+/// インゲームで実際に生成された1P/2Pのキャラ名の記録（結果画面で勝者のキャラを出すために使う）。
+/// 通常のセレクト経由でも、F9のデバッグ生成でも、生成時に GameInputManager が書き込む。
+/// </summary>
+public static class MatchCharacters
+{
+    public static string Player1Name = "";
+    public static string Player2Name = "";
 }

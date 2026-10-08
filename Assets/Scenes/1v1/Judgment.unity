@@ -153,7 +153,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: -100, y: -90}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &10186380
@@ -185,8 +185,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294967295
-  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+    rgba: 4278202101
+  m_fontColor: {r: 0.9622642, g: 0.18227367, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -203,8 +203,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 100
-  m_fontSizeBase: 100
+  m_fontSize: 200
+  m_fontSizeBase: 200
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -242,7 +242,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_margin: {x: 0, y: -179.60995, z: -210.70572, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -439,9 +439,27 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  timedTexts:
+  - text: {fileID: 10186380}
+    hideAfterSeconds: 3
+  winnerCharacters:
+  - characterName: Player1
+    displayObject: {fileID: 6758519040437653269, guid: aa90d0cad5f0e2e49a621f84ddd6fc4d, type: 3}
+  - characterName: Player2
+    displayObject: {fileID: 5939530159737485577, guid: c5323318139c20442940e84b82dfc630, type: 3}
+  winnerSpawnPoint: {fileID: 865107448}
+  fallbackWinnerDisplay: {fileID: 0}
+  winnerAppearDelay: 3.5
+  winnerPopDuration: 0
+  winnerAppearSE: {fileID: 0}
+  faceCameraOnAppear: 1
+  faceTargetCamera: {fileID: 816588688}
+  faceCameraYawOffset: 0
+  debugForceWinner: 0
   requiredHits: 3
   blinkInterval: 0.4
-  transitionDelay: 0.7
+  hitAnyButtonTextDuration: 5
+  transitionDelay: 60
   nextSceneName: Title
 --- !u!4 &119570595
 Transform:
@@ -801,7 +819,7 @@ Transform:
   m_GameObject: {fileID: 816588686}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -10}
+  m_LocalPosition: {x: 0, y: 2, z: -5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -851,6 +869,37 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!1 &865107447
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 865107448}
+  m_Layer: 0
+  m_Name: WinnerSpawn
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &865107448
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 865107447}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: 0.34397304, z: -0, w: 0.9389795}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 40.238, z: 0}
 --- !u!1 &1255295551
 GameObject:
   m_ObjectHideFlags: 0
@@ -976,3 +1025,4 @@ SceneRoots:
   - {fileID: 2113039392}
   - {fileID: 119570595}
   - {fileID: 216452530}
+  - {fileID: 865107448}
