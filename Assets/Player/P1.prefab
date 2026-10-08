@@ -1690,6 +1690,20 @@ MonoBehaviour:
   enableF7DebugKey: 1
   enableF8DebugKey: 1
   enableF10DebugKey: 1
+  enableArrowKeyAnimation: 0
+  enableDpadAnimation: 0
+  upArrowAnimation:
+    animationName: Anim-Up
+    useTrigger: 1
+  leftArrowAnimation:
+    animationName: Anim-Left
+    useTrigger: 1
+  rightArrowAnimation:
+    animationName: Anim-Right
+    useTrigger: 1
+  downArrowAnimation:
+    animationName: Anim-Down
+    useTrigger: 1
   PlayerName: P1
   PLayerTagName: 
   moveSpeed: 3
@@ -1754,7 +1768,7 @@ MonoBehaviour:
     upSpeed: 5
   kickAtk: 30
   kickMissDuration: 0.5
-  kickHitDuration: 0.6
+  kickHitDuration: 0.5
   kickStunDuration: 0.67
   kickHitStopDuration: 0.08
   kickKnockback:
