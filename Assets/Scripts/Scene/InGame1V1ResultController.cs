@@ -109,6 +109,8 @@ public class InGame1V1ResultController : MonoBehaviour
     [Header("設定")]
     [Tooltip("画面が割れてシーン遷移するまでに必要なボタン連打回数。キーボード／ゲームパッド／マウスのどのボタンでも1回と数える。")]
     [SerializeField] int requiredHits = 3;          // 遷移に必要な連打回数
+    [Tooltip("ONにすると、この画面の間は「ボタン連打によるシーン遷移」以外の入力操作（UI操作・キャラ操作など、Input Systemのアクション経由のもの）を全て無効にする。画面を離れる時に元に戻す。")]
+    [SerializeField] bool blockOtherInput = true;   // 連打以外の操作を無効にするか
     [Tooltip("「HIT ANY BUTTON」の文字が点滅する間隔（秒）。")]
     [SerializeField] float blinkInterval = 0.4f;    // 文字の点滅間隔
     [Tooltip("「HIT ANY BUTTON」の文字が、結果画面に入ってから何秒後に消えるか。0以下なら消えずに、画面が割れる演出が始まるまで点滅し続ける。\n消えた後もボタン連打のカウントは続く。")]
@@ -127,6 +129,9 @@ public class InGame1V1ResultController : MonoBehaviour
     readonly System.Collections.Generic.List<Coroutine> crackFadeRoutines = new System.Collections.Generic.List<Coroutine>();
     SpriteRenderer[] crackRenderers; // crackStageSpritesから自動生成する表示用SpriteRenderer（内部管理）
     Coroutine winnerRoutine;
+    // 連打以外の入力を止めるために、こちらが無効化したアクション（画面を離れる時に元に戻す）
+    readonly System.Collections.Generic.List<InputAction> blockedActions = new System.Collections.Generic.List<InputAction>();
+    readonly System.Collections.Generic.List<InputAction> tmpActions = new System.Collections.Generic.List<InputAction>();
     GameObject winnerInstance; // Prefabから生成した勝者キャラ（再入場時に破棄する）
     // シーン内オブジェクトの元の大きさ（出現演出で0に縮めるため、あらかじめ保存しておく）
     readonly System.Collections.Generic.Dictionary<GameObject, Vector3> sceneDisplayBaseScales =
@@ -183,6 +188,13 @@ public class InGame1V1ResultController : MonoBehaviour
         // 「何らかのボタンが押された」を検知（キーボード／ゲームパッド／マウス共通）
         anyButtonListener = InputSystem.onAnyButtonPress.Call(OnAnyButtonPressed);
 
+        // 連打（onAnyButtonPress＝デバイス入力を直接監視）以外の、アクション経由の入力を全て止める
+        if (blockOtherInput)
+        {
+            BlockOtherInput();
+            StartCoroutine(KeepBlockingOtherInput());
+        }
+
         if (blinkRoutine != null) StopCoroutine(blinkRoutine);
         blinkRoutine = StartCoroutine(BlinkText());
 
@@ -231,6 +243,53 @@ public class InGame1V1ResultController : MonoBehaviour
     {
         anyButtonListener?.Dispose();
         anyButtonListener = null;
+
+        RestoreBlockedInput();
+    }
+
+    // 現在有効なInput Systemのアクションを全て無効にする（UI操作・キャラ操作など）。
+    // 無効にしたアクションは記録しておき、画面を離れる時にRestoreBlockedInputで元に戻す。
+    // ※ onAnyButtonPress（連打の検知）はアクションを使わないので、これで止まることはない。
+    void BlockOtherInput()
+    {
+        tmpActions.Clear();
+        if (InputSystem.ListEnabledActions(tmpActions) == 0) return;
+
+        foreach (var action in tmpActions)
+        {
+            if (!blockedActions.Contains(action)) blockedActions.Add(action);
+        }
+        InputSystem.DisableAllEnabledActions();
+    }
+
+    // 他のオブジェクトが後から（OnEnable／Start／デバイス抜き差しなどで）アクションを有効にしても、
+    // 毎フレーム見張って無効にし直す。
+    IEnumerator KeepBlockingOtherInput()
+    {
+        while (true)
+        {
+            yield return null;
+            BlockOtherInput();
+        }
+    }
+
+    // BlockOtherInputで無効にしたアクションを元に戻す。
+    // シーン遷移で既に破棄されたオブジェクトのアクションは、有効化せず飛ばす。
+    void RestoreBlockedInput()
+    {
+        foreach (var action in blockedActions)
+        {
+            try
+            {
+                if (action.actionMap != null && action.actionMap.asset == null) continue; // 破棄済み
+                action.Enable();
+            }
+            catch (System.Exception)
+            {
+                // 破棄済みなどで有効化できないものは無視する
+            }
+        }
+        blockedActions.Clear();
     }
 
     void OnAnyButtonPressed(InputControl control)
