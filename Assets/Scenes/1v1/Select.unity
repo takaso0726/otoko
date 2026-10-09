@@ -1037,11 +1037,6 @@ MonoBehaviour:
     selectableBy: 2
     portraitPrefab: {fileID: 5939530159737485577, guid: f254ac76668bacc4aaea9cf843b98b83, type: 3}
     nameImage: {fileID: 21300000, guid: 6d94763c859627644bbdfd0c515465d1, type: 3}
-  - characterName: Rikishi
-    anchor: {fileID: 802211629}
-    selectableBy: 0
-    portraitPrefab: {fileID: 0}
-    nameImage: {fileID: 0}
   player1:
     playerName: Player1
     cursor: {fileID: 1317837554}
