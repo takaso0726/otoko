@@ -68,8 +68,9 @@ public class CharacterSelectController : MonoBehaviour
         [Tooltip("このキャラを選べるプレイヤー。例: 「Player1」というキャラは Player1Only、「Player2」は Player2Only にすると、それぞれ1P・2Pだけが選べる")]
         public SelectablePlayer selectableBy = SelectablePlayer.Both;
 
-        [Header("ドアップ画像")]
-        public Sprite portrait;       // カーソルを合わせた時に表示するドアップ画像（1P・2P共通）
+        [Header("ドアップ表示")]
+        [Tooltip("カーソルを合わせた時に表示するドアップ用プレハブ（1P・2P共通）。各プレイヤーの portraitRoot の子として生成される。Image/アニメーション/Spine等、中身は自由")]
+        public GameObject portraitPrefab;
 
         [Header("名前表示（画像）")]
         public Sprite nameImage;      // キャラ名を表す画像（ロゴ・ロゴタイプ等）。選択中にnameImageObjectへ反映する
@@ -83,12 +84,22 @@ public class CharacterSelectController : MonoBehaviour
         public GameObject readyMark;   // 決定後に表示する「READY」表示（Inspectorで非アクティブにしておく。1Pと2Pで必ず別々のオブジェクトを割り当てること）
         [Tooltip("READYマークを選択キャラのアンカー位置からどれだけずらすか。1Pと2Pで違う値にしておくと、同じキャラを選んでも重ならず両方見える（例: 1P=(-40,0) / 2P=(40,0)）")]
         public Vector2 readyMarkOffset; // ScreenSpace-Overlayならピクセル単位
-        public Image portraitImage;    // 選択中キャラのドアップ表示用（1Pは画面左、2Pは画面右に配置しておく）
+        [Header("ドアップ表示位置")]
+        [Tooltip("ドアップ用プレハブを映す場所（親）。UIならCanvas内のRectTransform、3Dならシーン内の空オブジェクトなど、どのTransformでもOK。1Pと2Pで別々の場所を指定する")]
+        public Transform portraitRoot;
+        [Tooltip("portraitRoot の中心からのズレ。UIプレハブ(RectTransform)ならanchoredPosition、それ以外はlocalPosition。0なら中心にぴったり配置")]
+        public Vector3 portraitOffset = Vector3.zero;
+        [Tooltip("ドアップの拡大率。プレハブ自身のスケールに掛け算される（1=等倍、1.5=1.5倍）")]
+        public float portraitScale = 1f;
         public Image nameImageObject;  // 選択中キャラの名前画像表示用（未設定なら何もしない）
         public int startIndex;         // このプレイヤーの初期カーソル位置（characters配列のインデックス）
 
         [HideInInspector] public int currentIndex;   // characters配列内でのカーソル位置（グローバルインデックス）
         [HideInInspector] public bool decided;
+
+        // キャラのインデックス → 生成済みドアッププレハブ。毎回Instantiate/Destroyせず、表示切り替えで再利用する
+        [System.NonSerialized] public Dictionary<int, GameObject> portraitInstances;
+        [System.NonSerialized] public GameObject currentPortrait;
     }
 
     [Header("キャラクター一覧（グリッド順）")]
@@ -360,7 +371,7 @@ public class CharacterSelectController : MonoBehaviour
 
     // カーソルが乗っているキャラクターのドアップ画像・名前表示を、そのプレイヤー専用のUIに反映する
     // （1P用UIは画面左、2P用UIは画面右のRectTransformに配置しておく想定）
-    // ドアップ画像は1P・2P共通の portrait を使用する。
+    // ドアップ表示は1P・2P共通の portraitPrefab を使用し、プレイヤーごとに別インスタンスを生成する。
     void UpdateSelectionDisplay(PlayerSelector p, int playerNumber)
     {
         if (p == null) return;
@@ -368,15 +379,7 @@ public class CharacterSelectController : MonoBehaviour
 
         var entry = characters[p.currentIndex];
 
-        if (p.portraitImage != null)
-        {
-            Sprite sprite = entry.portrait;
-
-            p.portraitImage.sprite = sprite;
-
-            // portrait未設定のキャラの場合はImageを非表示にして「空の白い四角」が出ないようにする
-            p.portraitImage.enabled = sprite != null;
-        }
+        ShowPortrait(p, p.currentIndex);
 
         if (p.nameImageObject != null)
         {
@@ -386,6 +389,58 @@ public class CharacterSelectController : MonoBehaviour
             // nameImage未設定のキャラの場合はImageを非表示にして「空の白い四角」が出ないようにする
             p.nameImageObject.enabled = nameSprite != null;
         }
+    }
+
+    // 選択中キャラのドアップ用プレハブを表示する。
+    // 初回はportraitRootの子として生成し、2回目以降は生成済みインスタンスのアクティブ切り替えだけを行う。
+    void ShowPortrait(PlayerSelector p, int characterIndex)
+    {
+        if (p.portraitRoot == null) return;
+
+        // 前に表示していたものは非表示にする（Unity的にnull＝破棄済みの場合は何もしない）
+        if (p.currentPortrait != null)
+        {
+            p.currentPortrait.SetActive(false);
+            p.currentPortrait = null;
+        }
+
+        var prefab = characters[characterIndex].portraitPrefab;
+        if (prefab == null) return; // 未設定のキャラは何も表示しない
+
+        if (p.portraitInstances == null)
+        {
+            p.portraitInstances = new Dictionary<int, GameObject>();
+        }
+
+        // 破棄済み（親ごとDestroyされた等）のキャッシュが残っていたら作り直す
+        if (!p.portraitInstances.TryGetValue(characterIndex, out var instance) || instance == null)
+        {
+            instance = Instantiate(prefab, p.portraitRoot, false);
+            PlacePortrait(instance, p);
+            p.portraitInstances[characterIndex] = instance;
+        }
+
+        instance.SetActive(true);
+        p.currentPortrait = instance;
+    }
+
+    // 生成したドアッププレハブを portraitRoot の中心（＋offset）に配置し、拡大率を反映する。
+    // プレハブ自身の位置は上書きされるが、回転とスケールはプレハブの設定を活かす。
+    void PlacePortrait(GameObject instance, PlayerSelector p)
+    {
+        var t = instance.transform;
+
+        if (t is RectTransform rt)
+        {
+            rt.anchoredPosition3D = p.portraitOffset;
+        }
+        else
+        {
+            t.localPosition = p.portraitOffset;
+        }
+
+        float scale = p.portraitScale > 0f ? p.portraitScale : 1f;
+        t.localScale = t.localScale * scale;
     }
 
     // AudioClipがInspectorで未設定の場合にPlayOneShot(null)警告が出るのを防ぐ
