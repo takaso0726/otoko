@@ -130,6 +130,10 @@ public class InGame1V1ResultController : MonoBehaviour
         public string label;
         [Tooltip("遷移先のシーン名。Build Settingsに登録されている必要がある。ゲーム終了の項目は \"QUIT\" にする。")]
         public string sceneToLoad;
+        [Tooltip("この項目のアイコン本体のオブジェクト。Icon Anchorを指定した場合、メニューが出る時にこのオブジェクトがIcon Anchorの位置へ移動する。")]
+        public Transform icon;
+        [Tooltip("このアイコンを表示する位置を決める空オブジェクト。未設定なら、Iconをシーンに置いた位置のまま表示する。\n※UI（Canvas内）のアイコンなら、同じCanvas内に置いたRectTransformを指定すること。")]
+        public Transform iconAnchor;
         [Tooltip("選択中に光らせる、アイコンの外側に重ねて配置したアウトライン用オブジェクト（Imageなど）。")]
         public GameObject glowOutline;
     }
@@ -549,10 +553,30 @@ public class InGame1V1ResultController : MonoBehaviour
         if (hitAnyButtonText != null) hitAnyButtonText.enabled = false;
         if (menuRoot != null) menuRoot.SetActive(true);
 
+        ApplyMenuIconAnchors();
+
         if (se == null) se = GetComponent<AudioSource>();
         if (se != null && menuOpenSE != null) se.PlayOneShot(menuOpenSE);
 
         SetMenuSelectedGlow(menuIndex);
+    }
+
+    // 各メニュー項目のアイコンを、Icon Anchor（空オブジェクト）の位置へ移動する。
+    // Glow Outlineがアイコンの子でない場合は、アイコンと同じ移動量だけ動かして位置関係を保つ。
+    void ApplyMenuIconAnchors()
+    {
+        if (menuItems == null) return;
+
+        foreach (var item in menuItems)
+        {
+            if (item == null || item.icon == null || item.iconAnchor == null) continue;
+
+            Vector3 delta = item.iconAnchor.position - item.icon.position;
+            item.icon.position += delta;
+
+            if (item.glowOutline != null && !item.glowOutline.transform.IsChildOf(item.icon))
+                item.glowOutline.transform.position += delta;
+        }
     }
 
     void Update()
