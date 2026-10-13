@@ -33,7 +33,7 @@ public class InGame1V1ResultController : MonoBehaviour
     [SerializeField] GameObject crackEffect;    // 最後のヒットで発動する「画面が割れる」パーティクル／アニメーション（Inspectorで非アクティブにしておく）
 
     [Header("ひび割れ演出（画像を上から順に表示。直前の画像は消える）")]
-    [Tooltip("ひび割れの各段階のSprite。配列の上（Element 0）から順に1枚ずつフェード表示される。新しい画像のフェードインが完了すると、直前の画像は非表示になる。前半（Slow Stage Count枚）はCrack Stage Interval、後半はCrack Stage Interval Fastの間隔で表示する。各ひびごとのSEはCrack Stage SEsで指定する。\nボタン操作とは無関係に、シーンに入ってからの時間経過で進む。")]
+    [Tooltip("ひび割れの各段階のSprite。配列の上（Element 0）から順に1枚ずつフェード表示される。新しい画像のフェードインが完了すると、直前の画像は非表示になる。前半（Slow Stage Count枚）はCrack Stage Interval、後半はCrack Stage Interval Fastの間隔で表示する。各ひびごとのSEはCrack Stage SEsで指定する。\n【Use Attack Button For Cracksがオンの時】パンチ／キックが実際に出るたびに1枚ずつ進む（＝攻撃のクールタイムに合わせて切り替わる。下の間隔設定は使われない）。オフの時は、ボタン操作とは無関係に時間経過で進む。")]
     [SerializeField] Sprite[] crackStageSprites;  // ひびの段階Sprite。配列の並び順（上から順）に1枚ずつ表示していく
     [Tooltip("ひび割れの各段階（Crack Stage Sprites）が表示される瞬間に鳴らすSE。\n" +
              "Element番号がCrack Stage Spritesと対応する（Element 0 = 1枚目のひびの表示時に鳴る）。\n" +
@@ -107,7 +107,12 @@ public class InGame1V1ResultController : MonoBehaviour
     [SerializeField] int debugForceWinner = 0;
 
     [Header("設定")]
-    [Tooltip("画面が割れてシーン遷移するまでに必要なボタン連打回数。キーボード／ゲームパッド／マウスのどのボタンでも1回と数える。")]
+    [Tooltip("ONにすると、ひび割れは「パンチ／キックが実際に出るたびに1枚ずつ」表示され、直前の画像は消える。切り替わる間隔はPlayerの攻撃のクールダウン（Punch Miss Duration／Kick Miss Durationなど）に一致し、クールダウン中の連打は数えない。遷移に数えるのも攻撃が出た回数だけになる。\n" +
+             "※シーン内にPlayer（PlayerInput付き）が必要。Playerはこの画面ではリザルト画面モード（攻撃ボタン以外・移動は無効）になる。\n" +
+             "OFFにすると従来どおり、ひびは時間経過で自動表示し、どのボタンの連打でも遷移する。")]
+    [SerializeField] bool useAttackButtonForCracks = true;
+    [Tooltip("画面が割れてシーン遷移するまでに必要なボタン連打回数。キーボード／ゲームパッド／マウスのどのボタンでも1回と数える。\n" +
+             "【Use Attack Button For Cracksがオンでひび画像がある時】は使われない。最後のひび画像が出た後に攻撃を1回押すと遷移する。")]
     [SerializeField] int requiredHits = 3;          // 遷移に必要な連打回数
     [Tooltip("ONにすると、シーン遷移の連打としてゲームパッドのAボタン（下ボタン）だけを数える。OFFならキーボード／ゲームパッド／マウスのどのボタンでも1回と数える（キーボードで動作確認する時はOFF）。")]
     [SerializeField] bool aButtonOnly = true;       // 連打としてAボタンだけを数えるか
@@ -115,14 +120,48 @@ public class InGame1V1ResultController : MonoBehaviour
     [SerializeField] float blinkInterval = 0.4f;    // 文字の点滅間隔
     [Tooltip("「HIT ANY BUTTON」の文字が、結果画面に入ってから何秒後に消えるか。0以下なら消えずに、画面が割れる演出が始まるまで点滅し続ける。\n消えた後もボタン連打のカウントは続く。")]
     [SerializeField] float hitAnyButtonTextDuration = 5f; // 文字を表示しておく時間（秒）。0以下なら消さない
-    [Tooltip("画面が割れる演出が始まってから、次のシーンへ遷移するまでの待ち時間（秒）。")]
-    [SerializeField] float transitionDelay = 0.7f;  // 割れる演出後、シーン遷移までのウェイト
     [Tooltip("遷移先のシーン名。Build Settingsのシーン一覧に登録されている必要がある。")]
     [SerializeField] string nextSceneName = "Title"; // 遷移先シーン名
+
+    [System.Serializable]
+    public class ResultMenuItem
+    {
+        [Tooltip("項目名（管理用。画面には表示されない。例：もう一度戦う／キャラ選択へ／タイトルへ）")]
+        public string label;
+        [Tooltip("遷移先のシーン名。Build Settingsに登録されている必要がある。ゲーム終了の項目は \"QUIT\" にする。")]
+        public string sceneToLoad;
+        [Tooltip("選択中に光らせる、アイコンの外側に重ねて配置したアウトライン用オブジェクト（Imageなど）。")]
+        public GameObject glowOutline;
+    }
+
+    [Header("リザルトメニュー（指定回数目の攻撃でメニューを出し、選んだ項目のシーンへ遷移）")]
+    [Tooltip("メニュー項目の一覧（左から順に並べる）。1つ以上設定すると、遷移の仕方が「メニューで選んだ先へ」に変わる。空のままなら従来どおり、最後のひびの後の攻撃で Next Scene Name へ遷移する。")]
+    [SerializeField] ResultMenuItem[] menuItems;
+    [Tooltip("メニュー全体の親オブジェクト（各項目のアイコン等をまとめたもの）。Inspectorでは非アクティブにしておく。メニューが出る時にアクティブになる。")]
+    [SerializeField] GameObject menuRoot;
+    [Tooltip("何回目の攻撃（ボタン）でメニューを出すか。")]
+    [Min(1)]
+    [SerializeField] int menuOpenHitCount = 4;
+    [Tooltip("選択中アイコンの光の明滅の速さ。")]
+    [SerializeField] float menuGlowPulseSpeed = 3f;
+    [Tooltip("光の明滅の下限（0〜1）。")]
+    [SerializeField] float menuGlowMinAlpha = 0.4f;
+    [Tooltip("光の明滅の上限（0〜1）。")]
+    [SerializeField] float menuGlowMaxAlpha = 1f;
+    [Tooltip("メニューが出る時に鳴らすSE。未設定なら鳴らさない。")]
+    [SerializeField] AudioClip menuOpenSE;
+    [Tooltip("メニューの項目を切り替えた時のSE（「ドンッ」）。未設定なら鳴らさない。")]
+    [SerializeField] AudioClip menuMoveSE;
+    [Tooltip("メニューの項目を決定した時のSE（「バシィッ」）。未設定なら鳴らさない。鳴り終わるまで待ってから遷移する。")]
+    [SerializeField] AudioClip menuDecideSE;
 
     int hitCount;
     int revealedStageCount; // crackStageSpritesのうち、すでに表示済みの枚数
     bool isTransitioning;
+    bool menuOpen;            // リザルトメニューを表示中か
+    int menuIndex;            // メニューで選択中の項目
+    int menuOpenedFrame;      // メニューを開いたフレーム（開いた攻撃ボタンがそのまま決定にならないようにする）
+    Coroutine menuGlowRoutine;
     System.IDisposable anyButtonListener;
     Coroutine blinkRoutine;
     Coroutine crackAutoRevealRoutine;
@@ -158,6 +197,18 @@ public class InGame1V1ResultController : MonoBehaviour
         revealedStageCount = 0;
         isTransitioning = false;
 
+        // メニューも閉じた状態に戻す（再入場時に前回のメニューが残らないように）
+        menuOpen = false;
+        if (menuGlowRoutine != null) { StopCoroutine(menuGlowRoutine); menuGlowRoutine = null; }
+        if (menuRoot != null) menuRoot.SetActive(false);
+        if (menuItems != null)
+        {
+            foreach (var item in menuItems)
+            {
+                if (item != null && item.glowOutline != null) item.glowOutline.SetActive(false);
+            }
+        }
+
         if (crackEffect != null) crackEffect.SetActive(false);
         if (hitAnyButtonText != null) hitAnyButtonText.enabled = true;
 
@@ -182,15 +233,32 @@ public class InGame1V1ResultController : MonoBehaviour
             }
         }
 
-        // 「何らかのボタンが押された」を検知（キーボード／ゲームパッド／マウス共通）
-        anyButtonListener = InputSystem.onAnyButtonPress.Call(OnAnyButtonPressed);
+        // この画面にいるPlayerは、攻撃ボタン以外の操作・移動を無効にする（リザルト画面モード）
+        foreach (var player in FindObjectsByType<Player>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            player.SetResultMode(true);
+        }
+
+        if (useAttackButtonForCracks)
+        {
+            // パンチ／キックが実際に出た時だけ数える（クールダウン中の連打は数えない）
+            Player.ResultAttackPressed += OnResultAttackPressed;
+        }
+        else
+        {
+            // 「何らかのボタンが押された」を検知（キーボード／ゲームパッド／マウス共通）
+            anyButtonListener = InputSystem.onAnyButtonPress.Call(OnAnyButtonPressed);
+        }
 
         if (blinkRoutine != null) StopCoroutine(blinkRoutine);
         blinkRoutine = StartCoroutine(BlinkText());
 
-        // ひびはボタン操作と関係なく、時間経過で自動的に1段階ずつ進める
+        // 攻撃ボタンでひびを出さない設定の時だけ、ボタン操作と関係なく時間経過で自動的に1段階ずつ進める
         if (crackAutoRevealRoutine != null) StopCoroutine(crackAutoRevealRoutine);
-        crackAutoRevealRoutine = StartCoroutine(AutoRevealCrackStages());
+        if (!useAttackButtonForCracks)
+        {
+            crackAutoRevealRoutine = StartCoroutine(AutoRevealCrackStages());
+        }
 
         // 勝者キャラ：前回生成したものを破棄し、シーン内のキャラはいったん全て隠してから、勝者のキャラだけ出現させる
         if (winnerInstance != null)
@@ -231,6 +299,7 @@ public class InGame1V1ResultController : MonoBehaviour
 
     void OnDisable()
     {
+        Player.ResultAttackPressed -= OnResultAttackPressed;
         anyButtonListener?.Dispose();
         anyButtonListener = null;
     }
@@ -244,18 +313,79 @@ public class InGame1V1ResultController : MonoBehaviour
 
     void OnAnyButtonPressed(InputControl control)
     {
-        if (isTransitioning) return;
+        if (isTransitioning || menuOpen) return;
 
         // Aボタンのみ有効の設定なら、それ以外のボタンは連打として数えない
         if (aButtonOnly && !IsAButton(control)) return;
 
+        RegisterHit();
+    }
+
+    // Player（リザルト画面モード）が、パンチ／キックを実際に出したと通知してきた時に呼ばれる
+    // （攻撃のクールダウン中は通知されないので、ひびの切り替え間隔はPlayerの攻撃のクールダウンに一致する）
+    void OnResultAttackPressed(Player player)
+    {
+        if (isTransitioning || menuOpen) return;
+        RegisterHit();
+    }
+
+    // 1回分のヒットを数える。
+    // 【メニューあり（Menu Items設定済み）】
+    //   ・攻撃が出るたびに次のひびを1枚表示し、Menu Open Hit Count回目でメニューを出す。
+    //   ・遷移は、メニューで選んだ項目のシーンへ行う。
+    // 【メニューなし】
+    //   ・攻撃ボタンでひびを出す設定＋ひび画像ありの時：最後の画像が出た後に攻撃を1回押すと、次のシーンへ遷移する。
+    //   ・それ以外：Required Hits回の連打で遷移する。
+    void RegisterHit()
+    {
+        bool hasMenu = menuItems != null && menuItems.Length > 0;
+        bool hasStages = useAttackButtonForCracks && crackRenderers != null && crackRenderers.Length > 0;
+        bool allRevealed = hasStages && revealedStageCount >= crackRenderers.Length;
+
         hitCount++;
         if (se != null && hitSE != null) se.PlayOneShot(hitSE);
 
-        if (hitCount >= requiredHits)
+        if (hasMenu)
         {
-            StartCoroutine(PlayCrackAndTransition());
+            if (useAttackButtonForCracks) RevealNextCrackStage();
+            if (hitCount >= menuOpenHitCount) OpenMenu();
+            return;
         }
+
+        if (allRevealed)
+        {
+            PlayCrackAndTransition();
+            return;
+        }
+
+        if (useAttackButtonForCracks) RevealNextCrackStage();
+
+        if (!hasStages && hitCount >= requiredHits)
+        {
+            PlayCrackAndTransition();
+        }
+    }
+
+    // 次のひび画像を1枚フェード表示する。フェードイン完了で直前の画像が消える（常に最新の1枚だけが見える）。
+    // 連打が速くてフェード中に次が押されても、新しい画像のフェードが完了するたびに1つ前が消えていく。
+    // 全て出し切った後は、最後の画像のまま画面が割れるまで待つ。
+    void RevealNextCrackStage()
+    {
+        if (crackRenderers == null || crackRenderers.Length == 0) return;
+
+        int i = revealedStageCount;
+        if (i >= crackRenderers.Length) return;
+
+        SpriteRenderer img = crackRenderers[i];
+        SpriteRenderer prev = (i > 0) ? crackRenderers[i - 1] : null;
+
+        if (img != null)
+        {
+            crackFadeRoutines.Add(StartCoroutine(FadeInCrackImage(img, prev)));
+        }
+        revealedStageCount = i + 1;
+
+        PlayCrackStageSE(i);
     }
 
     // crackStageSprites（Spriteアセット）から、表示用のSpriteRendererを1回だけ自動生成する。
@@ -390,7 +520,7 @@ public class InGame1V1ResultController : MonoBehaviour
         }
     }
 
-    IEnumerator PlayCrackAndTransition()
+    void PlayCrackAndTransition()
     {
         isTransitioning = true;
 
@@ -400,9 +530,134 @@ public class InGame1V1ResultController : MonoBehaviour
         if (crackEffect != null) crackEffect.SetActive(true);
         if (se != null && crackSE != null) se.PlayOneShot(crackSE);
 
-        yield return new WaitForSeconds(transitionDelay);
-
         SceneManager.LoadScene(nextSceneName);
+    }
+
+    //=====================================================
+    // リザルトメニュー
+    //=====================================================
+
+    // メニューを出す。「HIT ANY BUTTON」は消し、以降は攻撃ボタンを連打として数えない。
+    void OpenMenu()
+    {
+        if (menuOpen || isTransitioning) return;
+
+        menuOpen = true;
+        menuOpenedFrame = Time.frameCount;
+        menuIndex = 0;
+
+        if (hitAnyButtonText != null) hitAnyButtonText.enabled = false;
+        if (menuRoot != null) menuRoot.SetActive(true);
+
+        if (se == null) se = GetComponent<AudioSource>();
+        if (se != null && menuOpenSE != null) se.PlayOneShot(menuOpenSE);
+
+        SetMenuSelectedGlow(menuIndex);
+    }
+
+    void Update()
+    {
+        if (!menuOpen || isTransitioning) return;
+
+        // メニューを開いたフレームは入力を受け付けない（開いた攻撃ボタンがそのまま決定にならないように）
+        if (Time.frameCount <= menuOpenedFrame) return;
+
+        int nav = ReadMenuHorizontalNav();
+        if (nav != 0) MoveMenuSelection(nav);
+
+        if (ReadMenuDecide()) DecideMenu();
+    }
+
+    // 左右入力（キーボード←→/A D、ゲームパッド十字キー／左スティック）。右が+1、左が-1。
+    int ReadMenuHorizontalNav()
+    {
+        if (Keyboard.current != null)
+        {
+            if (Keyboard.current.rightArrowKey.wasPressedThisFrame || Keyboard.current.dKey.wasPressedThisFrame) return 1;
+            if (Keyboard.current.leftArrowKey.wasPressedThisFrame || Keyboard.current.aKey.wasPressedThisFrame) return -1;
+        }
+        if (Gamepad.current != null)
+        {
+            if (Gamepad.current.dpad.right.wasPressedThisFrame || Gamepad.current.leftStick.right.wasPressedThisFrame) return 1;
+            if (Gamepad.current.dpad.left.wasPressedThisFrame || Gamepad.current.leftStick.left.wasPressedThisFrame) return -1;
+        }
+        return 0;
+    }
+
+    // 決定（Enterキー／ゲームパッドのAボタン）
+    bool ReadMenuDecide()
+    {
+        return (Keyboard.current != null && Keyboard.current.enterKey.wasPressedThisFrame)
+            || (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame);
+    }
+
+    void MoveMenuSelection(int dir)
+    {
+        menuIndex = (menuIndex + dir + menuItems.Length) % menuItems.Length;
+
+        if (se != null && menuMoveSE != null) se.PlayOneShot(menuMoveSE);
+        SetMenuSelectedGlow(menuIndex);
+    }
+
+    // 選択中の項目だけアウトラインを表示して明滅させ、他は非表示にする。
+    void SetMenuSelectedGlow(int selectedIndex)
+    {
+        for (int i = 0; i < menuItems.Length; i++)
+        {
+            var glow = menuItems[i] != null ? menuItems[i].glowOutline : null;
+            if (glow != null) glow.SetActive(i == selectedIndex);
+        }
+
+        if (menuGlowRoutine != null) StopCoroutine(menuGlowRoutine);
+        menuGlowRoutine = null;
+
+        var selectedGlow = menuItems[selectedIndex] != null ? menuItems[selectedIndex].glowOutline : null;
+        if (selectedGlow != null) menuGlowRoutine = StartCoroutine(MenuGlowPulse(selectedGlow));
+    }
+
+    // CanvasGroupのalphaで、選択中アイコンの光をゆっくり明滅させる（無ければ自動で追加する）。
+    IEnumerator MenuGlowPulse(GameObject glowObject)
+    {
+        var canvasGroup = glowObject.GetComponent<CanvasGroup>();
+        if (canvasGroup == null) canvasGroup = glowObject.AddComponent<CanvasGroup>();
+
+        while (true)
+        {
+            float t = (Mathf.Sin(Time.time * menuGlowPulseSpeed) + 1f) * 0.5f;
+            canvasGroup.alpha = Mathf.Lerp(menuGlowMinAlpha, menuGlowMaxAlpha, t);
+            yield return null;
+        }
+    }
+
+    // 選択中の項目を決定する。遷移先は、その項目のScene To Load。
+    void DecideMenu()
+    {
+        var item = menuItems[menuIndex];
+        if (item == null || string.IsNullOrEmpty(item.sceneToLoad)) return;
+
+        isTransitioning = true;
+        if (se != null && menuDecideSE != null) se.PlayOneShot(menuDecideSE);
+
+        StartCoroutine(LoadMenuSceneAfterSE(item.sceneToLoad));
+    }
+
+    // 決定SEが鳴り切る前にシーンが破棄されて音が切れないよう、SEの長さだけ待ってから遷移する。
+    IEnumerator LoadMenuSceneAfterSE(string sceneName)
+    {
+        float wait = (se != null && menuDecideSE != null) ? menuDecideSE.length : 0f;
+        if (wait > 0f) yield return new WaitForSeconds(wait);
+
+        if (sceneName == "QUIT")
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
+            yield break;
+        }
+
+        SceneManager.LoadScene(sceneName);
     }
 
     // 勝者が使っていたキャラの名前を、
@@ -560,7 +815,7 @@ public class InGame1V1ResultController : MonoBehaviour
 
         float elapsed = 0f;
 
-        while (!isTransitioning)
+        while (!isTransitioning && !menuOpen)
         {
             bool hasLimit = hitAnyButtonTextDuration > 0f;
             if (hasLimit && elapsed >= hitAnyButtonTextDuration) break;

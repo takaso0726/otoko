@@ -146,6 +146,59 @@ public class Player : MonoBehaviour
     [Header("移動設定")]
     public float moveSpeed = 3f;             // 移動速度
     public float turnSpeed = 15f;            // 向きを変える速さ
+
+    //=====================================================
+    // ★追加：自動向き合い設定
+    //   相手（対人戦はenemyPlayer／対CPU戦はenemy）の方向へ、常に自動で向きを変える。
+    //   ONの間は「移動方向を向く」処理を行わないため、後退する時も相手の方を向いたまま下がる。
+    //   向きはZ軸（P1/P2の間合いが変化する軸）だけで判定する。
+    //=====================================================
+    [Header("自動向き合い設定")]
+    [Tooltip("ONにすると、常に相手の方向へ自動で向きを変える（移動方向は向かない）。OFFにすると従来どおり移動方向を向く。")]
+    [SerializeField] bool enableAutoFacing = true;
+    [Tooltip("相手とのZ軸の距離がこの値より小さい時は向きを変えない（真横で重なった時に左右へ向きがブレ続けるのを防ぐ）。")]
+    [SerializeField] float autoFaceDeadZone = 0.05f;
+    [Tooltip("ONにすると、攻撃・投げ・必殺技の最中は向きを変えず、終わってから相手へ向き直す。OFF（既定）なら技の最中でも常に相手を向く。")]
+    [SerializeField] bool lockFacingDuringAction = false;
+
+    //=====================================================
+    // ★追加：リザルト画面モード
+    //   ONの間は、攻撃ボタン（パンチ／キック）以外の操作を受け付けず、移動も制限する。
+    //   ・スティック入力は無視（左右移動・しゃがみ・上下キックの分岐もすべて無効）
+    //   ・ジャンプ／仁王立ち／投げ／必殺技／L1は無効
+    //   ・被弾・ダメージ判定は行わない（攻撃は見た目だけ）
+    //   ・向きの自動変更、押しのけ合い、移動範囲のクランプも行わない（配置した位置のまま動かない）
+    //   パンチ／キックが実際に出るたびに ResultAttackPressed イベントが発行される（ひび割れ演出などが購読する）。
+    //   攻撃のクールダウン（攻撃モーション中）に押したボタンは無視され、イベントも発行されない。
+    //=====================================================
+    [Header("リザルト画面モード")]
+    [Tooltip("ONにすると、攻撃ボタン（パンチ／キック）以外の操作と移動を無効にする。通常はOFF。\n" +
+             "下のAuto Detect Result SceneがONなら、InGame1V1ResultControllerのあるシーンでは自動的にONになる。")]
+    [SerializeField] bool isResultMode = false;
+    [Tooltip("ONにすると、シーン内にInGame1V1ResultControllerがある時（＝リザルト画面）、自動でリザルト画面モードにする。")]
+    [SerializeField] bool autoDetectResultScene = true;
+
+    // リザルト画面モード中に、パンチ／キックが実際に出た瞬間（EnterPunch／EnterKick）に発行される。
+    // 攻撃のクールダウン中（攻撃モーション中）のボタン押下では発行されない＝発行間隔は攻撃のクールダウンに一致する。
+    public static event System.Action<Player> ResultAttackPressed;
+
+    public bool IsResultMode => isResultMode;
+
+    // リザルト画面モードのON/OFFを切り替える（InGame1V1ResultControllerからも呼ばれる）
+    public void SetResultMode(bool enable)
+    {
+        isResultMode = enable;
+        if (!enable) return;
+
+        // 入力の残りを消し、移動・しゃがみ状態からも抜けておく
+        moveInput = Vector2.zero;
+        ClearInputIntents();
+        if (currentState == PlayerState.Move || currentState == PlayerState.Crouch)
+        {
+            StopMoveAnimation();
+            currentState = PlayerState.Idle;
+        }
+    }
     [SerializeField] float moveInputThreshold = 0.03f;    // 左右移動と判定するスティックの入力量
     [SerializeField] float crouchInputThreshold = -0.43f; // しゃがみ／下キックと判定するスティックの下入力量
     [SerializeField] float upKickInputThreshold = 0.25f;  // 上キックと判定するスティックの上入力量
@@ -573,6 +626,8 @@ public class Player : MonoBehaviour
     enum MoveDirection { None, Forward, Backward }
     MoveDirection lastMoveDir = MoveDirection.None;
     int guardComboCount;             // 仁王立ちで連続して耐えた回数
+    bool autoFaceSnapped;            // ★追加：最初に相手を認識した時に、補間なしで即座に向き合わせたか
+    bool hasMoveBackwardParam;       // ★追加：Animatorに"MoveBackward"(Bool)が存在するか（存在する時だけ値を送る）
     // ★追加：F6キーでON/OFFする、常時仁王立ちデバッグモードの現在の状態
     private bool debugAlwaysGuard = false;
     bool rebornCamStarted;           // 根性復活のクローズアップカメラを開始済みか
@@ -893,6 +948,17 @@ public class Player : MonoBehaviour
         }
     }
 
+    // ★追加：リザルト画面（InGame1V1ResultControllerがあるシーン）なら、自動でリザルト画面モードにする
+    void Awake()
+    {
+        if (autoDetectResultScene && !isResultMode
+            && FindAnyObjectByType<InGame1V1ResultController>(FindObjectsInactive.Include) != null)
+        {
+            isResultMode = true;
+            DLog($"[{PlayerName}] リザルト画面を検知したため、リザルト画面モードで起動します");
+        }
+    }
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     // 各種コンポーネント・子オブジェクトの当たり判定の取得と初期化を行う
     void Start()
@@ -911,11 +977,25 @@ public class Player : MonoBehaviour
         animator = GetComponent<Animator>();
         se = GetComponent<AudioSource>();
 
+        // ★追加：後退用アニメーションの切り替えに使う"MoveBackward"(Bool)がAnimatorにあるか調べておく。
+        //   無い場合はSetBoolを呼ばない（毎フレーム警告が出るのを防ぐ）。
+        if (animator != null)
+        {
+            foreach (var param in animator.parameters)
+            {
+                if (param.name == "MoveBackward" && param.type == AnimatorControllerParameterType.Bool)
+                {
+                    hasMoveBackwardParam = true;
+                    break;
+                }
+            }
+        }
+
         // GameMNGを名前に依存しない方法で探してキャッシュしておく。
         // （オブジェクト名が"ManagerObject"や"GameMNG"でなくても正しく取得できるようにする）
         // 見つからない場合はここでハッキリ警告を出し、以降のNullReferenceExceptionを防ぐ。
         gameMNG = FindAnyObjectByType<GameMNG>();
-        if (gameMNG == null)
+        if (gameMNG == null && !isResultMode) // リザルト画面にはGameMNGが無いのが普通なのでエラーにしない
         {
             Debug.LogError("シーン内にGameMNGコンポーネントを持つGameObjectが見つかりません。" +
                 "配置し忘れ／非アクティブ状態になっていないか確認してください。");
@@ -992,7 +1072,8 @@ public class Player : MonoBehaviour
     // 左スティック：Move（継続的な値なので、押した/離したではなく現在値を保持するだけ）
     public void OnMove(InputValue value)
     {
-        moveInput = value.Get<Vector2>();
+        // ★追加：リザルト画面モード中はスティック入力をすべて無視する（移動・しゃがみ等を無効化）
+        moveInput = isResultMode ? Vector2.zero : value.Get<Vector2>();
     }
 
     // ★追加：ダウン中（HP<=0）の「根性復活」の連打を1回分カウントする。
@@ -1020,6 +1101,7 @@ public class Player : MonoBehaviour
     public void OnJump(InputValue value)
     {
         if (!value.isPressed) return;
+        if (isResultMode) return; // ★リザルト画面モード：攻撃ボタン以外は無効
 
         if (HP <= 0)
         {
@@ -1036,6 +1118,13 @@ public class Player : MonoBehaviour
     {
         if (!value.isPressed) return;
 
+        // ★リザルト画面モード：攻撃として受け付ける（通知は、実際に攻撃が出るEnterPunch内で行う）
+        if (isResultMode)
+        {
+            wantPunch = true;
+            return;
+        }
+
         if (HP <= 0)
         {
             RegisterMash(); // ダウン中は復活チャレンジの連打としてカウントするだけ
@@ -1051,6 +1140,13 @@ public class Player : MonoBehaviour
     {
         if (!value.isPressed) return;
 
+        // ★リザルト画面モード：攻撃として受け付ける（通知は、実際に攻撃が出るEnterKick内で行う）
+        if (isResultMode)
+        {
+            wantKick = true;
+            return;
+        }
+
         if (HP <= 0)
         {
             if (mashWithAnyButton) RegisterMash(); // ★どのボタンでもOKの設定がONの時だけ連打として数える
@@ -1065,6 +1161,7 @@ public class Player : MonoBehaviour
     public void OnStand(InputValue value)
     {
         if (!value.isPressed) return;
+        if (isResultMode) return; // ★リザルト画面モード：攻撃ボタン以外は無効
 
         if (HP <= 0)
         {
@@ -1080,6 +1177,7 @@ public class Player : MonoBehaviour
     public void OnThrow(InputValue value)
     {
         if (!value.isPressed) return;
+        if (isResultMode) return; // ★リザルト画面モード：攻撃ボタン以外は無効
 
         if (HP <= 0)
         {
@@ -1096,6 +1194,7 @@ public class Player : MonoBehaviour
     public void OnL1(InputValue value)
     {
         if (!value.isPressed) return;
+        if (isResultMode) return; // ★リザルト画面モード：攻撃ボタン以外は無効
 
         // ★追加：ダウン中（HP<=0）のL1は必殺技ではなく「漢気復活」の要求として扱う
         //   （OnPunchがダウン中は連打カウントになるのと同じ仕組み）
@@ -1121,7 +1220,7 @@ public class Player : MonoBehaviour
         MaintainKankiChargeEffect(); // ★追加：漢気ゲージ1本以上の間、追従エフェクトを出し続ける
         TickReviveBuff();            // ★追加：漢気復活後の攻撃力上昇の残り時間を消化する
         TickMashButtonVisual();      // ★追加：連打ボタン画像の押した／押していない切り替え
-        ResolveOpponentIfMissing();  // ★追加：プレハブ化・再配置等で相手(enemyPlayer/enemy)の参照が切れていたら自動で探し直す
+        if (!isResultMode) ResolveOpponentIfMissing();  // ★追加：プレハブ化・再配置等で相手(enemyPlayer/enemy)の参照が切れていたら自動で探し直す
         // ★修正：しゃがみの見た目（コライダー・アニメーター）は、
         //   currentState（状態機械）を経由せず、毎フレーム「スティック下入力の有無」だけで直接同期する。
         //   以前はEnterCrouch()内でcurrentStateとコライダー/アニメーターを同時に変更していたため、
@@ -1301,7 +1400,7 @@ public class Player : MonoBehaviour
         }
 
         // HP判定・死亡処理は、コントローラーの有無に関係なく常に実行する
-        if (HP <= 0)
+        if (HP <= 0 && !isResultMode) // ★リザルト画面モードではダウン／復活処理を行わない
         {
             // ★デバッグ：F4キーでダウン中／Dead中のキャラクターを強制的に復活させる
             //   対象キャラクターはInspectorのenableF4DebugKeyで選択する。
@@ -1349,7 +1448,7 @@ public class Player : MonoBehaviour
             return;
         }
 
-        HandleArrowKeyAnimation(); // ★追加：矢印キーによるアニメーション再生（自由に動ける状態の時のみ）
+        if (!isResultMode) HandleArrowKeyAnimation(); // ★追加：矢印キーによるアニメーション再生（自由に動ける状態の時のみ）
         bool isFree = currentState == PlayerState.Idle
                    || currentState == PlayerState.Move
                    || currentState == PlayerState.Crouch;
@@ -1371,6 +1470,10 @@ public class Player : MonoBehaviour
     //   Updateの最後ではなくLateUpdateで行うことで、物理演算(FixedUpdate)による移動分も確実に制限できる。
     void LateUpdate()
     {
+        // ★リザルト画面モード：向きの自動変更・押しのけ・位置クランプを行わず、配置した位置のまま動かさない
+        if (isResultMode) return;
+
+        AutoFaceOpponent(); // ★追加：常に相手の方向を向く
         ResolvePlayerOverlap();
         ClampPositionWithinBounds();
     }
@@ -2157,6 +2260,7 @@ public class Player : MonoBehaviour
     void StopMoveAnimation()
     {
         animator.SetBool("Move", false);
+        if (hasMoveBackwardParam) animator.SetBool("MoveBackward", false);
         lastMoveDir = MoveDirection.None;
     }
 
@@ -2188,7 +2292,14 @@ public class Player : MonoBehaviour
         currentState = PlayerState.Move;
         // ※Space.Worldを指定し、向きが変わっても常に世界座標の指定方向へ移動するようにする
         transform.Translate(worldDirection * actualMoveSpeed * Time.deltaTime, Space.World);
-        FaceDirection(worldDirection);
+
+        // ★変更：自動向き合いがONの間は、移動方向ではなく相手の方向を向く（LateUpdateのAutoFaceOpponentが担当）。
+        //   従来の「移動方向を向く」挙動は、自動向き合いをOFFにした時だけ使う。
+        if (!enableAutoFacing) FaceDirection(worldDirection);
+
+        // ★追加：相手から離れる方向（後退）かどうかをAnimatorへ伝える。
+        //   相手の方を向いたまま下がるため、Animator側で後退モーションへ分岐させたい場合に使う（任意）。
+        if (hasMoveBackwardParam) animator.SetBool("MoveBackward", IsRetreating(worldDirection));
 
         // 漢気ゲージ：相手から離れる方向へ移動している間は減らす
         ApplyGaugeLossIfRetreating(worldDirection);
@@ -2241,6 +2352,69 @@ public class Player : MonoBehaviour
         if (enemyPlayer != null) return enemyPlayer.transform;
         if (enemy != null) return enemy.transform;
         return null;
+    }
+
+    // ★追加：相手の方向へ自動で向きを変える（LateUpdateから毎フレーム呼ばれる）。
+    //   ・向きは「相手が+Z側にいれば+Z、-Z側にいれば-Z」の2択（P1/P2の間合いはZ軸で決まる仕様に合わせている）。
+    //   ・相手がジャンプで頭上を飛び越えて左右が入れ替わった場合も、自動で向き直る。
+    //   ・掴まれ中／投げ飛ばされ中／ダウン中／死亡中は、演出を崩さないよう向きを変えない。
+    //   ・最初に相手を認識した1回だけは補間せず即座に向き合わせる（開始直後にゆっくり回る見た目を防ぐ）。
+    void AutoFaceOpponent()
+    {
+        if (!enableAutoFacing) return;
+        if (HP <= 0) return;
+
+        switch (currentState)
+        {
+            case PlayerState.Grabbed:
+            case PlayerState.Thrown:
+            case PlayerState.KnockedDown:
+            case PlayerState.Dead:
+                return;
+        }
+
+        if (lockFacingDuringAction)
+        {
+            switch (currentState)
+            {
+                case PlayerState.Punch:
+                case PlayerState.Kick:
+                case PlayerState.UpKick:
+                case PlayerState.DownKick:
+                case PlayerState.Throw:
+                case PlayerState.Special:
+                    return;
+            }
+        }
+
+        Transform opponentTf = GetOpponentTransform();
+        if (opponentTf == null) return;
+
+        float deltaZ = opponentTf.position.z - transform.position.z;
+        if (Mathf.Abs(deltaZ) < autoFaceDeadZone) return; // ほぼ同じ位置：今の向きを維持
+
+        Vector3 faceDir = new Vector3(0f, 0f, Mathf.Sign(deltaZ));
+
+        if (!autoFaceSnapped)
+        {
+            transform.rotation = Quaternion.LookRotation(faceDir, Vector3.up);
+            autoFaceSnapped = true;
+            return;
+        }
+
+        FaceDirection(faceDir);
+    }
+
+    // ★追加：指定した移動方向が「相手から離れる方向（後退）」かどうかを返す。
+    bool IsRetreating(Vector3 worldDirection)
+    {
+        Transform opponentTf = GetOpponentTransform();
+        if (opponentTf == null) return false;
+
+        float deltaZ = opponentTf.position.z - transform.position.z;
+        if (Mathf.Abs(deltaZ) < 0.0001f) return false;
+
+        return Mathf.Sign(deltaZ) != Mathf.Sign(worldDirection.z);
     }
 
     // 指定した世界座標方向へプレイヤーの向きを滑らかに回転させる
@@ -2324,6 +2498,9 @@ public class Player : MonoBehaviour
     // パンチ（弱攻撃）処理。地上か空中かでアニメーションと当たり判定を切り替える
     void EnterPunch()
     {
+        // ★リザルト画面モード：パンチが実際に出たことを通知する（クールダウン中は、ここへ来ないので通知されない）
+        if (isResultMode) ResultAttackPressed?.Invoke(this);
+
         // ★修正：移動中にパンチへ遷移した際、Moveアニメーション(bool)がONのまま残り、
         //   パンチよりも移動が優先されているように見えてしまう不具合を解消する。
         StopMoveAnimation();
@@ -2358,6 +2535,9 @@ public class Player : MonoBehaviour
     // キック処理。スティックの上下入力で通常／上／下キックに分岐する
     void EnterKick(bool isCrouchInput)
     {
+        // ★リザルト画面モード：キックが実際に出たことを通知する（クールダウン中は、ここへ来ないので通知されない）
+        if (isResultMode) ResultAttackPressed?.Invoke(this);
+
         // ★修正：移動中にキックへ遷移した際、Moveアニメーション(bool)がONのまま残り、
         //   キックよりも移動が優先されているように見えてしまう不具合を解消する。
         StopMoveAnimation();
@@ -2934,7 +3114,7 @@ public class Player : MonoBehaviour
         float actualMoveSpeed = moveSpeed * speedRatio;
 
         transform.Translate(worldDirection * actualMoveSpeed * Time.deltaTime, Space.World);
-        FaceDirection(worldDirection);
+        if (!enableAutoFacing) FaceDirection(worldDirection); // ★変更：自動向き合いONの間は相手を向いたまま
     }
 
     // 拘束中の行動（攻撃・ガード・投げ・必殺技）のタイマーを進め、時間切れになったらIdleへ戻す。
@@ -3343,6 +3523,9 @@ public class Player : MonoBehaviour
     {
         //地面に当たっている場合は無視
         if (collision.gameObject.CompareTag("Ground")) return;
+
+        // ★リザルト画面モード：攻撃は見た目だけで、被弾・ダメージ・掴みの判定は行わない
+        if (isResultMode) return;
 
         // すでに倒れている場合は無視
         // ★変更：以前は「自分のタグ(PLayerTagName)と同じタグのオブジェクトは無視」も行っていたが、削除した。
