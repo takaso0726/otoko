@@ -1703,8 +1703,13 @@ MonoBehaviour:
   PLayerTagName: 
   moveSpeed: 3
   turnSpeed: 180
+  enableAutoFacing: 1
+  autoFaceDeadZone: 0.05
+  lockFacingDuringAction: 0
+  isResultMode: 0
+  autoDetectResultScene: 1
   moveInputThreshold: 0.03
-  crouchInputThreshold: -0.43
+  crouchInputThreshold: -0.7
   upKickInputThreshold: 0.25
   minMoveAnimSpeed: 0.6
   maxMoveAnimSpeed: 1.4
@@ -1717,7 +1722,7 @@ MonoBehaviour:
   maxHP: 1000
   atk: 10
   Player_status: 0
-  guardDuration: 1.4
+  guardDuration: 0.6
   throwDuration: 0.75
   throwAtk: 20
   throwStunDuration: 0.5

@@ -1708,8 +1708,13 @@ MonoBehaviour:
   PLayerTagName: 
   moveSpeed: 3
   turnSpeed: 180
+  enableAutoFacing: 1
+  autoFaceDeadZone: 0.05
+  lockFacingDuringAction: 0
+  isResultMode: 0
+  autoDetectResultScene: 1
   moveInputThreshold: 0.03
-  crouchInputThreshold: -0.73
+  crouchInputThreshold: -0.7
   upKickInputThreshold: 0.25
   minMoveAnimSpeed: 0.6
   maxMoveAnimSpeed: 1.4
