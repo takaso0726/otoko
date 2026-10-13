@@ -628,6 +628,11 @@ public class Player : MonoBehaviour
     int guardComboCount;             // 仁王立ちで連続して耐えた回数
     bool autoFaceSnapped;            // ★追加：最初に相手を認識した時に、補間なしで即座に向き合わせたか
     bool hasMoveBackwardParam;       // ★追加：Animatorに"MoveBackward"(Bool)が存在するか（存在する時だけ値を送る）
+    bool hasGuardParam;              // ★追加：Animatorに"Guard"(Bool)が存在するか（存在する時だけ値を送る）
+    bool guardAnimApplied;           // ★追加：Animatorへ最後に送った"Guard"の値（変化した時だけ送る）
+    const string GuardParam = "Guard"; // ★仁王立ちアニメーション用のAnimatorパラメータ名（Bool）
+    bool hasGuardSuccessParam;       // ★追加：Animatorに"Guard-success"(Trigger)が存在するか（存在する時だけ立てる）
+    const string GuardSuccessParam = "Guard-success"; // ★仁王立ち成功（ガード成功）アニメーション用のAnimatorパラメータ名（Trigger）
     // ★追加：F6キーでON/OFFする、常時仁王立ちデバッグモードの現在の状態
     private bool debugAlwaysGuard = false;
     bool rebornCamStarted;           // 根性復活のクローズアップカメラを開始済みか
@@ -988,6 +993,28 @@ public class Player : MonoBehaviour
                     hasMoveBackwardParam = true;
                     break;
                 }
+            }
+
+            // ★追加：仁王立ち用の"Guard"(Bool)・ガード成功用の"Guard-success"(Trigger)がAnimatorにあるか調べる。
+            //   無ければ警告を1回だけ出し、そのアニメーションの再生は行わない。
+            foreach (var param in animator.parameters)
+            {
+                if (param.name == GuardParam && param.type == AnimatorControllerParameterType.Bool)
+                {
+                    hasGuardParam = true;
+                }
+                else if (param.name == GuardSuccessParam && param.type == AnimatorControllerParameterType.Trigger)
+                {
+                    hasGuardSuccessParam = true;
+                }
+            }
+            if (!hasGuardParam)
+            {
+                Debug.LogWarning($"[{PlayerName}] Animatorに'{GuardParam}'(Bool)パラメータがありません。仁王立ちのアニメーションは再生されません。", this);
+            }
+            if (!hasGuardSuccessParam)
+            {
+                Debug.LogWarning($"[{PlayerName}] Animatorに'{GuardSuccessParam}'(Trigger)パラメータがありません。仁王立ち成功のアニメーションは再生されません。", this);
             }
         }
 
@@ -1470,6 +1497,8 @@ public class Player : MonoBehaviour
     //   Updateの最後ではなくLateUpdateで行うことで、物理演算(FixedUpdate)による移動分も確実に制限できる。
     void LateUpdate()
     {
+        SyncGuardAnimation(); // ★追加：仁王立ち（Guard状態）の間だけ、仁王立ちアニメーションを再生する
+
         // ★リザルト画面モード：向きの自動変更・押しのけ・位置クランプを行わず、配置した位置のまま動かさない
         if (isResultMode) return;
 
@@ -2625,6 +2654,23 @@ public class Player : MonoBehaviour
         DLog($"[{PlayerName}] UpKick発動{delay}秒後：再生中クリップ={clipName}（クリップ長={clipLength:F2}秒） / ステートのSpeed={st.speed} / Multiplier(パラメータ)の現在値={st.speedMultiplier} / 遷移中={animator.IsInTransition(0)} / animator.speed={animator.speed} / レイヤー数={animator.layerCount}");
     }
 
+    // ★追加：Animatorの"Guard"(Bool)を、現在の状態(currentState == Guard)に合わせる。
+    //   Guardへ入る／出る経路は複数あるため（通常のガード、被弾、掴まれ、F6デバッグの切り替え等）、
+    //   個々の箇所で出し入れせず、状態だけを見て毎フレーム同期する。値が変わった時だけAnimatorへ送る。
+    void SyncGuardAnimation()
+    {
+        if (!hasGuardParam || animator == null) return;
+
+        bool wantGuardAnim = currentState == PlayerState.Guard;
+        if (wantGuardAnim == guardAnimApplied) return;
+
+        guardAnimApplied = wantGuardAnim;
+        animator.SetBool(GuardParam, wantGuardAnim);
+
+        // ガードを抜けた後に、未消費のGuard-successトリガーが残って後から誤再生されないよう消しておく
+        if (!wantGuardAnim && hasGuardSuccessParam) animator.ResetTrigger(GuardSuccessParam);
+    }
+
     // 仁王立ち（ガード）処理。ガードフラグを立て、演出用パーティクルを再生する
     void EnterGuard()
     {
@@ -3605,6 +3651,14 @@ public class Player : MonoBehaviour
             // 攻撃力上昇中であることを示すエフェクトを出し続ける（次に自分の攻撃が当たるまで）
             isGuardBuffed = true;
             StartGuardBuffEffect();
+
+            // ★追加：仁王立ち成功アニメーション（Animatorの"Guard-success"トリガー）を再生する。
+            //   ヒットストップ中はanimator.speedが0になり遷移しないが、トリガーは消費されるまで残るので、
+            //   ヒットストップが終わった瞬間に再生が始まる。
+            if (hasGuardSuccessParam && animator != null)
+            {
+                animator.SetTrigger(GuardSuccessParam);
+            }
 
             // ガード成功時のヒットストップ（少しだけ動けなくする）。
             // ガードのポーズを崩したくないのでHeadHitアニメーションは再生しない。
