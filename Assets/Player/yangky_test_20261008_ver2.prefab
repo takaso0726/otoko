@@ -12,9 +12,9 @@ GameObject:
   - component: {fileID: 5007667025274516037}
   - component: {fileID: 3919506599177047107}
   - component: {fileID: 8757109264841862037}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-RightFoot
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -104,9 +104,9 @@ GameObject:
   - component: {fileID: 3814811100537494050}
   - component: {fileID: 1081342137876855032}
   - component: {fileID: 5476116204920963579}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-LeftLeg
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -196,9 +196,9 @@ GameObject:
   - component: {fileID: 2587220370022906684}
   - component: {fileID: 7962244926102658397}
   - component: {fileID: 991326705844337597}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-LeftForeArm
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -288,9 +288,9 @@ GameObject:
   - component: {fileID: 7119637916681120547}
   - component: {fileID: 1131507513991920895}
   - component: {fileID: 6500757721661840354}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-RightLeg
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -380,9 +380,9 @@ GameObject:
   - component: {fileID: 2644159441811950905}
   - component: {fileID: 6873958102477750862}
   - component: {fileID: 6379354217391538545}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-LeftFoot
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -472,9 +472,9 @@ GameObject:
   - component: {fileID: 7504405079043933161}
   - component: {fileID: 2558552727726754202}
   - component: {fileID: 3108297495450728668}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-LeftArm
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -564,9 +564,9 @@ GameObject:
   - component: {fileID: 1392560725170388888}
   - component: {fileID: 3771553585942874851}
   - component: {fileID: 8419449007032224126}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-LeftUpLeg
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -656,9 +656,9 @@ GameObject:
   - component: {fileID: 1411860133892448606}
   - component: {fileID: 2178534952492527848}
   - component: {fileID: 1898140741861553655}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-RightHand
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -748,9 +748,9 @@ GameObject:
   - component: {fileID: 7675740385667996414}
   - component: {fileID: 7624824287128681655}
   - component: {fileID: 4825683030835391533}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-RightForeArm
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -840,9 +840,9 @@ GameObject:
   - component: {fileID: 7642700442083754953}
   - component: {fileID: 7544638330512743743}
   - component: {fileID: 5289106933170859413}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-LeftHand
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -932,9 +932,9 @@ GameObject:
   - component: {fileID: 6111793650264479368}
   - component: {fileID: 6038136936036229616}
   - component: {fileID: 1588466415378345302}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-RightArm
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -1024,9 +1024,9 @@ GameObject:
   - component: {fileID: 3837165111407154276}
   - component: {fileID: 2470399993998982353}
   - component: {fileID: 1752685869948644569}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-Head
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -1116,9 +1116,9 @@ GameObject:
   - component: {fileID: 3761476903802645047}
   - component: {fileID: 2172356988450529056}
   - component: {fileID: 8279901166996762054}
-  m_Layer: 10
+  m_Layer: 13
   m_Name: P-RightUpLeg
-  m_TagString: P1Attack
+  m_TagString: P2Attack
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -1204,6 +1204,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: -9119908323053236901, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -8934172183923270589, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
       propertyPath: m_LocalScale.x
       value: 1.65
@@ -1260,9 +1268,261 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -8653925103826193019, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -8614415804772736794, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -8380689708222042282, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -8275938511955741445, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -8259118631118862985, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -7762367255687201365, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -7612803265288960255, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -7491417239426595509, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -7419950943728055426, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -7381036159570867405, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -7008086743399267071, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -6824613472649400329, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -6764074223378131810, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -6651959653579566012, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -6215559199000519228, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -6152822153341757011, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -6079049996073082774, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -5632336997957511308, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -5298007517248095939, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -3573237478335662032, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -3499034961309850988, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -3494124692440896192, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -2861465562957341800, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -2742761410879256698, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -2283286389926724866, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -1979198530202172219, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -1978778432249105963, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -1955448075966397385, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -1549231395013268787, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -1427679845270094291, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -1312147426986386068, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -1123021838991947651, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -360067506433780107, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -181697488509272181, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: -29008875031800879, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 223000880058046919, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
       propertyPath: m_Name
       value: yangky_test_20261008_ver2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1150670702178476919, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 1292914000126454356, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 1687346063163751523, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 2629193616891207523, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 2693098049842030482, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 3084112346042153513, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 3260675066062146946, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 3584065336111852127, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 3603468405682351393, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 3716908001351239866, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 3854185020615531941, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 3858746792672811853, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 4292779200995450864, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 4696224528089850685, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 5537171828960735967, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 5582624136758221800, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 5709942370410545909, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 6082143984777904598, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 6166140691800018342, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 6404549601478119375, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 7657647148293444189, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 7755313377117640121, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 7769178246516028670, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 8307994380087564252, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 8590037816562902385, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 8863414588131938635, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 9179390059116776395, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      propertyPath: m_Layer
+      value: 13
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1309,6 +1569,9 @@ PrefabInstance:
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 7981375898559367419}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 1010547427434158078}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
       insertIndex: -1
@@ -1322,9 +1585,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1447875865487785314}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 7981375898559367419}
   m_SourcePrefab: {fileID: 100100000, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
 --- !u!4 &144829678328981420 stripped
 Transform:
@@ -1376,6 +1636,219 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
   m_PrefabInstance: {fileID: 4869353308093024752}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &7981375898559367419
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5715634008164873377}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Player
+  enableDebugLog: 1
+  enableF2DebugKey: 1
+  enableF3DebugKey: 1
+  enableF4DebugKey: 0
+  enableF5DebugKey: 0
+  enableF6DebugKey: 0
+  enableF7DebugKey: 0
+  enableF8DebugKey: 0
+  enableF10DebugKey: 0
+  enableArrowKeyAnimation: 0
+  enableDpadAnimation: 0
+  upArrowAnimation:
+    animationName: Anim-Up
+    useTrigger: 1
+  leftArrowAnimation:
+    animationName: Anim-Left
+    useTrigger: 1
+  rightArrowAnimation:
+    animationName: Anim-Right
+    useTrigger: 1
+  downArrowAnimation:
+    animationName: Anim-Down
+    useTrigger: 1
+  PlayerName: P2
+  PLayerTagName: 
+  moveSpeed: 7.26
+  turnSpeed: 180
+  enableAutoFacing: 1
+  autoFaceDeadZone: 0.05
+  lockFacingDuringAction: 0
+  isResultMode: 0
+  autoDetectResultScene: 1
+  moveInputThreshold: 0.03
+  crouchInputThreshold: -0.43
+  upKickInputThreshold: 0.25
+  minMoveAnimSpeed: 0.4
+  maxMoveAnimSpeed: 1.4
+  minMoveSpeedRatio: 0.4
+  minPosition: {x: 0, y: -1.95, z: -10}
+  maxPosition: {x: 0, y: 10, z: 10}
+  force: {x: 0, y: 0, z: 0}
+  Jumpflag: 1
+  HP: 1000
+  maxHP: 1000
+  atk: 10
+  Player_status: 0
+  guardDuration: 0.5
+  throwDuration: 1.5
+  throwAtk: 5
+  throwStunDuration: 0.5
+  escapeTimeAtZeroHp: 1.5
+  escapeTimeAtFullHp: 0.4
+  escapeReductionPerInput: 0.15
+  throwHorizontalSpeed: 6
+  throwUpSpeed: 5
+  grabFailHorizontalSpeed: 3
+  grabFailUpSpeed: 3
+  throwStartPlayTime: 0.2
+  enableThrowStartPlay: 0
+  guardAtkBonusMultiplier: 1
+  guardSuccessStunDuration: 0.5
+  rebornTimeLimit: 5
+  rebornHpRatio: 0.3
+  mashThresholdBase: 11
+  mashWithAnyButton: 1
+  mashThresholdStep: 3
+  standHeight: 2.1
+  standCenter: {x: 0, y: 1.97, z: 0}
+  crouchHeight: 0.65
+  crouchCenter: {x: 0, y: 0.5, z: 0}
+  MenBlock_se: {fileID: 0}
+  Men_particle: {fileID: 0}
+  Hit_particle: {fileID: 0}
+  punchHitEffectData: {fileID: 0}
+  kickHitEffectData: {fileID: 0}
+  guardHitEffectData: {fileID: 0}
+  mashHitEffectData: {fileID: 0}
+  missHitEffectData: {fileID: 0}
+  enableHitStop: 1
+  hitStopDuration: 0.08
+  guardHitStopDuration: 0.05
+  freezeAnimatorDuringHitStop: 1
+  punchAtk: 10
+  punchMissDuration: 0.5
+  punchHitDuration: 0.5
+  punchStunDuration: 0.3
+  punchHitStopDuration: 0.08
+  punchKnockback:
+    horizontalSpeed: 2.5
+    upSpeed: 0
+  kickAtk: 10
+  kickMissDuration: 0.6
+  kickHitDuration: 0.6
+  kickStunDuration: 0.4
+  kickHitStopDuration: 0.08
+  kickKnockback:
+    horizontalSpeed: 3.5
+    upSpeed: 0
+  upKickAtk: 10
+  upKickMissDuration: 0.7
+  upKickHitDuration: 0.7
+  upKickStunDuration: 0.5
+  upKickHitStopDuration: 0.08
+  upKickKnockback:
+    horizontalSpeed: 2
+    upSpeed: 5
+  downKickAtk: 10
+  downKickMissDuration: 0.5
+  downKickHitDuration: 0.5
+  downKickStunDuration: 0.4
+  downKickHitStopDuration: 0.08
+  downKickKnockback:
+    horizontalSpeed: 3
+    upSpeed: 0
+  specialAtk: 20
+  specialHitStopDuration: 0.08
+  specialKnockback:
+    horizontalSpeed: 0
+    upSpeed: 0
+  specialStunDuration: 0.5
+  enableGuardSuccessEffect: 1
+  guardSuccessEffectPrefab: {fileID: 0}
+  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
+  guardSuccessEffectLifetime: 1
+  enableGuardBuffEffect: 1
+  guardBuffEffectPrefab: {fileID: 0}
+  guardBuffEffectOffset: {x: 0, y: 1, z: 0}
+  kankiGaugePerBar: 100
+  kankiGaugeBarCount: 2
+  gaugeGainOnHit: 15
+  gaugeGainOnGuard: 10
+  gaugeLossOnRetreat: 5
+  atkPowerPerBar: 0.25
+  enableKankiChargeEffect: 1
+  kankiChargeEffectPrefab: {fileID: 6396199705279390725, guid: 3033e5beaf41edf45b102dad69361753, type: 3}
+  kankiChargeEffectOffset: {x: 0, y: 0, z: 0}
+  kankiChargeEffectFollowLocal: 1
+  enableKankiRevive: 1
+  kankiReviveBarCost: 1
+  reviveAtkMultiplier: 1.5
+  reviveAtkBuffDuration: 10
+  kankiReviveEffectPrefab: {fileID: 0}
+  kankiReviveEffectOffset: {x: 0, y: 1, z: 0}
+  kankiReviveEffectLifetime: 2
+  reviveBuffEffectPrefab: {fileID: 0}
+  reviveBuffEffectOffset: {x: 0, y: 1, z: 0}
+  specialRequiredGauge: 200
+  specialGaugeCost: 200
+  specialDuration: 3
+  specialSe: {fileID: 0}
+  specialEffectPrefab: {fileID: 0}
+  specialEffectOffset: {x: 0, y: 1, z: 0}
+  specialEffectLifetime: 1.5
+  enemy: {fileID: 0}
+  enemyPlayer: {fileID: 0}
+  animator: {fileID: 0}
+  fightingCamera: {fileID: 0}
+  punchMultiHit:
+    allowMultiHit: 0
+    maxHitCount: 1
+  kickMultiHit:
+    allowMultiHit: 0
+    maxHitCount: 1
+  upKickMultiHit:
+    allowMultiHit: 0
+    maxHitCount: 1
+  downKickMultiHit:
+    allowMultiHit: 0
+    maxHitCount: 1
+  specialMultiHit:
+    allowMultiHit: 1
+    maxHitCount: 5
+  specialHitCooldown: 0.1
+  enablePlayerPush: 1
+  pushSkinWidth: 0.02
+  maxPushSpeed: 20
+  showMashPrompt: 1
+  mashPromptText: "\u30DC\u30BF\u30F3\u3092\u9023\u6253\u3057\u308D\uFF01"
+  mashPromptFontSize: 64
+  mashPromptColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  showMashRemainingCount: 1
+  mashRemainingFontSize: 150
+  mashRemainingColor: {r: 1, g: 1, b: 1, a: 1}
+  mashRemainingYRatio: 0.42
+  showMashButtonImage: 1
+  mashButtonNormalImage: {fileID: 0}
+  mashButtonPressedImage: {fileID: 0}
+  mashButtonPressedDuration: 0.06
+  mashButtonReleaseMinDuration: 0.05
+  mashButtonSizeRatio: 0.22
+  mashButtonXRatio: 0.5
+  mashButtonYRatio: 0.72
+  showRebornTimeLimit: 1
+  rebornTimeLabel: "\u5FA9\u6D3B\u307E\u3067"
+  rebornTimeFontSize: 56
+  rebornTimeColor: {r: 1, g: 1, b: 1, a: 1}
+  rebornTimeLowThreshold: 1.5
+  rebornTimeLowColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  showRebornTimeBar: 1
+  rebornTimeBarWidthRatio: 0.4
+  rebornTimeYRatio: 0.03
 --- !u!136 &1010547427434158078
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -1436,7 +1909,7 @@ Animator:
   m_GameObject: {fileID: 5715634008164873377}
   m_Enabled: 1
   m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: 1e9d2b3fd013d14449ff209fdb2b9767, type: 2}
+  m_Controller: {fileID: 9100000, guid: fd0682e02a0f2b74fb09f350dc131989, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -1575,219 +2048,6 @@ MonoBehaviour:
   m_DefaultActionMap: Player
   m_SplitScreenIndex: -1
   m_Camera: {fileID: 0}
---- !u!114 &7981375898559367419
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5715634008164873377}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Player
-  enableDebugLog: 1
-  enableF2DebugKey: 1
-  enableF3DebugKey: 1
-  enableF4DebugKey: 0
-  enableF5DebugKey: 0
-  enableF6DebugKey: 0
-  enableF7DebugKey: 0
-  enableF8DebugKey: 0
-  enableF10DebugKey: 0
-  enableArrowKeyAnimation: 0
-  enableDpadAnimation: 0
-  upArrowAnimation:
-    animationName: Anim-Up
-    useTrigger: 1
-  leftArrowAnimation:
-    animationName: Anim-Left
-    useTrigger: 1
-  rightArrowAnimation:
-    animationName: Anim-Right
-    useTrigger: 1
-  downArrowAnimation:
-    animationName: Anim-Down
-    useTrigger: 1
-  PlayerName: 
-  PLayerTagName: 
-  moveSpeed: 3
-  turnSpeed: 15
-  enableAutoFacing: 1
-  autoFaceDeadZone: 0.05
-  lockFacingDuringAction: 0
-  isResultMode: 0
-  autoDetectResultScene: 1
-  moveInputThreshold: 0.03
-  crouchInputThreshold: -0.43
-  upKickInputThreshold: 0.25
-  minMoveAnimSpeed: 0.4
-  maxMoveAnimSpeed: 1.4
-  minMoveSpeedRatio: 0.4
-  minPosition: {x: -10, y: -10, z: -10}
-  maxPosition: {x: 10, y: 10, z: 10}
-  force: {x: 0, y: 0, z: 0}
-  Jumpflag: 1
-  HP: 100
-  maxHP: 100
-  atk: 10
-  Player_status: 0
-  guardDuration: 0.5
-  throwDuration: 1.5
-  throwAtk: 5
-  throwStunDuration: 0.5
-  escapeTimeAtZeroHp: 1.5
-  escapeTimeAtFullHp: 0.4
-  escapeReductionPerInput: 0.15
-  throwHorizontalSpeed: 6
-  throwUpSpeed: 5
-  grabFailHorizontalSpeed: 3
-  grabFailUpSpeed: 3
-  throwStartPlayTime: 0.2
-  enableThrowStartPlay: 0
-  guardAtkBonusMultiplier: 1
-  guardSuccessStunDuration: 0.5
-  rebornTimeLimit: 5
-  rebornHpRatio: 0.3
-  mashThresholdBase: 11
-  mashWithAnyButton: 1
-  mashThresholdStep: 3
-  standHeight: 2
-  standCenter: {x: 0, y: 1, z: 0}
-  crouchHeight: 0.65
-  crouchCenter: {x: 0, y: 0.5, z: 0}
-  MenBlock_se: {fileID: 0}
-  Men_particle: {fileID: 0}
-  Hit_particle: {fileID: 0}
-  punchHitEffectData: {fileID: 0}
-  kickHitEffectData: {fileID: 0}
-  guardHitEffectData: {fileID: 0}
-  mashHitEffectData: {fileID: 0}
-  missHitEffectData: {fileID: 0}
-  enableHitStop: 1
-  hitStopDuration: 0.08
-  guardHitStopDuration: 0.05
-  freezeAnimatorDuringHitStop: 1
-  punchAtk: 10
-  punchMissDuration: 0.5
-  punchHitDuration: 0.5
-  punchStunDuration: 0.3
-  punchHitStopDuration: 0.08
-  punchKnockback:
-    horizontalSpeed: 2.5
-    upSpeed: 0
-  kickAtk: 10
-  kickMissDuration: 0.6
-  kickHitDuration: 0.6
-  kickStunDuration: 0.4
-  kickHitStopDuration: 0.08
-  kickKnockback:
-    horizontalSpeed: 3.5
-    upSpeed: 0
-  upKickAtk: 10
-  upKickMissDuration: 0.7
-  upKickHitDuration: 0.7
-  upKickStunDuration: 0.5
-  upKickHitStopDuration: 0.08
-  upKickKnockback:
-    horizontalSpeed: 2
-    upSpeed: 5
-  downKickAtk: 10
-  downKickMissDuration: 0.5
-  downKickHitDuration: 0.5
-  downKickStunDuration: 0.4
-  downKickHitStopDuration: 0.08
-  downKickKnockback:
-    horizontalSpeed: 3
-    upSpeed: 0
-  specialAtk: 20
-  specialHitStopDuration: 0.08
-  specialKnockback:
-    horizontalSpeed: 0
-    upSpeed: 0
-  specialStunDuration: 0.5
-  enableGuardSuccessEffect: 1
-  guardSuccessEffectPrefab: {fileID: 0}
-  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
-  guardSuccessEffectLifetime: 1
-  enableGuardBuffEffect: 1
-  guardBuffEffectPrefab: {fileID: 0}
-  guardBuffEffectOffset: {x: 0, y: 1, z: 0}
-  kankiGaugePerBar: 100
-  kankiGaugeBarCount: 2
-  gaugeGainOnHit: 15
-  gaugeGainOnGuard: 10
-  gaugeLossOnRetreat: 5
-  atkPowerPerBar: 0.25
-  enableKankiChargeEffect: 1
-  kankiChargeEffectPrefab: {fileID: 6396199705279390725, guid: 3033e5beaf41edf45b102dad69361753, type: 3}
-  kankiChargeEffectOffset: {x: 0, y: 0, z: 0}
-  kankiChargeEffectFollowLocal: 1
-  enableKankiRevive: 1
-  kankiReviveBarCost: 1
-  reviveAtkMultiplier: 1.5
-  reviveAtkBuffDuration: 10
-  kankiReviveEffectPrefab: {fileID: 0}
-  kankiReviveEffectOffset: {x: 0, y: 1, z: 0}
-  kankiReviveEffectLifetime: 2
-  reviveBuffEffectPrefab: {fileID: 0}
-  reviveBuffEffectOffset: {x: 0, y: 1, z: 0}
-  specialRequiredGauge: 200
-  specialGaugeCost: 200
-  specialDuration: 3
-  specialSe: {fileID: 0}
-  specialEffectPrefab: {fileID: 0}
-  specialEffectOffset: {x: 0, y: 1, z: 0}
-  specialEffectLifetime: 1.5
-  enemy: {fileID: 0}
-  enemyPlayer: {fileID: 0}
-  animator: {fileID: 0}
-  fightingCamera: {fileID: 0}
-  punchMultiHit:
-    allowMultiHit: 0
-    maxHitCount: 1
-  kickMultiHit:
-    allowMultiHit: 0
-    maxHitCount: 1
-  upKickMultiHit:
-    allowMultiHit: 0
-    maxHitCount: 1
-  downKickMultiHit:
-    allowMultiHit: 0
-    maxHitCount: 1
-  specialMultiHit:
-    allowMultiHit: 1
-    maxHitCount: 5
-  specialHitCooldown: 0.1
-  enablePlayerPush: 1
-  pushSkinWidth: 0.02
-  maxPushSpeed: 20
-  showMashPrompt: 1
-  mashPromptText: "\u30DC\u30BF\u30F3\u3092\u9023\u6253\u3057\u308D\uFF01"
-  mashPromptFontSize: 64
-  mashPromptColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  showMashRemainingCount: 1
-  mashRemainingFontSize: 150
-  mashRemainingColor: {r: 1, g: 1, b: 1, a: 1}
-  mashRemainingYRatio: 0.42
-  showMashButtonImage: 1
-  mashButtonNormalImage: {fileID: 0}
-  mashButtonPressedImage: {fileID: 0}
-  mashButtonPressedDuration: 0.06
-  mashButtonReleaseMinDuration: 0.05
-  mashButtonSizeRatio: 0.22
-  mashButtonXRatio: 0.5
-  mashButtonYRatio: 0.72
-  showRebornTimeLimit: 1
-  rebornTimeLabel: "\u5FA9\u6D3B\u307E\u3067"
-  rebornTimeFontSize: 56
-  rebornTimeColor: {r: 1, g: 1, b: 1, a: 1}
-  rebornTimeLowThreshold: 1.5
-  rebornTimeLowColor: {r: 1, g: 0.2, b: 0.2, a: 1}
-  showRebornTimeBar: 1
-  rebornTimeBarWidthRatio: 0.4
-  rebornTimeYRatio: 0.03
 --- !u!4 &5718635071536965577 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 923175545146912313, guid: 050c5e93cf6193d46b8efd0aecfa8580, type: 3}
