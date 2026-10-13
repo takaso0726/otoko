@@ -176,8 +176,9 @@ public class GameInputManager : MonoBehaviour
 
     // 生成した1P/2PのenemyPlayerを、お互いに設定する。
     // プレハブはシーン上のオブジェクトを参照できないため、プレハブのenemyPlayerは空になっている。
-    // ここで相互に設定しないと、相手の攻撃を「相手の攻撃か？」と判定できず、当たり判定が働かない。
-    // （Player側にも保険の自動補完はあるが、ここで確実に設定しておく）
+    // ※被弾判定（当たり判定）は、Player側が「触れた攻撃コライダーの持ち主」を直接たどって行うため、
+    //   enemyPlayerの設定には依存しない（同じキャラ同士でも、タグや参照に関係なく判定できる）。
+    //   ここでの相互設定は、自動向き合い・押しのけ・投げなど「相手を参照する処理」のために行う。
     void LinkOpponents(GameObject p1, GameObject p2)
     {
         if (p1 == null || p2 == null) return;
@@ -199,6 +200,7 @@ public class GameInputManager : MonoBehaviour
     // プレハブはシーン上のオブジェクトを参照できないため、生成のたびに実行時に設定する必要がある。
     //   ・PlayerName ... GameMNGがHPバー更新や勝敗判定を"P1"/"P2"で振り分けているため、
     //                    プレハブ側の値に関係なく、生成時に1Pは"P1"、2Pは"P2"へ固定する。
+    //   ・PLayerTagName . 同じキャラを選ぶとプレハブ側の値が1P/2Pで同じになるため、これも生成時に固定する。
     //   ・カメラ ........ 追従対象へ登録し、Player側のfightingCamera（ガード演出・復活演出用）も設定する。
     //   ・GameMNG ....... p1/p2を差し替え、HPバー・漢気ゲージを生成したプレイヤーの値に合わせ直す。
     void SetupSceneLinks(GameObject p1, GameObject p2)
@@ -206,8 +208,8 @@ public class GameInputManager : MonoBehaviour
         var player1 = p1 != null ? p1.GetComponent<Player>() : null;
         var player2 = p2 != null ? p2.GetComponent<Player>() : null;
 
-        if (player1 != null) player1.PlayerName = "P1";
-        if (player2 != null) player2.PlayerName = "P2";
+        if (player1 != null) { player1.PlayerName = "P1"; player1.PLayerTagName = "P1"; }
+        if (player2 != null) { player2.PlayerName = "P2"; player2.PLayerTagName = "P2"; }
 
         var cam = cameraController != null ? cameraController : FindAnyObjectByType<FightingCameraController>();
         if (cam != null)

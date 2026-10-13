@@ -3539,19 +3539,22 @@ public class Player : MonoBehaviour
         //  （ダメージ・ヒットストップ・ガード演出等、何も発生させない）。
         if (currentState == PlayerState.Special) return;
 
-        // ★修正：相手が「対人戦のPlayer(enemyPlayer)」か「対CPU戦のEnemy(enemy)」かを
-        //   それぞれ判定する。以前はenemyPlayerしか見ておらず、enemy(CPU)の攻撃が
-        //   一切ヒット判定されずHPが減らないバグの原因になっていた。
-        bool isEnemyPlayerAttack = enemyPlayer != null
-            && enemyPlayer.AttackHitboxes != null
-            && System.Array.Exists(enemyPlayer.AttackHitboxes, hb => hb == collision);
+        // ★変更：相手の攻撃判定かどうかは、触れたコライダーの「持ち主」を親からたどって直接取得する。
+        //   タグやInspectorのenemyPlayer/enemy参照には一切依存しない。
+        //   「相手のアタックボックス（攻撃用コライダー）が自分の体に触れた」時だけ被弾として扱う。
+        Player attackerPlayer = collision.GetComponentInParent<Player>();
+        Enemy attackerEnemy = attackerPlayer == null ? collision.GetComponentInParent<Enemy>() : null;
 
-        bool isEnemyAttack = !isEnemyPlayerAttack && enemy != null
-            && enemy.AttackHitboxes != null
-            && System.Array.Exists(enemy.AttackHitboxes, hb => hb == collision);
+        // 自分自身の攻撃判定が自分の体に触れただけの場合は除外する（attackerPlayer == this）
+        bool isEnemyPlayerAttack = attackerPlayer != null && attackerPlayer != this
+            && attackerPlayer.AttackHitboxes != null
+            && System.Array.Exists(attackerPlayer.AttackHitboxes, hb => hb == collision);
 
-        // どちらの攻撃用ヒットボックスでもなければ、このイベントは無視する
-        //   （＝自分のヒットボックスが相手の体に当たっただけの、攻撃側視点のイベント等）
+        bool isEnemyAttack = attackerEnemy != null
+            && attackerEnemy.AttackHitboxes != null
+            && System.Array.Exists(attackerEnemy.AttackHitboxes, hb => hb == collision);
+
+        // 相手のアタックボックスでなければ無視（相手の体に自分の攻撃が当たった、攻撃側視点のイベント等）
         if (!isEnemyPlayerAttack && !isEnemyAttack)
         {
             return;
@@ -3560,9 +3563,9 @@ public class Player : MonoBehaviour
         // ★追加：相手が投げ動作中に、その左手・左前腕の当たり判定が自分の体に触れた場合は、
         //   ダメージを与える通常の被弾ではなく「掴みの接触」として相手側に通知する（ダメージ・ヒットストップ等は発生させない）。
         //   掴めない状態（ジャンプ中等）だった場合も、通知先で無視されるだけで、ここでは被弾扱いにしない。
-        if (isEnemyPlayerAttack && enemyPlayer.IsGrabHitbox(collision))
+        if (isEnemyPlayerAttack && attackerPlayer.IsGrabHitbox(collision))
         {
-            enemyPlayer.OnGrabHitboxContact(this);
+            attackerPlayer.OnGrabHitboxContact(this);
             return;
         }
 
@@ -3572,7 +3575,7 @@ public class Player : MonoBehaviour
         //   falseが返った場合は、既に規定回数ヒット済みなのでこの接触は完全に無視する（ダメージ・演出も一切発生させない）。
         if (isEnemyPlayerAttack)
         {
-            if (!enemyPlayer.TryRegisterHit()) return;
+            if (!attackerPlayer.TryRegisterHit()) return;
         }
         else if (isEnemyAttack)
         {
@@ -3581,7 +3584,7 @@ public class Player : MonoBehaviour
         }
 
         //今回被弾させてきた相手の攻撃力を取得（対人戦かCPU戦かで参照先を切り替える）
-        int attackerAtk = isEnemyPlayerAttack ? enemyPlayer.atk : enemy.atk;
+        int attackerAtk = isEnemyPlayerAttack ? attackerPlayer.atk : attackerEnemy.atk;
 
         //ここまで来たら「敵の攻撃用ヒットボックスが自分の体に当たった」＝正真正銘の被弾
         if (isGuarding)
@@ -3614,7 +3617,7 @@ public class Player : MonoBehaviour
             }
 
             // ガード成功の擬音演出（攻撃者→自分の方向を基準に、空白地帯へ表示）
-            Transform guardAttackerTf = isEnemyPlayerAttack ? enemyPlayer.transform : enemy.transform;
+            Transform guardAttackerTf = isEnemyPlayerAttack ? attackerPlayer.transform : attackerEnemy.transform;
             if (HitEffectSpawner.Instance != null && guardHitEffectData != null)
             {
                 HitEffectSpawner.Instance.Spawn(guardHitEffectData, guardAttackerTf.position, transform.position);
@@ -3635,13 +3638,13 @@ public class Player : MonoBehaviour
             }
 
             // ガードされてもヒットはヒット（空振りではない）なので攻撃側に通知
-            if (isEnemyPlayerAttack) enemyPlayer.NotifyAttackLanded();
-            else if (enemy != null) enemy.NotifyAttackLanded();
+            if (isEnemyPlayerAttack) attackerPlayer.NotifyAttackLanded();
+            else if (attackerEnemy != null) attackerEnemy.NotifyAttackLanded();
 
             // ★追加：ガード成功で、攻撃してきた相手を guardSuccessStunDuration 秒だけスタン（行動不能）にする。
             //   ※NotifyAttackLanded()の後に呼ぶこと（命中によるクールダウン切替の後で、やられ状態へ上書きするため）。
             //   ※CPU(Enemy)が攻撃者の場合は未対応（Enemy.cs側にApplyGuardedStun()相当が必要）。
-            if (isEnemyPlayerAttack) enemyPlayer.ApplyGuardedStun(guardSuccessStunDuration);
+            if (isEnemyPlayerAttack) attackerPlayer.ApplyGuardedStun(guardSuccessStunDuration);
         }
         else
         {
@@ -3652,7 +3655,7 @@ public class Player : MonoBehaviour
             // ★追加：攻撃者が自分の前方にいたか後方にいたかで、被弾アニメーション用のフラグを分けて立てる。
             //   "Hit-front" = 前から攻撃された（相手が自分の正面にいる）／"Hit-back" = 後ろから攻撃された（相手が背後にいる）。
             //   既存の"Hit"は従来どおり立てたまま、それに加えてどちらか一方だけを立てる。
-            Transform hitAttackerTf = isEnemyPlayerAttack ? enemyPlayer.transform : (enemy != null ? enemy.transform : null);
+            Transform hitAttackerTf = isEnemyPlayerAttack ? attackerPlayer.transform : (attackerEnemy != null ? attackerEnemy.transform : null);
             if (hitAttackerTf != null)
             {
                 bool attackerInFront = IsOpponentInFront(hitAttackerTf);
@@ -3668,7 +3671,7 @@ public class Player : MonoBehaviour
             float appliedHitStop = hitStopDuration;
             if (isEnemyPlayerAttack)
             {
-                float perAttackHitStop = enemyPlayer.GetCurrentHitStopDuration();
+                float perAttackHitStop = attackerPlayer.GetCurrentHitStopDuration();
                 if (perAttackHitStop >= 0f) appliedHitStop = perAttackHitStop;
             }
             StartHitStop(appliedHitStop);
@@ -3679,10 +3682,10 @@ public class Player : MonoBehaviour
             //   ※この一撃でHPが0になる場合は、ダウン処理と干渉しないようノックバックしない。
             if (isEnemyPlayerAttack && HP - attackerAtk > 0)
             {
-                KnockbackSetting knockback = enemyPlayer.GetCurrentKnockbackSetting();
+                KnockbackSetting knockback = attackerPlayer.GetCurrentKnockbackSetting();
                 if (knockback != null && (knockback.horizontalSpeed != 0f || knockback.upSpeed != 0f))
                 {
-                    Vector3 awayDirection = GetAwayDirectionFrom(enemyPlayer);
+                    Vector3 awayDirection = GetAwayDirectionFrom(attackerPlayer);
                     RequestKnockback(awayDirection * knockback.horizontalSpeed + Vector3.up * knockback.upSpeed, appliedHitStop);
                 }
             }
@@ -3691,7 +3694,7 @@ public class Player : MonoBehaviour
             //   ※CPU(Enemy)の攻撃は未対応（Enemy.csにGetCurrentStunDuration()相当が必要）。
             if (isEnemyPlayerAttack)
             {
-                ApplyStun(enemyPlayer.GetCurrentStunDuration(), HP - attackerAtk <= 0);
+                ApplyStun(attackerPlayer.GetCurrentStunDuration(), HP - attackerAtk <= 0);
             }
 
             Vector3 hitPoint = collision.ClosestPoint(collision.transform.position);
@@ -3703,20 +3706,20 @@ public class Player : MonoBehaviour
             // 「ドカン」「ドドン」等の擬音演出。
             // 攻撃者に今の攻撃タイプ(パンチ/キック)を問い合わせて、対応する擬音データを選ぶ。
             // 角度・距離はHitEffectData側（Inspector）で調整する。
-            Transform attackerTf = isEnemyPlayerAttack ? enemyPlayer.transform : enemy.transform;
+            Transform attackerTf = isEnemyPlayerAttack ? attackerPlayer.transform : attackerEnemy.transform;
             HitEffectData selectedHitEffect = null;
 
             if (isEnemyPlayerAttack)
             {
                 // 対人戦：相手Playerの現在の攻撃タイプに応じたHitEffectDataを取得
-                selectedHitEffect = enemyPlayer.GetHitEffectDataFor(enemyPlayer.CurrentAttackType);
-                enemyPlayer.NotifyAttackLanded(); // 空振りではなく命中したことを攻撃側へ通知
+                selectedHitEffect = attackerPlayer.GetHitEffectDataFor(attackerPlayer.CurrentAttackType);
+                attackerPlayer.NotifyAttackLanded(); // 空振りではなく命中したことを攻撃側へ通知
             }
-            else if (enemy != null)
+            else if (attackerEnemy != null)
             {
                 // 対CPU戦：Enemy側の現在の攻撃タイプに応じたHitEffectDataを取得
-                selectedHitEffect = enemy.GetHitEffectDataFor(enemy.CurrentAttackType);
-                enemy.NotifyAttackLanded(); // 空振りではなく命中したことを攻撃側へ通知
+                selectedHitEffect = attackerEnemy.GetHitEffectDataFor(attackerEnemy.CurrentAttackType);
+                attackerEnemy.NotifyAttackLanded(); // 空振りではなく命中したことを攻撃側へ通知
             }
 
             if (HitEffectSpawner.Instance != null && selectedHitEffect != null)
@@ -3742,13 +3745,13 @@ public class Player : MonoBehaviour
         // ★修正：以前は "= 10" で固定値に戻しており、攻撃の種類ごとの攻撃力や
         //   漢気ゲージによる補正まで消えてしまっていた。ここではガード上昇分だけを
         //   取り消し、ゲージ補正込みの本来の攻撃力に戻す。
-        if (isEnemyPlayerAttack) enemyPlayer.ResetAtkAfterHit();
-        else if (enemy != null) enemy.atk = 10; // ※Enemy側は未対応。同様の仕組みが必要なら要相談。
+        if (isEnemyPlayerAttack) attackerPlayer.ResetAtkAfterHit();
+        else if (attackerEnemy != null) attackerEnemy.atk = 10; // ※Enemy側は未対応。同様の仕組みが必要なら要相談。
 
         if (HP < 0) HP = 0;
 
         //デバッグログ：誰からどれだけダメージを受けてHPがいくつになったか
-        string attackerName = isEnemyPlayerAttack ? enemyPlayer.PlayerName : "Enemy(CPU)";
+        string attackerName = isEnemyPlayerAttack ? attackerPlayer.PlayerName : "Enemy(CPU)";
         DLog($"[{PlayerName}] {attackerName}から被弾。ダメージ={attackerAtk}{(isGuarding ? "(ガード半減)" : "")} / 残りHP={HP}");
     }
 
