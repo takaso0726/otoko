@@ -434,7 +434,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   timedTexts:
   - text: {fileID: 10186380}
-    hideAfterSeconds: 3
+    hideAfterSeconds: 1.5
   winnerCharacters:
   - characterName: Player1
     displayObject: {fileID: 6758519040437653269, guid: aa90d0cad5f0e2e49a621f84ddd6fc4d, type: 3}
@@ -470,6 +470,13 @@ MonoBehaviour:
     glowOutline: {fileID: 1701466460138517899, guid: 92ebb68a0bb0325479d598bfa23075b0, type: 3}
     glowOffset: {x: 0, y: 0.15, z: 0}
     glowScale: 1
+  - label: ReturnBattle
+    icon: {fileID: 5709403844593631584, guid: bc714a037c72a824bb1b121664b7dd09, type: 3}
+    iconAnchor: {fileID: 1890556756}
+    sceneToLoad: InGame1v1
+    glowOutline: {fileID: 6561721605819217326, guid: 9579a9c1ee69b2f419ee09dc09267e4e, type: 3}
+    glowOffset: {x: 0, y: 0.15, z: 0}
+    glowScale: 0.25
   menuRoot: {fileID: 0}
   menuOpenHitCount: 4
   menuGlowPulseSpeed: 3
@@ -1102,6 +1109,37 @@ PrefabInstance:
       insertIndex: -1
       addedObject: {fileID: 1958182334}
   m_SourcePrefab: {fileID: 100100000, guid: c8d7ad2492d262346bffc70f2bba92aa, type: 3}
+--- !u!1 &1890556755
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1890556756}
+  m_Layer: 0
+  m_Name: returnBattle_Icon_Pos
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1890556756
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1890556755}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 3, y: 1.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1958182332 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: -6947368500140495992, guid: c8d7ad2492d262346bffc70f2bba92aa, type: 3}
@@ -1153,7 +1191,7 @@ Transform:
   m_GameObject: {fileID: 1958759556}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 3, y: 1.5, z: 0}
+  m_LocalPosition: {x: 0, y: 1.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1251,5 +1289,6 @@ SceneRoots:
   - {fileID: 216452530}
   - {fileID: 865107448}
   - {fileID: 1838435713}
-  - {fileID: 1958759557}
   - {fileID: 1151180366}
+  - {fileID: 1958759557}
+  - {fileID: 1890556756}
