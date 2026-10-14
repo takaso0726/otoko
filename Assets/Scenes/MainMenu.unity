@@ -874,7 +874,7 @@ MonoBehaviour:
     glowOutline: {fileID: 858639413}
   - label: CPU
     anchor: {fileID: 474098733}
-    sceneToLoad: O.I
+    sceneToLoad: SFC
     glowOutline: {fileID: 1945320399}
   glowPulseSpeed: 3
   glowMinAlpha: 0.4
