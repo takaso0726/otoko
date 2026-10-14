@@ -526,7 +526,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: dee198d2e895c444b88a0dce01fb3b91, type: 3}
+  m_Motion: {fileID: -203655887218126122, guid: c016ddd541f65684b93e22cd6e246c2a, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -637,7 +637,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: d6ff2f9eb5de7384583e495b0a587aa3, type: 3}
+  m_Motion: {fileID: -203655887218126122, guid: 45b82551cd451c344aec242156fbdb24, type: 3}
   m_Tag: 
   m_SpeedParameter: MoveSpeedMultiplier
   m_MirrorParameter: 
@@ -753,10 +753,7 @@ AnimatorStateTransition:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: 
-  m_Conditions:
-  - m_ConditionMode: 1
-    m_ConditionEvent: Jump
-    m_EventTreshold: 0
+  m_Conditions: []
   m_DstStateMachine: {fileID: 0}
   m_DstState: {fileID: 4553401650651208464}
   m_Solo: 0

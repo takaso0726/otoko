@@ -1515,7 +1515,7 @@ PrefabInstance:
     - target: {fileID: 5822821947120931875, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 7b096f496a8b2a2408654882aa3214f9, type: 2}
+      objectReference: {fileID: 2100000, guid: 271497e05e553184e8a6ca67958dae6f, type: 2}
     - target: {fileID: 6240733294840144465, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
       propertyPath: m_Layer
       value: 13
@@ -1648,10 +1648,29 @@ MonoBehaviour:
   enableF7DebugKey: 1
   enableF8DebugKey: 1
   enableF10DebugKey: 1
+  enableArrowKeyAnimation: 0
+  enableDpadAnimation: 0
+  upArrowAnimation:
+    animationName: Anim-Up
+    useTrigger: 1
+  leftArrowAnimation:
+    animationName: Anim-Left
+    useTrigger: 1
+  rightArrowAnimation:
+    animationName: Anim-Right
+    useTrigger: 1
+  downArrowAnimation:
+    animationName: Anim-Down
+    useTrigger: 1
   PlayerName: P2
   PLayerTagName: 
   moveSpeed: 3
   turnSpeed: 180
+  enableAutoFacing: 1
+  autoFaceDeadZone: 0.05
+  lockFacingDuringAction: 0
+  isResultMode: 0
+  autoDetectResultScene: 1
   moveInputThreshold: 0.03
   crouchInputThreshold: -0.43
   upKickInputThreshold: 0.25
@@ -1680,9 +1699,11 @@ MonoBehaviour:
   throwStartPlayTime: 0.2
   enableThrowStartPlay: 0
   guardAtkBonusMultiplier: 10.5
+  guardSuccessStunDuration: 0.5
   rebornTimeLimit: 4
   rebornHpRatio: 0.5
   mashThresholdBase: 10
+  mashWithAnyButton: 1
   mashThresholdStep: 5
   standHeight: 1.93
   standCenter: {x: 0, y: 0.82, z: 0}
@@ -1802,6 +1823,23 @@ MonoBehaviour:
   mashRemainingFontSize: 150
   mashRemainingColor: {r: 1, g: 1, b: 1, a: 1}
   mashRemainingYRatio: 0.42
+  showMashButtonImage: 1
+  mashButtonNormalImage: {fileID: 0}
+  mashButtonPressedImage: {fileID: 0}
+  mashButtonPressedDuration: 0.06
+  mashButtonReleaseMinDuration: 0.05
+  mashButtonSizeRatio: 0.22
+  mashButtonXRatio: 0.5
+  mashButtonYRatio: 0.72
+  showRebornTimeLimit: 1
+  rebornTimeLabel: "\u5FA9\u6D3B\u307E\u3067"
+  rebornTimeFontSize: 56
+  rebornTimeColor: {r: 1, g: 1, b: 1, a: 1}
+  rebornTimeLowThreshold: 1.5
+  rebornTimeLowColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  showRebornTimeBar: 1
+  rebornTimeBarWidthRatio: 0.4
+  rebornTimeYRatio: 0.03
 --- !u!54 &1588701942435684227
 Rigidbody:
   m_ObjectHideFlags: 0

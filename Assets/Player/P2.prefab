@@ -1515,7 +1515,7 @@ PrefabInstance:
     - target: {fileID: 5822821947120931875, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 70c7414ba08605c4e94de54b6932fd49, type: 2}
+      objectReference: {fileID: 2100000, guid: bd579553f36dcab46bb4dad9cf87ad3d, type: 2}
     - target: {fileID: 6240733294840144465, guid: 29dd0fc02d04a7447b40e484821a9f0d, type: 3}
       propertyPath: m_Layer
       value: 13
@@ -1797,11 +1797,11 @@ MonoBehaviour:
     upSpeed: 0
   specialStunDuration: 0.1
   enableGuardSuccessEffect: 1
-  guardSuccessEffectPrefab: {fileID: 4575220094214949160, guid: 2b606bf4bbf80c64585e8eed7a58d48d, type: 3}
+  guardSuccessEffectPrefab: {fileID: 8365365947410503083, guid: 3e810419a41d2184da2046cdec7abe38, type: 3}
   guardSuccessEffectOffset: {x: 0, y: 1.98, z: 0}
   guardSuccessEffectLifetime: 1
   enableGuardBuffEffect: 1
-  guardBuffEffectPrefab: {fileID: 6444108975891323404, guid: 84e25cecb914eed4cab6604a274eac33, type: 3}
+  guardBuffEffectPrefab: {fileID: 3568051733618127096, guid: 2e2455a33c696d74dbe4a1baff6ff255, type: 3}
   guardBuffEffectOffset: {x: 0, y: 0.68, z: 0}
   kankiGaugePerBar: 100
   kankiGaugeBarCount: 2
