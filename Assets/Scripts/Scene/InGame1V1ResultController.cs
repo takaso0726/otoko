@@ -128,14 +128,32 @@ public class InGame1V1ResultController : MonoBehaviour
     {
         [Tooltip("項目名（管理用。画面には表示されない。例：もう一度戦う／キャラ選択へ／タイトルへ）")]
         public string label;
-        [Tooltip("遷移先のシーン名。Build Settingsに登録されている必要がある。ゲーム終了の項目は \"QUIT\" にする。")]
-        public string sceneToLoad;
-        [Tooltip("この項目のアイコン本体のオブジェクト。Icon Anchorを指定した場合、メニューが出る時にこのオブジェクトがIcon Anchorの位置へ移動する。")]
+        [Tooltip("この項目のアイコン本体。シーン内のオブジェクト、またはプロジェクト内のPrefabを指定できる。\n"
+                 + "・Prefabの場合：メニューが出る時にIcon Anchorの位置へ生成されて出現する（Icon Anchorの親の下に生成。未設定ならMenu Rootの下）。\n"
+                 + "・シーン内オブジェクトの場合：メニューが出る時にIcon Anchorの位置へ移動する。")]
         public Transform icon;
         [Tooltip("このアイコンを表示する位置を決める空オブジェクト。未設定なら、Iconをシーンに置いた位置のまま表示する。\n※UI（Canvas内）のアイコンなら、同じCanvas内に置いたRectTransformを指定すること。")]
         public Transform iconAnchor;
-        [Tooltip("選択中に光らせる、アイコンの外側に重ねて配置したアウトライン用オブジェクト（Imageなど）。")]
+        [Tooltip("遷移先のシーン名。Build Settingsに登録されている必要がある。ゲーム終了の項目は \"QUIT\" にする。")]
+        public string sceneToLoad;
+        [Tooltip("選択中に光らせる、アイコンの外側に重ねて配置したアウトライン用オブジェクト（Imageなど）。\n"
+                 + "シーン内のオブジェクト、またはプロジェクト内のPrefab（メニューが出る時にアイコンと同じ親の下へ生成される）を指定できる。")]
         public GameObject glowOutline;
+        [Tooltip("【光る側の位置調整】普通のアイコンと同じ座標からのずれ（光るアイコンの親のローカル座標。UIならピクセル単位）。\n"
+                 + "X=右＋／左－、Y=上＋／下－、Z=奥行き。全て0なら同じ座標（Menu Glow Back Offsetの分だけ奥）。")]
+        public Vector3 glowOffset = Vector3.zero;
+        [Tooltip("【光る側の大きさ調整】光るアイコンの元の大きさに掛ける倍率。1=そのまま、1.2=少し大きく。")]
+        public float glowScale = 1f;
+
+        // Prefabを指定した場合に、メニューが出る時に生成した実体（実行時のみ。Inspectorには出ない）
+        [System.NonSerialized] public Transform iconRuntime;
+        [System.NonSerialized] public GameObject glowRuntime;
+
+        // 実際に操作・表示する対象。Prefabアセットそのものは触らない（アセットを書き換えないため）。
+        public Transform Icon => iconRuntime != null ? iconRuntime
+            : (icon != null && icon.gameObject.scene.IsValid() ? icon : null);
+        public GameObject Glow => glowRuntime != null ? glowRuntime
+            : (glowOutline != null && glowOutline.scene.IsValid() ? glowOutline : null);
     }
 
     [Header("リザルトメニュー（指定回数目の攻撃でメニューを出し、選んだ項目のシーンへ遷移）")]
@@ -152,12 +170,28 @@ public class InGame1V1ResultController : MonoBehaviour
     [SerializeField] float menuGlowMinAlpha = 0.4f;
     [Tooltip("光の明滅の上限（0〜1）。")]
     [SerializeField] float menuGlowMaxAlpha = 1f;
+    [Tooltip("光るアイコンを、普通のアイコンより奥（カメラから遠い方向）へずらす距離。0なら同じ座標のまま。\n"
+             + "※アイコンと光るアイコンが同じ親の下にある場合は、ヒエラルキー上の並びでも光る側がアイコンの後ろに描画される。\n"
+             + "※World Space／3D表示の時にこの距離が効く。Screen Space - OverlayのCanvasでは並び順だけで前後が決まる。")]
+    [SerializeField] float menuGlowBackOffset = 0.05f;
     [Tooltip("メニューが出る時に鳴らすSE。未設定なら鳴らさない。")]
     [SerializeField] AudioClip menuOpenSE;
     [Tooltip("メニューの項目を切り替えた時のSE（「ドンッ」）。未設定なら鳴らさない。")]
     [SerializeField] AudioClip menuMoveSE;
     [Tooltip("メニューの項目を決定した時のSE（「バシィッ」）。未設定なら鳴らさない。鳴り終わるまで待ってから遷移する。")]
     [SerializeField] AudioClip menuDecideSE;
+    [Tooltip("「QUIT」項目を決定した時に出す終了確認ポップアップ（メインメニューと同じもの）。未設定なら確認なしで即終了する。")]
+    [SerializeField] QuitConfirmPopup quitPopup;
+
+    [Header("入力の制限")]
+    [Tooltip("ONにすると、リザルト画面では勝者のプレイヤーのコントローラー（デバイス）の操作だけを受け付ける。\n"
+             + "メニューの選択・決定、攻撃ボタンの連打カウントのどちらも、敗者側のデバイスは無視する。\n"
+             + "※勝者が未確定（引き分け／デバッグ起動）の場合や、勝者のデバイスが取得できない場合は、制限せず全員の操作を受け付ける。")]
+    [SerializeField] bool winnerOnlyInput = true;
+
+    // 勝者のPlayer／使用デバイス（winnerOnlyInput用）
+    Player winnerPlayer;
+    readonly System.Collections.Generic.List<InputDevice> winnerDevices = new System.Collections.Generic.List<InputDevice>();
 
     int hitCount;
     int revealedStageCount; // crackStageSpritesのうち、すでに表示済みの枚数
@@ -166,6 +200,9 @@ public class InGame1V1ResultController : MonoBehaviour
     int menuIndex;            // メニューで選択中の項目
     int menuOpenedFrame;      // メニューを開いたフレーム（開いた攻撃ボタンがそのまま決定にならないようにする）
     Coroutine menuGlowRoutine;
+    // 光るアイコンの元の大きさ（メニューを開き直しても倍率が重ならないように保存しておく）
+    readonly System.Collections.Generic.Dictionary<Transform, Vector3> glowBaseScales =
+        new System.Collections.Generic.Dictionary<Transform, Vector3>();
     System.IDisposable anyButtonListener;
     Coroutine blinkRoutine;
     Coroutine crackAutoRevealRoutine;
@@ -209,7 +246,15 @@ public class InGame1V1ResultController : MonoBehaviour
         {
             foreach (var item in menuItems)
             {
-                if (item != null && item.glowOutline != null) item.glowOutline.SetActive(false);
+                if (item == null) continue;
+
+                // 前回メニューを出した時にPrefabから生成した実体を破棄する（再入場時に重複しないように）
+                if (item.iconRuntime != null) Destroy(item.iconRuntime.gameObject);
+                if (item.glowRuntime != null) Destroy(item.glowRuntime);
+                item.iconRuntime = null;
+                item.glowRuntime = null;
+
+                if (item.Glow != null) item.Glow.SetActive(false);
             }
         }
 
@@ -242,6 +287,7 @@ public class InGame1V1ResultController : MonoBehaviour
         {
             player.SetResultMode(true);
         }
+        RefreshWinnerRestriction();
 
         if (useAttackButtonForCracks)
         {
@@ -299,6 +345,7 @@ public class InGame1V1ResultController : MonoBehaviour
     void Start()
     {
         if (se == null) se = GetComponent<AudioSource>();
+        RefreshWinnerRestriction();
     }
 
     void OnDisable()
@@ -315,9 +362,48 @@ public class InGame1V1ResultController : MonoBehaviour
         return pad != null && control == pad.buttonSouth;
     }
 
+    // 勝者のPlayerと使用デバイスを探し直し、勝者以外のPlayerの攻撃入力を無効にする。
+    // 勝者が未確定／見つからない場合は制限しない（全員の操作を受け付ける）。
+    void RefreshWinnerRestriction()
+    {
+        winnerPlayer = null;
+        winnerDevices.Clear();
+
+        var players = FindObjectsByType<Player>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        int winner = winnerOnlyInput ? GetWinnerPlayer() : 0;
+        if (winner == 1 || winner == 2)
+        {
+            // PlayerInputのプレイヤー番号（0始まり）が 勝者-1 のPlayerを勝者とする（1P=0、2P=1）
+            foreach (var player in players)
+            {
+                var pi = player.PlayerInputComponent;
+                if (pi != null && pi.playerIndex == winner - 1)
+                {
+                    winnerPlayer = player;
+                    foreach (var device in pi.devices) winnerDevices.Add(device);
+                    break;
+                }
+            }
+        }
+
+        foreach (var player in players)
+        {
+            player.SetResultInputEnabled(winnerPlayer == null || player == winnerPlayer);
+        }
+    }
+
+    // このデバイスからの操作を受け付けてよいか。勝者のデバイスが特定できていない時は全て許可。
+    bool IsAllowedDevice(InputDevice device)
+    {
+        if (!winnerOnlyInput || winnerDevices.Count == 0) return true;
+        return winnerDevices.Contains(device);
+    }
+
     void OnAnyButtonPressed(InputControl control)
     {
         if (isTransitioning || menuOpen) return;
+        if (control != null && !IsAllowedDevice(control.device)) return; // 勝者以外のデバイスは無視
 
         // Aボタンのみ有効の設定なら、それ以外のボタンは連打として数えない
         if (aButtonOnly && !IsAButton(control)) return;
@@ -330,6 +416,7 @@ public class InGame1V1ResultController : MonoBehaviour
     void OnResultAttackPressed(Player player)
     {
         if (isTransitioning || menuOpen) return;
+        if (winnerOnlyInput && winnerPlayer != null && player != winnerPlayer) return; // 勝者以外の攻撃は数えない
         RegisterHit();
     }
 
@@ -546,6 +633,8 @@ public class InGame1V1ResultController : MonoBehaviour
     {
         if (menuOpen || isTransitioning) return;
 
+        RefreshWinnerRestriction();
+
         menuOpen = true;
         menuOpenedFrame = Time.frameCount;
         menuIndex = 0;
@@ -553,6 +642,7 @@ public class InGame1V1ResultController : MonoBehaviour
         if (hitAnyButtonText != null) hitAnyButtonText.enabled = false;
         if (menuRoot != null) menuRoot.SetActive(true);
 
+        SpawnMenuPrefabs();
         ApplyMenuIconAnchors();
 
         if (se == null) se = GetComponent<AudioSource>();
@@ -561,21 +651,88 @@ public class InGame1V1ResultController : MonoBehaviour
         SetMenuSelectedGlow(menuIndex);
     }
 
-    // 各メニュー項目のアイコンを、Icon Anchor（空オブジェクト）の位置へ移動する。
-    // Glow Outlineがアイコンの子でない場合は、アイコンと同じ移動量だけ動かして位置関係を保つ。
+    // アイコン／光るアイコンにPrefabが設定されている項目は、ここで生成して出現させる。
+    // ・アイコン：Icon Anchorの親の下（未設定ならMenu Rootの下）に生成する。
+    // ・光るアイコン：アイコンと同じ親の下に生成する（描画順をアイコンの後ろにするため）。
+    // 生成した光るアイコンは、選択されるまで非表示にしておく。
+    void SpawnMenuPrefabs()
+    {
+        if (menuItems == null) return;
+
+        foreach (var item in menuItems)
+        {
+            if (item == null) continue;
+
+            // アイコン（Prefabアセットが指定されている場合のみ生成）
+            if (item.iconRuntime == null && item.icon != null && !item.icon.gameObject.scene.IsValid())
+            {
+                Transform parent = item.iconAnchor != null ? item.iconAnchor.parent
+                                 : (menuRoot != null ? menuRoot.transform : transform);
+                var inst = Instantiate(item.icon.gameObject, parent, false);
+                inst.name = item.icon.gameObject.name;
+                inst.SetActive(true);
+                item.iconRuntime = inst.transform;
+            }
+
+            // 光るアイコン（Prefabアセットが指定されている場合のみ生成）
+            if (item.glowRuntime == null && item.glowOutline != null && !item.glowOutline.scene.IsValid())
+            {
+                Transform icon = item.Icon;
+                Transform parent = icon != null ? icon.parent
+                                 : (menuRoot != null ? menuRoot.transform : transform);
+                var inst = Instantiate(item.glowOutline, parent, false);
+                inst.name = item.glowOutline.name;
+                inst.SetActive(false); // 選択されるまで非表示
+                item.glowRuntime = inst;
+            }
+        }
+    }
+
+    // 各メニュー項目のアイコンを、Icon Anchor（空オブジェクト）の位置へ移動し、
+    // 光るアイコン（Glow Outline）を、普通のアイコンと同じ座標に重ね、少し奥（後ろ）に配置する。
+    // Icon Anchor未設定の項目は、アイコンはそのままの位置で、光るアイコンだけをアイコンの座標に合わせる。
     void ApplyMenuIconAnchors()
     {
         if (menuItems == null) return;
 
         foreach (var item in menuItems)
         {
-            if (item == null || item.icon == null || item.iconAnchor == null) continue;
+            Transform icon = item != null ? item.Icon : null;
+            if (icon == null) continue;
 
-            Vector3 delta = item.iconAnchor.position - item.icon.position;
-            item.icon.position += delta;
+            if (item.iconAnchor != null)
+                icon.position = item.iconAnchor.position;
 
-            if (item.glowOutline != null && !item.glowOutline.transform.IsChildOf(item.icon))
-                item.glowOutline.transform.position += delta;
+            GameObject glow = item.Glow;
+            if (glow != null)
+            {
+                var glowTr = glow.transform;
+
+                // 同じ座標に重ねてから、カメラから遠い方向（奥）へ少しだけずらす
+                Camera cam = Camera.main;
+                Vector3 backDir = cam != null ? cam.transform.forward : Vector3.forward;
+                glowTr.position = icon.position + backDir * menuGlowBackOffset;
+
+                // 項目ごとの位置調整（光るアイコンの親のローカル座標で、同じ座標からずらす）
+                glowTr.localPosition += item.glowOffset;
+
+                // 項目ごとの大きさ調整（元の大きさ × 倍率）
+                if (!glowBaseScales.TryGetValue(glowTr, out var baseScale))
+                {
+                    baseScale = glowTr.localScale;
+                    glowBaseScales[glowTr] = baseScale;
+                }
+                float scaleMul = item.glowScale > 0f ? item.glowScale : 1f;
+                glowTr.localScale = baseScale * scaleMul;
+
+                // 同じ親の下なら、描画順もアイコンの1つ後ろ（＝アイコンが手前）にする
+                if (glowTr.parent == icon.parent && glowTr != icon)
+                {
+                    int iconIndex = icon.GetSiblingIndex();
+                    int glowIndex = glowTr.GetSiblingIndex();
+                    glowTr.SetSiblingIndex(glowIndex < iconIndex ? iconIndex - 1 : iconIndex);
+                }
+            }
         }
     }
 
@@ -593,26 +750,32 @@ public class InGame1V1ResultController : MonoBehaviour
     }
 
     // 左右入力（キーボード←→/A D、ゲームパッド十字キー／左スティック）。右が+1、左が-1。
+    // 接続中の全パッドを見るが、Winner Only Inputがオンなら勝者のデバイスの入力だけを受け付ける。
     int ReadMenuHorizontalNav()
     {
-        if (Keyboard.current != null)
+        if (Keyboard.current != null && IsAllowedDevice(Keyboard.current))
         {
             if (Keyboard.current.rightArrowKey.wasPressedThisFrame || Keyboard.current.dKey.wasPressedThisFrame) return 1;
             if (Keyboard.current.leftArrowKey.wasPressedThisFrame || Keyboard.current.aKey.wasPressedThisFrame) return -1;
         }
-        if (Gamepad.current != null)
+        foreach (var pad in Gamepad.all)
         {
-            if (Gamepad.current.dpad.right.wasPressedThisFrame || Gamepad.current.leftStick.right.wasPressedThisFrame) return 1;
-            if (Gamepad.current.dpad.left.wasPressedThisFrame || Gamepad.current.leftStick.left.wasPressedThisFrame) return -1;
+            if (pad == null || !IsAllowedDevice(pad)) continue;
+            if (pad.dpad.right.wasPressedThisFrame || pad.leftStick.right.wasPressedThisFrame) return 1;
+            if (pad.dpad.left.wasPressedThisFrame || pad.leftStick.left.wasPressedThisFrame) return -1;
         }
         return 0;
     }
 
-    // 決定（Enterキー／ゲームパッドのAボタン）
+    // 決定（Enterキー／ゲームパッドのAボタン）。Winner Only Inputがオンなら勝者のデバイスだけ。
     bool ReadMenuDecide()
     {
-        return (Keyboard.current != null && Keyboard.current.enterKey.wasPressedThisFrame)
-            || (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame);
+        if (Keyboard.current != null && IsAllowedDevice(Keyboard.current) && Keyboard.current.enterKey.wasPressedThisFrame) return true;
+        foreach (var pad in Gamepad.all)
+        {
+            if (pad != null && IsAllowedDevice(pad) && pad.buttonSouth.wasPressedThisFrame) return true;
+        }
+        return false;
     }
 
     void MoveMenuSelection(int dir)
@@ -628,14 +791,14 @@ public class InGame1V1ResultController : MonoBehaviour
     {
         for (int i = 0; i < menuItems.Length; i++)
         {
-            var glow = menuItems[i] != null ? menuItems[i].glowOutline : null;
+            var glow = menuItems[i] != null ? menuItems[i].Glow : null;
             if (glow != null) glow.SetActive(i == selectedIndex);
         }
 
         if (menuGlowRoutine != null) StopCoroutine(menuGlowRoutine);
         menuGlowRoutine = null;
 
-        var selectedGlow = menuItems[selectedIndex] != null ? menuItems[selectedIndex].glowOutline : null;
+        var selectedGlow = menuItems[selectedIndex] != null ? menuItems[selectedIndex].Glow : null;
         if (selectedGlow != null) menuGlowRoutine = StartCoroutine(MenuGlowPulse(selectedGlow));
     }
 
@@ -659,9 +822,16 @@ public class InGame1V1ResultController : MonoBehaviour
         var item = menuItems[menuIndex];
         if (item == null || string.IsNullOrEmpty(item.sceneToLoad)) return;
 
-        isTransitioning = true;
         if (se != null && menuDecideSE != null) se.PlayOneShot(menuDecideSE);
 
+        // ゲーム終了項目は、メインメニューと同じ煽りポップアップを出す
+        if (item.sceneToLoad == "QUIT" && quitPopup != null)
+        {
+            quitPopup.Open();
+            return;
+        }
+
+        isTransitioning = true;
         StartCoroutine(LoadMenuSceneAfterSE(item.sceneToLoad));
     }
 

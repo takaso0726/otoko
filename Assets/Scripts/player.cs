@@ -184,6 +184,14 @@ public class Player : MonoBehaviour
 
     public bool IsResultMode => isResultMode;
 
+    // ★追加：リザルト画面で、このPlayerの攻撃ボタン入力を受け付けるか。
+    //   InGame1V1ResultControllerが「勝者以外の操作は無効」にする時、勝者以外のPlayerをfalseにする。
+    bool resultInputEnabled = true;
+    public void SetResultInputEnabled(bool enabled) { resultInputEnabled = enabled; }
+
+    // ★追加：このPlayerに紐づいているPlayerInput（1P=playerIndex 0／2P=1、使用デバイスの取得に使う）
+    public PlayerInput PlayerInputComponent => playerInput != null ? playerInput : GetComponent<PlayerInput>();
+
     // リザルト画面モードのON/OFFを切り替える（InGame1V1ResultControllerからも呼ばれる）
     public void SetResultMode(bool enable)
     {
@@ -1148,6 +1156,7 @@ public class Player : MonoBehaviour
         // ★リザルト画面モード：攻撃として受け付ける（通知は、実際に攻撃が出るEnterPunch内で行う）
         if (isResultMode)
         {
+            if (!resultInputEnabled) return; // ★勝者以外の操作は受け付けない
             wantPunch = true;
             return;
         }
@@ -1170,6 +1179,7 @@ public class Player : MonoBehaviour
         // ★リザルト画面モード：攻撃として受け付ける（通知は、実際に攻撃が出るEnterKick内で行う）
         if (isResultMode)
         {
+            if (!resultInputEnabled) return; // ★勝者以外の操作は受け付けない
             wantKick = true;
             return;
         }
