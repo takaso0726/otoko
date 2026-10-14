@@ -61,8 +61,12 @@ PrefabInstance:
       value: 0.1
       objectReference: {fileID: 0}
     - target: {fileID: 6897903952467720368, guid: f7bfdc150271c9844b0dce4dd0659200, type: 3}
+      propertyPath: InitialModule.startSpeed.scalar
+      value: 20
+      objectReference: {fileID: 0}
+    - target: {fileID: 6897903952467720368, guid: f7bfdc150271c9844b0dce4dd0659200, type: 3}
       propertyPath: InitialModule.startLifetime.scalar
-      value: 0.75
+      value: 0.5
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

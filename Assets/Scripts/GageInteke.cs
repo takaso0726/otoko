@@ -1,62 +1,66 @@
 using UnityEngine;
 
 [RequireComponent(typeof(ParticleSystem))]
-public class ParticleAttractorToTarget : MonoBehaviour
+public class ParticleAttractor : MonoBehaviour
 {
-    [Header("設定")]
-    [SerializeField] private Transform targetTransform; // 吸い込み先のターゲット（3D位置、またはUIに追従するオブジェクト）
-    [SerializeField] private float moveSpeed = 10f;     // 吸い込まれる速度
-    [SerializeField] private float arriveDistance = 0.5f; // 到着とみなす距離
+    [SerializeField] private RectTransform targetUI;
+    [SerializeField] private Camera targetCamera;
+    [SerializeField] private float speed = 10f;       // 引き寄せる速度
+    [SerializeField] private float reachDistance = 0.2f; // 吸収判定の距離
 
     private ParticleSystem ps;
     private ParticleSystem.Particle[] particles;
 
-    private void Start()
+    void Start()
     {
         ps = GetComponent<ParticleSystem>();
+        if (targetCamera == null) targetCamera = Camera.main;
 
-        // パーティクルの最大数分の配列を確保（GC Allocを防ぐため使い回す）
-        var main = ps.main;
-        particles = new ParticleSystem.Particle[main.maxParticles];
     }
 
-    private void LateUpdate()
+    void LateUpdate()
     {
-        if (targetTransform == null) return;
+        if (targetUI == null || ps == null) return;
 
-        // 1. 現在生きているパーティクルの情報を取得
-        int numParticlesAlive = ps.GetParticles(particles);
+        // UIのWorld位置を取得（CanvasのRender Modeに応じたスクリーン座標換算）
+        Vector3 targetWorldPos = GetTargetWorldPosition();
 
-        Vector3 targetPos = targetTransform.position;
-
-        // 2. 1粒ずつ位置を書き換える
-        for (int i = 0; i < numParticlesAlive; i++)
+        int maxParticles = ps.main.maxParticles;
+        if (particles == null || particles.Length < maxParticles)
         {
-            // パーティクルの現在地からターゲットへ向けて補間移動
-            // ※ Simulation SpaceがWorldであることが前提
-            particles[i].position = Vector3.Lerp(
+            particles = new ParticleSystem.Particle[maxParticles];
+        }
+
+        int count = ps.GetParticles(particles);
+
+        for (int i = 0; i < count; i++)
+        {
+            // ターゲットに向かって徐々に移動（LerpまたはMoveTowards）
+            particles[i].position = Vector3.MoveTowards(
                 particles[i].position,
-                targetPos,
-                moveSpeed * Time.deltaTime
+                targetWorldPos,
+                speed * Time.deltaTime
             );
 
-            // 3. ターゲットに十分近づいたら消滅させる
-            float distance = Vector3.Distance(particles[i].position, targetPos);
-            if (distance < arriveDistance)
+            // ターゲットに到達したら粒子の寿命をゼロにして消滅させる（「吸収」の表現）
+            if (Vector3.Distance(particles[i].position, targetWorldPos) < reachDistance)
             {
-                particles[i].remainingLifetime = 0f; // 寿命を0にして消す
-                OnParticleAbsorbed(); // ゲージ増加などの処理
+                particles[i].remainingLifetime = 0;
+                // ここでUIゲージを増やすイベントなどを呼ぶと効果的！
             }
         }
 
-        // 4. 変更したパーティクル情報をシステムに戻す
-        ps.SetParticles(particles, numParticlesAlive);
+        ps.SetParticles(particles, count);
     }
 
-    private void OnParticleAbsorbed()
+    private Vector3 GetTargetWorldPosition()
     {
-        // ゲージを増やす処理やSEの再生など
-        // ※ 1フレームに複数個同時に消えることがあるため、呼び出し頻度に注意
-        Debug.Log("パーティクルがゲージに吸収された！");
+        // UIのScreen/World位置をParticleSystemの座標系に合わせる
+        Vector3 uiScreenPos = RectTransformUtility.WorldToScreenPoint(targetCamera, targetUI.position);
+
+        // 3D空間上のZ軸深度（ParticleSystemのZ位置に合わせる）
+        uiScreenPos.z = Mathf.Abs(targetCamera.transform.position.z - transform.position.z);
+
+        return targetCamera.ScreenToWorldPoint(uiScreenPos);
     }
 }
