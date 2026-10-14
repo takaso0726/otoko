@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -15,8 +16,9 @@ using UnityEngine.InputSystem.Users;
 //       2P = Player2CharacterName / player2SpawnPoint / Gamepad[1]
 //   ・ゲームパッドの抜き差しがあっても、生成済みキャラは入れ替わらず、
 //     操作デバイスだけを割り当て直す（新しいパッドでの自動参加はしない）
-//   ・【デバッグ】セレクト画面でキャラが選択されていない場合、
-//     インゲーム画面で F9 を押すと、1P/2Pのスポーン地点にデバッグ用プレハブを生成する
+//   ・【デバッグ】インゲーム画面で F9 を押すたびに、既存の1P/2Pを消して生成し直す
+//       セレクト画面でキャラを選択済み ... 選択したキャラで再生成
+//       未選択                         ... デバッグ用プレハブで生成（初回もF9で生成）
 //     （Editor / Development Build のみ有効）
 //
 // PlayerInputManager側の設定：
@@ -51,7 +53,7 @@ public class GameInputManager : MonoBehaviour
     [SerializeField] GameObject debugPlayer1Prefab;
     [Tooltip("2P用。空ならfallbackPrefabを使用します。")]
     [SerializeField] GameObject debugPlayer2Prefab;
-    [Tooltip("デバッグ生成を行うキー")]
+    [Tooltip("デバッグ再生成を行うキー（押すたびに既存の1P/2Pを消して生成し直す）")]
     [SerializeField] Key debugSpawnKey = Key.F9;
 
     [Header("シーン内の参照（空なら実行時に自動で探す）")]
@@ -65,7 +67,8 @@ public class GameInputManager : MonoBehaviour
     [SerializeField] string player2ControlScheme = "";
 
     PlayerInputManager manager;
-    bool spawned; // 二重生成防止
+    bool spawned;    // 二重生成防止
+    bool respawning; // 再生成中（Destroyの完了待ち）の連打防止
 
     public GameObject Player1Instance { get; private set; }
     public GameObject Player2Instance { get; private set; }
@@ -118,12 +121,38 @@ public class GameInputManager : MonoBehaviour
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
     void Update()
     {
-        if (spawned) return;
-        if (CharacterSelectController.CharacterSelectionResult.IsValid) return;
+        if (respawning) return;
 
         var kb = Keyboard.current;
         if (kb != null && kb[debugSpawnKey].wasPressedThisFrame)
-            SpawnAll(true);
+            StartCoroutine(RespawnRoutine());
+    }
+
+    // 既存の1P/2Pを消して、1フレーム待ってから生成し直す。
+    // Destroyはフレーム終了時に実行されるため、同じフレームでJoinPlayerすると
+    // 古いPlayerInputがまだ残っており、人数カウントやデバイスの割り当てが衝突してしまう。
+    IEnumerator RespawnRoutine()
+    {
+        respawning = true;
+
+        DestroyPlayer(Player1Instance);
+        DestroyPlayer(Player2Instance);
+        Player1Instance = null;
+        Player2Instance = null;
+        spawned = false;
+
+        yield return null;
+
+        // セレクト済みなら選択キャラで、未選択ならデバッグ用プレハブで生成する
+        bool debugSpawn = !CharacterSelectController.CharacterSelectionResult.IsValid;
+        SpawnAll(debugSpawn);
+
+        respawning = false;
+    }
+
+    static void DestroyPlayer(GameObject go)
+    {
+        if (go != null) Destroy(go);
     }
 #endif
 
