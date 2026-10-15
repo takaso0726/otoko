@@ -76,6 +76,8 @@ public class Player : MonoBehaviour
     [SerializeField] bool enableF8DebugKey = false;
     [Tooltip("ONにすると、このキャラクターでF10キー（やられ状態中に連続で攻撃が当たった回数の画面表示ON/OFF）が使えます。")]
     [SerializeField] bool enableF10DebugKey = false;
+    [Tooltip("F10で表示するデバッグ文字（やられ状態／相手の技のクールタイム）のフォントサイズ。")]
+    [SerializeField, Range(8, 48)] int f10DebugFontSize = 18;
 
     //=====================================================
     // ★追加：矢印キー（↑←→↓）で任意のアニメーションを再生する設定
@@ -303,14 +305,74 @@ public class Player : MonoBehaviour
     [Tooltip("★追加：ONにすると、手が相手に接触してから上のthrowStartPlayFramesフレームだけ掴みモーションを再生し続け、その後に止める。" +
              "OFF（既定）の時は、手が相手に接触した瞬間にアニメーションを即座に止める。")]
     [SerializeField] bool enableThrowStartPlay = false;
+    [Tooltip("★追加：掴んでいる間に方向入力（前／後）をした時は、拘束時間の終了を待たずに即座に投げ飛ばす。\n" +
+             "投げ飛ばした後、掴んでいた側が次の行動に移れるようになるまでの硬直フレーム数（60F=1秒）。\n" +
+             "※拘束時間の残りがこれより短ければ、残り時間のほうが使われる。")]
+    [SerializeField] int throwReleaseRecoveryFrames = 20;
+    [Tooltip("★追加：掴みが成立してから、方向入力による即時投げを受け付け始めるまでのフレーム数（60F=1秒）。\n" +
+             "この間は入力しても投げに移行せず、掴んだ状態を保つ。この間の入力は先行入力としては扱わず、\n" +
+             "経過後も入力し続けている（押しっぱなし）場合に投げが決まる。")]
+    [SerializeField] int throwInputStartDelayFrames = 10;
 
     //=====================================================
     // ★ガード（仁王立ち）成功時の攻撃力上昇設定
+    //   ★変更：以前は「相手の攻撃力を自分の攻撃力に加算」していたが、
+    //   「次に与える技のダメージ倍率を上げる」方式に変更した。
     //=====================================================
     [Header("ガード成功時の攻撃力上昇設定")]
-    [Tooltip("ガード成功時、「相手の攻撃力 × この倍率」を自分の攻撃力に上乗せする。" +
-             "1なら相手の攻撃力をそのまま加算、0.5なら半分だけ加算、0なら上昇なし。")]
-    [SerializeField] float guardAtkBonusMultiplier = 1.0f;
+    [Tooltip("ガード成功時、次に自分が与える技のダメージ倍率。1.5なら次の技のダメージが1.5倍になる。\n" +
+             "（漢気ゲージによる攻撃力補正とは別に、さらに掛け算される）\n" +
+             "倍率は次の攻撃が相手に命中するまで持続する。1以下なら上昇なし。\n" +
+             "★技を出す（命中する）前に続けてガードに成功すると、成功するたびにこの倍率が掛け算で重なっていく（1.5なら 1.5 → 2.25 → 3.375…）。")]
+    [SerializeField] float guardSuccessNextAttackMultiplier = 1.5f;
+    [Tooltip("ガード成功を重ねた時の、倍率の上限。0以下なら上限なし。")]
+    [SerializeField] float guardSuccessMaxMultiplier = 0f;
+
+    //=====================================================
+    // ★ガード（仁王立ち）失敗時のペナルティ設定
+    //   「失敗」＝相手の攻撃を一度も受け止めないまま、仁王立ちの拘束時間が終わった（空ガード）場合。
+    //=====================================================
+    [Header("ガード失敗時のペナルティ設定")]
+    [Tooltip("ガード失敗後、漢気ゲージの増加量にかかる倍率。0.5なら半減。1なら影響なし。")]
+    [Range(0f, 1f)]
+    [SerializeField] float guardFailGaugeGainRate = 0.5f;
+    [Tooltip("ガード失敗後、漢気ゲージの増加率が下がる時間（フレーム数。60F=1秒）。0なら下がらない。")]
+    [SerializeField] int guardFailGaugePenaltyFrames = 180;
+    [Tooltip("ガード失敗直後に受けるダメージにかかる倍率。1.5なら1.5倍。1なら影響なし。")]
+    [SerializeField] float guardFailDamageMultiplier = 1.5f;
+    [Tooltip("ガード失敗直後、受けるダメージが増える時間（フレーム数。60F=1秒）。0なら増えない。")]
+    [SerializeField] int guardFailDamagePenaltyFrames = 60;
+
+    private bool guardBlockedThisGuard = false; // 今の仁王立ちで、相手の攻撃を1回でも受け止めたか（失敗判定用）
+    private int guardFailGaugeTimer = 0;        // 漢気ゲージ増加率ダウンの残りフレーム数
+    private int guardFailDamageTimer = 0;       // 被ダメージ増加の残りフレーム数
+
+    // ★追加：F10デバッグ表示用。直前に受けたダメージの記録
+    private int lastDamageTaken = 0;            // 実際に減ったダメージ量（ガード半減・失敗ペナルティ反映後）
+    private int lastDamageBase = 0;             // ペナルティ倍率を掛ける前のダメージ量
+    private string lastDamageKind = "なし";     // 直前のダメージの種類（通常被弾／ガード(半減)／damege()）
+
+    void RecordDamage(int damage, int baseDamage, string kind)
+    {
+        lastDamageTaken = damage;
+        lastDamageBase = baseDamage;
+        lastDamageKind = kind;
+    }
+
+    // ガード失敗ペナルティの残りフレームを消化する（Updateの先頭から毎フレーム呼ぶ）
+    void TickGuardFailPenalty()
+    {
+        if (guardFailGaugeTimer > 0) guardFailGaugeTimer = Mathf.Max(guardFailGaugeTimer - frameStep, 0);
+        if (guardFailDamageTimer > 0) guardFailDamageTimer = Mathf.Max(guardFailDamageTimer - frameStep, 0);
+    }
+
+    // 仁王立ちが空振り（1回も受け止めずに終了）した時に呼ぶ
+    void ApplyGuardFailPenalty()
+    {
+        guardFailGaugeTimer = Mathf.Max(guardFailGaugePenaltyFrames, 0);
+        guardFailDamageTimer = Mathf.Max(guardFailDamagePenaltyFrames, 0);
+        DLog($"[{PlayerName}] ガード失敗：漢気ゲージ増加率×{guardFailGaugeGainRate}を{guardFailGaugeTimer}F／被ダメージ×{guardFailDamageMultiplier}を{guardFailDamageTimer}F");
+    }
 
     //=====================================================
     // ★ガード（仁王立ち）成功時の、相手へのスタン設定
@@ -491,6 +553,7 @@ public class Player : MonoBehaviour
     [SerializeField] Vector3 guardBuffEffectOffset = new Vector3(0f, 1.0f, 0f); // 生成位置のオフセット（プレイヤー基準）
 
     private bool isGuardBuffed = false;               // 現在ガード成功による攻撃力上昇中かどうか
+    private float guardBuffMultiplier = 1f;            // 現在のガード成功による累積ダメージ倍率（ガード成功のたびに掛け算で増える）
     private ParticleSystem activeGuardBuffEffect;      // 生成中の攻撃力上昇エフェクトの参照（多重生成防止・停止処理用）
     //=====================================================
     // ---- 漢気ゲージ(必殺技ゲージ) ----
@@ -906,6 +969,7 @@ public class Player : MonoBehaviour
         if (isGuardBuffed)
         {
             isGuardBuffed = false;
+            guardBuffMultiplier = 1f; // 技が当たったので累積倍率をリセット
             StopGuardBuffEffect();
         }
     }
@@ -1299,6 +1363,7 @@ public class Player : MonoBehaviour
 
         MaintainKankiChargeEffect(); // ★追加：漢気ゲージ1本以上の間、追従エフェクトを出し続ける
         TickReviveBuff();            // ★追加：漢気復活後の攻撃力上昇の残り時間を消化する
+        TickGuardFailPenalty();      // ★追加：ガード失敗ペナルティ（ゲージ増加率ダウン／被ダメージ増加）の残り時間を消化する
         TickMashButtonVisual();      // ★追加：連打ボタン画像の押した／押していない切り替え
         if (!isResultMode) ResolveOpponentIfMissing();  // ★追加：プレハブ化・再配置等で相手(enemyPlayer/enemy)の参照が切れていたら自動で探し直す
         // ★修正：しゃがみの見た目（コライダー・アニメーター）は、
@@ -2033,6 +2098,7 @@ public class Player : MonoBehaviour
     private int stunComboCount = 0;          // 今のやられ状態中に連続で当たった回数（0=やられ中ではない）
     private int lastStunComboCount = 0;      // 直前に終わったやられ状態での連続ヒット数
     private bool showStunComboDebug = false; // F10で切り替える、連続ヒット数の画面表示ON/OFF
+    private int stunBarTotalFrames = 0;      // ★追加：F10表示用。今のやられ状態の合計フレーム数（延長されたら増える）。消化済み部分を□で残すために使う
 
     void StunDLog(string message)
     {
@@ -2048,6 +2114,10 @@ public class Player : MonoBehaviour
             || currentState == PlayerState.Special) return;
         if (currentState == PlayerState.Throw && grabbedTarget != null) return; // 相手を掴んでいる最中
 
+        // ★追加：仁王立ち（ガード）中の側には、相手の攻撃のスタン時間を一切反映しない。
+        //   ガード成功時は攻撃者側だけがApplyGuardedStunでスタンし、ガードした側はスタンしない。
+        if (currentState == PlayerState.Guard || isGuarding) return;
+
         bool alreadyStunned = currentState == PlayerState.Stunned;
 
         // この一撃でダウンする場合は、やられ状態にはせず、コンボだけ確定させる（以降はダウン処理に任せる）
@@ -2061,7 +2131,9 @@ public class Player : MonoBehaviour
         if (alreadyStunned)
         {
             stunComboCount++;
+            int prevTimer = stateTimer;
             stateTimer = Mathf.Max(stateTimer, frames);
+            stunBarTotalFrames += Mathf.Max(stateTimer - prevTimer, 0); // 延長された分だけバーの全長も伸ばす
         }
         else
         {
@@ -2089,7 +2161,9 @@ public class Player : MonoBehaviour
 
         if (currentState == PlayerState.Stunned)
         {
+            int prevTimer = stateTimer;
             stateTimer = Mathf.Max(stateTimer, frames);
+            stunBarTotalFrames += Mathf.Max(stateTimer - prevTimer, 0); // 延長された分だけバーの全長も伸ばす
         }
         else
         {
@@ -2111,6 +2185,7 @@ public class Player : MonoBehaviour
 
         currentState = PlayerState.Stunned;
         stateTimer = frames;
+        stunBarTotalFrames = frames; // F10表示用：バーの全長を初期化
 
         DLog($"[{PlayerName}] やられ状態に入りました（{frames}フレーム）");
     }
@@ -2124,28 +2199,154 @@ public class Player : MonoBehaviour
         stunComboCount = 0;
     }
 
-    // F10デバッグ表示：やられ状態中に連続で当たった回数を画面端に表示する
+    // ★追加：F10表示用。今「通常攻撃（パンチ／キック／上キック／下キック）」のクールダウン中なら、その残り／全長フレームを返す。
+    //   全長は、命中済みなら命中時の合計フレーム、空振り中なら空振り時の合計フレーム（攻撃を出した瞬間からの合計時間）。
+    public bool TryGetAttackCooldown(out string attackName, out int remainFrames, out int totalFrames)
+    {
+        attackName = "";
+        remainFrames = 0;
+        totalFrames = 0;
+
+        switch (currentState)
+        {
+            case PlayerState.Punch: attackName = "パンチ"; break;
+            case PlayerState.Kick: attackName = "キック"; break;
+            case PlayerState.UpKick: attackName = "上キック"; break;
+            case PlayerState.DownKick: attackName = "下キック"; break;
+            default: return false;
+        }
+
+        remainFrames = Mathf.Max(stateTimer, 0);
+        int total = attackLandedThisAttack ? GetHitFrames(CurrentAttackType) : currentAttackMissFrames;
+        totalFrames = Mathf.Max(total, remainFrames);
+        return true;
+    }
+
+    // F10デバッグ表示：
+    //   ・黄色の文字…やられ状態の情報（残りフレーム／連続ヒット数）
+    //   ・水色の文字…相手が出した通常攻撃のクールタイム情報（相手が攻撃中でなければ「なし」）
+    //   ・その下に、フレームバーを「やられ状態（黄）」「相手の技のクールタイム（水色）」の順に上下で隣り合わせに並べて表示する。
+    //     ■（塗りつぶし）＝残りフレーム／□（枠だけ）＝消化済み。1マス＝1フレームで、5フレームごとに少し間を空ける。
+    //     ★変更：2本のバーは同じ大きさ・同じ間隔のマスで描くため、フォントの字幅の違いに左右されず、上下で同じフレームの位置が揃う。
+    //     P1：左端を起点に右から左へ減る／P2：右端を起点に左から右へ減る（□が左から増える）。
     void DrawStunComboDebug()
     {
         if (!showStunComboDebug) return;
 
+        // P2は画面右側に表示する。PlayerInputのindexが1、またはPlayerNameが"P2"ならP2とみなす。
         int index = playerInput != null ? playerInput.playerIndex : 0;
-        float width = 420f;
-        float height = 150f;
-        float x = index == 0 ? 20f : Screen.width - width - 20f;
-        Rect rect = new Rect(x, Screen.height * 0.3f, width, height);
+        bool isRightSide = index == 1 || PlayerName == "P2";
+        float width = Screen.width * 0.45f;
+        float x = isRightSide ? Screen.width - width - 20f : 20f;
+        float y = Screen.height * 0.3f;
 
-        string stateText = currentState == PlayerState.Stunned ? $"やられ中（残り{stateTimer}フレーム）" : "通常";
-        string text = $"[{PlayerName}] やられ状態\n状態: {stateText}\n連続ヒット数: {stunComboCount}\n直前のコンボ: {lastStunComboCount} ヒット";
+        // ---- 数値情報（文字）----
+        bool stunned = currentState == PlayerState.Stunned;
+        int stunRemain = stunned ? Mathf.Max(stateTimer, 0) : 0;
+        int stunTotal = stunned ? Mathf.Max(stunBarTotalFrames, stunRemain) : 0;
+        string stateText = stunned ? $"やられ中（残り{stunRemain}F）" : "通常";
+        string stunText = $"[{PlayerName}] やられ状態\n状態: {stateText}\n連続ヒット数: {stunComboCount}\n直前のコンボ: {lastStunComboCount} ヒット";
+        y += DrawOutlinedLabel(new Rect(x, y, width, 0f), stunText, Color.yellow, isRightSide) + 6f;
 
+        int cdRemain = 0, cdTotal = 0;
+        string cooldownText = "相手の技: なし";
+        if (enemyPlayer != null && enemyPlayer.TryGetAttackCooldown(out string atkName, out cdRemain, out cdTotal))
+        {
+            cooldownText = $"相手の技: {atkName}（クールタイム残り{cdRemain}F）";
+        }
+        else
+        {
+            cdRemain = 0;
+            cdTotal = 0;
+        }
+        y += DrawOutlinedLabel(new Rect(x, y, width, 0f), cooldownText, Color.cyan, isRightSide) + 6f;
+
+        // ---- 仁王立ち上昇倍率／ダメージ量（緑）----
+        string buffText = isGuardBuffed
+            ? $"仁王立ち上昇倍率: ×{Mathf.Max(1f, guardBuffMultiplier):F2}（上昇中）"
+            : "仁王立ち上昇倍率: ×1.00（なし）";
+        string penaltyText = guardFailDamageTimer > 0
+            ? $"／ガード失敗ペナルティ中：被ダメージ×{guardFailDamageMultiplier:F2}（残り{guardFailDamageTimer}F）"
+            : "";
+        string damageText = lastDamageTaken > 0 || lastDamageKind != "なし"
+            ? $"直前に受けたダメージ: {lastDamageTaken}（{lastDamageKind}" + (lastDamageBase != lastDamageTaken ? $"／元{lastDamageBase}" : "") + "）"
+            : "直前に受けたダメージ: なし";
+        string guardInfoText = $"{buffText}\n現在の攻撃力: {atk}\n{damageText}{penaltyText}";
+        y += DrawOutlinedLabel(new Rect(x, y, width, 0f), guardInfoText, Color.green, isRightSide) + 8f;
+
+        // ---- フレームバー（上：やられ状態／下：相手の技のクールタイム）----
+        float cell = f10DebugFontSize * 0.8f;   // 1フレームぶんのマスの大きさ（フォントサイズに連動）
+        float pitch = cell + 3f;                // マスの間隔
+        float groupGap = cell * 0.5f;           // 5フレームごとの追加の間
+        float rowHeight = cell + 6f;
+
+        // 1行に収まるフレーム数（5の倍数）。収まらない分は次の行へ折り返す。上下のバーは同じ行位置で隣り合わせに描く。
+        int perRow = 5;
+        while (BarSlotX(perRow + 5, pitch, groupGap) - groupGap <= width) perRow += 5;
+        int rows = Mathf.Max(1, Mathf.CeilToInt(Mathf.Max(stunTotal, cdTotal) / (float)perRow));
+
+        for (int r = 0; r < rows; r++)
+        {
+            DrawFrameBarRow(x, y, width, isRightSide, r, perRow, stunRemain, stunTotal, cell, pitch, groupGap, Color.yellow);
+            y += rowHeight;
+            DrawFrameBarRow(x, y, width, isRightSide, r, perRow, cdRemain, cdTotal, cell, pitch, groupGap, Color.cyan);
+            y += rowHeight + 4f;
+        }
+    }
+
+    // バーの「何マス目(0始まり)」の起点側からの距離。5マスごとにgroupGapだけ間を空ける。
+    static float BarSlotX(int slot, float pitch, float groupGap)
+    {
+        return slot * pitch + (slot / 5) * groupGap;
+    }
+
+    // フレームバーの1行ぶん（r行目）を描く。remain個の■（塗り）と、total-remain個の□（枠のみ）。
+    // P1は左端が起点、P2は右端が起点（□が反対側＝左側から増えていく）。
+    void DrawFrameBarRow(float x, float y, float width, bool anchorRight, int r, int perRow,
+                         int remain, int total, float cell, float pitch, float groupGap, Color color)
+    {
+        Color prev = GUI.color;
+        for (int i = r * perRow; i < Mathf.Min(total, (r + 1) * perRow); i++)
+        {
+            float offset = BarSlotX(i - r * perRow, pitch, groupGap);
+            float cx = anchorRight ? x + width - offset - cell : x + offset;
+            Rect cellRect = new Rect(cx, y, cell, cell);
+
+            // 黒い縁取り
+            GUI.color = Color.black;
+            GUI.DrawTexture(new Rect(cellRect.x - 1f, cellRect.y - 1f, cell + 2f, cell + 2f), Texture2D.whiteTexture);
+
+            // 色付きの本体
+            GUI.color = color;
+            GUI.DrawTexture(cellRect, Texture2D.whiteTexture);
+
+            // 消化済みフレームは中をくり抜いて「□」にする
+            if (i >= remain)
+            {
+                GUI.color = new Color(0f, 0f, 0f, 0.85f);
+                GUI.DrawTexture(new Rect(cellRect.x + 2f, cellRect.y + 2f, cell - 4f, cell - 4f), Texture2D.whiteTexture);
+            }
+        }
+        GUI.color = prev;
+    }
+
+    // ★追加：縁取り付きのラベルを描画し、使用した高さを返す（文字が折り返しても下段と重ならないよう、高さは内容から計算する）。
+    //   rect.heightは無視して、f10DebugFontSizeと幅から算出する。
+    float DrawOutlinedLabel(Rect rect, string text, Color color, bool rightAlign)
+    {
         GUIStyle style = new GUIStyle(GUI.skin.label)
         {
-            fontSize = 26,
+            fontSize = f10DebugFontSize,
             fontStyle = FontStyle.Bold,
-            alignment = TextAnchor.UpperLeft,
+            alignment = rightAlign ? TextAnchor.UpperRight : TextAnchor.UpperLeft, // P2は右端に寄せる
+            wordWrap = true,
         };
-        GUIStyle outline = new GUIStyle(style) { normal = { textColor = Color.black } };
-        style.normal.textColor = Color.yellow;
+        style.normal.textColor = color;
+        GUIStyle outline = new GUIStyle(style);
+        outline.normal.textColor = Color.black;
+
+        float height = style.CalcHeight(new GUIContent(text), rect.width);
+        rect.height = height;
 
         Vector2[] offsets = { new Vector2(-2, -2), new Vector2(2, -2), new Vector2(-2, 2), new Vector2(2, 2) };
         foreach (var o in offsets)
@@ -2153,6 +2354,7 @@ public class Player : MonoBehaviour
             GUI.Label(new Rect(rect.x + o.x, rect.y + o.y, rect.width, rect.height), text, outline);
         }
         GUI.Label(rect, text, style);
+        return height;
     }
 
     //-----------------------------------------------------
@@ -2746,6 +2948,7 @@ public class Player : MonoBehaviour
         currentState = PlayerState.Guard;
         stateTimer = guardFrames;
         isGuarding = true;
+        guardBlockedThisGuard = false; // 今回の仁王立ちでまだ受け止めていない（終了時もfalseなら失敗）
 
         ParticleSystem newParticle = Instantiate(
             Men_particle,
@@ -2875,6 +3078,18 @@ public class Player : MonoBehaviour
         DLog($"[{PlayerName}] 掴まれた！脱出に必要なフレーム数={escapeTimer}（HP={HP}/{maxHP}）");
     }
 
+    // ★追加：今、投げの方向入力（前／後のスティック入力）をしているか。
+    //   掴んでいる側がこれをtrueにしている間は、掴まれている側は脱出できない（入力した時点で投げが確定するため）。
+    public bool IsInputtingThrowDirection => Mathf.Abs(moveInput.x) >= moveInputThreshold;
+
+    // ★追加：掴んでいる側が「今この瞬間に投げを確定させられる」か。
+    //   掴みが成立してからthrowInputStartDelayFramesフレーム以上経過していて、かつ方向入力をしている場合にtrue。
+    //   （掴み成立時にstateTimer=throwFramesへ設定しているので、経過フレーム = throwFrames - stateTimer）
+    bool CanCommitThrowNow =>
+        currentState == PlayerState.Throw && grabbedTarget != null
+        && IsInputtingThrowDirection
+        && (throwFrames - stateTimer) >= throwInputStartDelayFrames;
+
     // ★追加：掴まれている間、毎フレーム呼ばれる。時間経過に加え、
     //   ボタン（既存の意図フラグ）かスティックの入力があるたびに追加で脱出時間を短縮する。
     void TickGrabbed()
@@ -2896,7 +3111,10 @@ public class Player : MonoBehaviour
             escapeTimer -= escapeReductionFramesPerInput;
         }
 
-        if (escapeTimer <= 0)
+        // ★変更：掴んでいる側が方向入力をしている間は脱出させない（その入力で掴んだ側のUpdateが即座に投げを確定させる）。
+        //   Update順がP1/P2で入れ替わっても、同じフレームに「脱出」と「投げ」が競合しないようにするため。
+        bool grabberCommittingThrow = grabbingPlayer != null && grabbingPlayer.CanCommitThrowNow;
+        if (escapeTimer <= 0 && !grabberCommittingThrow)
         {
             EscapeFromGrab();
         }
@@ -3275,6 +3493,17 @@ public class Player : MonoBehaviour
             }
         }
 
+        // ★追加：掴んでいる間に方向入力（前／後）があったら、拘束時間の終了を待たずにその場で投げ飛ばす。
+        //   以前は拘束時間が切れるまで投げが決まらず、その前に掴まれた側のHPで決まる脱出時間（特にHP満タン時は短い）が
+        //   先に来て「入力しているのに脱出成功になる」ことがあった。入力を受けた時点で投げを確定させる。
+        //   ★ただし、掴み成立からthrowInputStartDelayFramesフレームの間は入力を受け付けず、掴んだ状態を保つ。
+        if (CanCommitThrowNow)
+        {
+            ResolveThrowLaunch(); // 方向入力ありなので必ず「投げ成立」になる（grabbedTargetはnullに戻る）
+            stateTimer = Mathf.Min(stateTimer, throwReleaseRecoveryFrames); // 投げ飛ばしモーションぶんだけ硬直してからIdleへ戻る
+            return;
+        }
+
         stateTimer -= frameStep;
         if (stateTimer > 0) return;
 
@@ -3306,6 +3535,12 @@ public class Player : MonoBehaviour
         {
             canThrow = true;
             return;
+        }
+
+        // ★追加：仁王立ちが、相手の攻撃を一度も受け止めないまま終わったら「ガード失敗」としてペナルティを与える
+        if (currentState == PlayerState.Guard && !guardBlockedThisGuard)
+        {
+            ApplyGuardFailPenalty();
         }
 
         DisableAllHitboxes();
@@ -3697,24 +3932,37 @@ public class Player : MonoBehaviour
         //今回被弾させてきた相手の攻撃力を取得（対人戦かCPU戦かで参照先を切り替える）
         int attackerAtk = isEnemyPlayerAttack ? attackerPlayer.atk : attackerEnemy.atk;
 
+        int attackerAtkBase = attackerAtk; // F10表示用：ペナルティ倍率を掛ける前の値
+
+        // ★追加：ガード失敗直後の一定時間は、受けるダメージが増える（ダウン判定・ガード時の半減などにもこの値が使われる）
+        if (guardFailDamageTimer > 0)
+        {
+            attackerAtk = Mathf.RoundToInt(attackerAtk * Mathf.Max(guardFailDamageMultiplier, 0f));
+        }
+
         //ここまで来たら「敵の攻撃用ヒットボックスが自分の体に当たった」＝正真正銘の被弾
         if (isGuarding)
         {
             // 仁王立ち（ガード）中に被弾した場合の処理
-            // ガード成功で「相手の攻撃力 × guardAtkBonusMultiplier」を自分の攻撃力に上乗せする
-            // （次の自分の攻撃が当たるまで持続。倍率はInspectorの「ガード成功時の攻撃力上昇設定」で調整可能）
-            int guardAtkBonus = Mathf.RoundToInt(attackerAtk * guardAtkBonusMultiplier);
-            atk += guardAtkBonus;
-            DLog($"[{PlayerName}] ガード成功による攻撃力上昇 +{guardAtkBonus}（相手攻撃力{attackerAtk} × 倍率{guardAtkBonusMultiplier}）");
+            // ★変更：ガード成功で、次に自分が与える技のダメージ倍率を上げる（guardSuccessNextAttackMultiplier倍）。
+            //   （次の自分の攻撃が当たるまで持続。倍率はInspectorの「ガード成功時の攻撃力上昇設定」で調整可能）
+            guardBlockedThisGuard = true; // 受け止めたので、この仁王立ちはガード失敗にならない
             DLog("漢!!");
             se.PlayOneShot(MenBlock_se);       // ガード成功の効果音を再生
             HP -= attackerAtk / 2;                // ガード中はダメージを半減させる
+            RecordDamage(attackerAtk / 2, attackerAtkBase / 2, "ガード(半減)"); // F10表示用
 
             // ガードに成功したので、自分の漢気ゲージを増やす
             AddKankiGauge(gaugeGainOnGuard);
 
             // 攻撃力上昇中であることを示すエフェクトを出し続ける（次に自分の攻撃が当たるまで）
+            // ★変更：技を出す前に続けてガードに成功した場合は、倍率を掛け算で重ねていく（倍々）。
+            float stepMultiplier = Mathf.Max(1f, guardSuccessNextAttackMultiplier);
+            guardBuffMultiplier = isGuardBuffed ? guardBuffMultiplier * stepMultiplier : stepMultiplier;
+            if (guardSuccessMaxMultiplier > 0f) guardBuffMultiplier = Mathf.Min(guardBuffMultiplier, guardSuccessMaxMultiplier);
             isGuardBuffed = true;
+            UpdateAtkByGauge(); // 倍率を反映して攻撃力を再計算する
+            DLog($"[{PlayerName}] ガード成功：次の技のダメージ倍率×{guardBuffMultiplier:F2}（攻撃力={atk}）");
             StartGuardBuffEffect();
 
             // ★追加：仁王立ち成功アニメーション（Animatorの"Guard-success"トリガー）を再生する。
@@ -3848,6 +4096,7 @@ public class Player : MonoBehaviour
             }
 
             HP -= attackerAtk;
+            RecordDamage(attackerAtk, attackerAtkBase, "通常被弾"); // F10表示用
         }
 
         //UIにHPを減らすように指示
@@ -3895,6 +4144,7 @@ public class Player : MonoBehaviour
     public void damege(int n)
     {
         HP -= n;
+        RecordDamage(n, n, "damege()（投げ等）"); // F10表示用
         if (HP < 0) HP = 0;
 
         //デバッグログ：ダメージ量と残りHP
@@ -3928,6 +4178,10 @@ public class Player : MonoBehaviour
     {
         float max = kankiGaugePerBar * kankiGaugeBarCount;
         float before = kankiGauge;
+
+        // ★追加：ガード失敗後の一定時間は、漢気ゲージの増加量を下げる（増加のみ。guardFailGaugeGainRate=0.5なら半減）
+        if (amount > 0f && guardFailGaugeTimer > 0) amount *= guardFailGaugeGainRate;
+
         kankiGauge = Mathf.Clamp(kankiGauge + amount, 0f, max);
         UpdateAtkByGauge();
 
@@ -3973,7 +4227,9 @@ public class Player : MonoBehaviour
         // ★追加：漢気復活による攻撃力上昇中は倍率を掛ける（1未満にはならない）。
         //   ここに組み込むことで、攻撃のたびにatkが再計算されても上昇が消えない。
         float reviveMultiplier = isReviveBuffed ? Mathf.Max(1f, reviveAtkMultiplier) : 1f;
-        atk = Mathf.RoundToInt(baseAtk * (1f + atkPowerPerBar * filledBars) * reviveMultiplier);
+        // ★追加：ガード成功中（次の攻撃が当たるまで）は、次に与える技のダメージ倍率を掛ける（1未満にはならない）
+        float guardMultiplier = isGuardBuffed ? Mathf.Max(1f, guardBuffMultiplier) : 1f;
+        atk = Mathf.RoundToInt(baseAtk * (1f + atkPowerPerBar * filledBars) * reviveMultiplier * guardMultiplier);
 
         // ★追加：ゲージ量が変わるたびに、充填中エフェクトのON/OFFを判定し直す
         UpdateKankiChargeEffect(filledBars >= 1);

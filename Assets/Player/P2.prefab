@@ -1722,22 +1722,22 @@ MonoBehaviour:
   maxHP: 1000
   atk: 10
   Player_status: 0
-  guardDuration: 1.3
-  throwDuration: 0.75
+  guardFrames: 30
+  throwFrames: 90
   throwAtk: 20
-  throwStunDuration: 0.5
-  escapeTimeAtZeroHp: 10
-  escapeTimeAtFullHp: 2
-  escapeReductionPerInput: 0.15
+  throwStunFrames: 30
+  escapeFramesAtZeroHp: 90
+  escapeFramesAtFullHp: 24
+  escapeReductionFramesPerInput: 9
   throwHorizontalSpeed: 9
   throwUpSpeed: 15
   grabFailHorizontalSpeed: 3
   grabFailUpSpeed: 3
-  throwStartPlayTime: 0.2
+  throwStartPlayFrames: 12
   enableThrowStartPlay: 0
   guardAtkBonusMultiplier: 100
-  guardSuccessStunDuration: 1
-  rebornTimeLimit: 4
+  guardSuccessStunFrames: 30
+  rebornTimeLimitFrames: 300
   rebornHpRatio: 0.5
   mashThresholdBase: 10
   mashWithAnyButton: 0
@@ -1755,47 +1755,47 @@ MonoBehaviour:
   mashHitEffectData: {fileID: 11400000, guid: 99debc3a56df75648b48c42066c82a73, type: 2}
   missHitEffectData: {fileID: 11400000, guid: 182479a3e4175444d9090102939c91b9, type: 2}
   enableHitStop: 1
-  hitStopDuration: 0.15
-  guardHitStopDuration: 0.05
+  hitStopFrames: 5
+  guardHitStopFrames: 3
   freezeAnimatorDuringHitStop: 1
   punchAtk: 10
-  punchMissDuration: 0.55
-  punchHitDuration: 0.45
-  punchStunDuration: 0.3
-  punchHitStopDuration: 0.08
+  punchMissFrames: 30
+  punchHitFrames: 30
+  punchStunFrames: 18
+  punchHitStopFrames: 5
   punchKnockback:
     horizontalSpeed: 1
     upSpeed: 5
   kickAtk: 30
-  kickMissDuration: 0.5
-  kickHitDuration: 0.5
-  kickStunDuration: 0.67
-  kickHitStopDuration: 0.08
+  kickMissFrames: 36
+  kickHitFrames: 36
+  kickStunFrames: 24
+  kickHitStopFrames: 5
   kickKnockback:
     horizontalSpeed: 5
     upSpeed: 5
   upKickAtk: 40
-  upKickMissDuration: 0.8
-  upKickHitDuration: 0.5
-  upKickStunDuration: 0.3
-  upKickHitStopDuration: 0.08
+  upKickMissFrames: 42
+  upKickHitFrames: 42
+  upKickStunFrames: 30
+  upKickHitStopFrames: 5
   upKickKnockback:
     horizontalSpeed: 5
     upSpeed: 10
   downKickAtk: 10
-  downKickMissDuration: 0.8
-  downKickHitDuration: 0.5
-  downKickStunDuration: 0.3
-  downKickHitStopDuration: 0.08
+  downKickMissFrames: 30
+  downKickHitFrames: 30
+  downKickStunFrames: 24
+  downKickHitStopFrames: 5
   downKickKnockback:
     horizontalSpeed: 5
     upSpeed: 0
   specialAtk: 100
-  specialHitStopDuration: 0.08
+  specialHitStopFrames: 5
   specialKnockback:
-    horizontalSpeed: 0
-    upSpeed: 0
-  specialStunDuration: 0.1
+    horizontalSpeed: 2
+    upSpeed: 5
+  specialStunFrames: 10
   enableGuardSuccessEffect: 1
   guardSuccessEffectPrefab: {fileID: 8365365947410503083, guid: 3e810419a41d2184da2046cdec7abe38, type: 3}
   guardSuccessEffectOffset: {x: 0, y: 1.98, z: 0}
@@ -1815,8 +1815,8 @@ MonoBehaviour:
   kankiChargeEffectFollowLocal: 1
   enableKankiRevive: 1
   kankiReviveBarCost: 1
-  reviveAtkMultiplier: 1.5
-  reviveAtkBuffDuration: 10
+  reviveAtkMultiplier: 5
+  reviveAtkBuffFrames: 600
   kankiReviveEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
   kankiReviveEffectOffset: {x: 0, y: 0, z: 0}
   kankiReviveEffectLifetime: 3
@@ -1824,7 +1824,7 @@ MonoBehaviour:
   reviveBuffEffectOffset: {x: 0, y: 0, z: 0}
   specialRequiredGauge: 100
   specialGaugeCost: 100
-  specialDuration: 2.25
+  specialFrames: 180
   specialSe: {fileID: 0}
   specialEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
   specialEffectOffset: {x: 0, y: 0, z: 0}
@@ -1848,23 +1848,23 @@ MonoBehaviour:
   specialMultiHit:
     allowMultiHit: 1
     maxHitCount: 5
-  specialHitCooldown: 0.1
+  specialHitCooldownFrames: 6
   enablePlayerPush: 1
   pushSkinWidth: 0.02
   maxPushSpeed: 1.29
   showMashPrompt: 1
   mashPromptText: "\u9F13\u52D5\u3092\u9AD8\u3081\u308D\uFF01\uFF01"
-  mashPromptFontSize: 64
+  mashPromptFontSize: 32
   mashPromptColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   showMashRemainingCount: 1
-  mashRemainingFontSize: 150
+  mashRemainingFontSize: 50
   mashRemainingColor: {r: 1, g: 1, b: 1, a: 1}
   mashRemainingYRatio: 0.42
   showMashButtonImage: 1
   mashButtonNormalImage: {fileID: 2800000, guid: 252576c28c75a7f4f99964946c62997e, type: 3}
   mashButtonPressedImage: {fileID: 2800000, guid: c3a4f25883c8d0549877dde7d3e52035, type: 3}
-  mashButtonPressedDuration: 0.08
-  mashButtonReleaseMinDuration: 0.05
+  mashButtonPressedFrames: 4
+  mashButtonReleaseMinFrames: 3
   mashButtonSizeRatio: 0.22
   mashButtonXRatio: 0.5
   mashButtonYRatio: 0.72
@@ -1872,7 +1872,7 @@ MonoBehaviour:
   rebornTimeLabel: "\u5FA9\u6D3B\u307E\u3067"
   rebornTimeFontSize: 56
   rebornTimeColor: {r: 1, g: 1, b: 1, a: 1}
-  rebornTimeLowThreshold: 1.5
+  rebornTimeLowThresholdFrames: 90
   rebornTimeLowColor: {r: 1, g: 0.2, b: 0.2, a: 1}
   showRebornTimeBar: 1
   rebornTimeBarWidthRatio: 0.4

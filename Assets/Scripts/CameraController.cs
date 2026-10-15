@@ -172,8 +172,9 @@ public class FightingCameraController : MonoBehaviour
     [Range(0.01f, 1f)]
     public float guardImpactSlowTimeScale = 0.1f;
 
-    [Tooltip("スローを保つ時間（秒）。実時間で計測されるため、timeScaleの影響を受けない")]
-    public float guardImpactSlowDuration = 0.15f;
+    [Tooltip("スローを保つ時間（フレーム数。60F=1秒）。実時間で計測されるため、timeScaleの影響を受けない")]
+    [Min(0)]
+    public int guardImpactSlowDurationFrames = 9;
 
     [Tooltip("スロー終了後、通常速度に戻るまでの時間（秒）")]
     public float guardImpactSlowRecoverDuration = 0.2f;
@@ -693,7 +694,7 @@ public class FightingCameraController : MonoBehaviour
         {
             TriggerSlowMotion(
                 guardImpactSlowTimeScale,
-                guardImpactSlowDuration,
+                guardImpactSlowDurationFrames / 60f, // フレーム数(60F=1秒)を秒へ換算して渡す
                 guardImpactSlowRecoverDuration
             );
         }
