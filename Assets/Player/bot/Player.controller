@@ -1102,7 +1102,7 @@ AnimatorStateMachine:
     m_Position: {x: -180, y: 570, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 7866437742052082912}
-    m_Position: {x: -24.416931, y: 1112.4536, z: 0}
+    m_Position: {x: -20, y: 1110, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 5318771206481818412}
     m_Position: {x: -50, y: 1280, z: 0}
@@ -2733,7 +2733,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: dac89921ba2e5fc4795efb233b862bde, type: 3}
+  m_Motion: {fileID: -203655887218126122, guid: 2b63782cc76540b44a054c45a7340b6f, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -3316,7 +3316,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Guard
-  m_Speed: 0.86
+  m_Speed: 1.79
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: -2993226769999785351}
@@ -3331,7 +3331,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: 043ba9a070fbe3c4389b417eae3b734b, type: 3}
+  m_Motion: {fileID: -203655887218126122, guid: 6d6d5db35874e4c46a5486f26abe4473, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
