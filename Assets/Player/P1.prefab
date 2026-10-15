@@ -1727,7 +1727,7 @@ MonoBehaviour:
   maxHP: 1000
   atk: 10
   Player_status: 0
-  guardDuration: 0.6
+  guardDuration: 1.3
   throwDuration: 0.75
   throwAtk: 20
   throwStunDuration: 0.5
