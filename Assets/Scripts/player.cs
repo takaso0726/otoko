@@ -47,7 +47,7 @@ public class Player : MonoBehaviour
         Special,    // 必殺技（漢気ゲージ消費技）
         KnockedDown,// ダウン中（根性復活チャレンジ中）
         Dead,       // 死亡（復活失敗）
-        Stunned,    // ★追加：やられ状態（被弾後、攻撃ごとに設定した秒数だけ行動不能）
+        Stunned,    // ★追加：やられ状態（被弾後、攻撃ごとに設定したフレーム数だけ行動不能）
     }
 
     //=====================================================
@@ -256,10 +256,10 @@ public class Player : MonoBehaviour
     //=====================================================
     // ★各アクションの持続時間（Inspectorで調整可能）
     //=====================================================
-    [Header("アクション時間設定（秒）")]
+    [Header("アクション時間設定（フレーム：60フレーム=1秒）")]
     // ※パンチ／キック／上キック／下キックの拘束時間は、下の「攻撃ごとの設定」（各技のヘッダー）へ移動した。
-    [SerializeField] float guardDuration = 0.5f;    // 仁王立ちの拘束時間
-    [SerializeField] float throwDuration = 1.5f;    // 投げの拘束時間
+    [SerializeField] int guardFrames = 30;    // 仁王立ちの拘束フレーム数
+    [SerializeField] int throwFrames = 90;    // 投げの拘束フレーム数
 
     //=====================================================
     // ★攻撃の種類ごとの攻撃力（Inspectorで個別に調整可能）
@@ -269,24 +269,24 @@ public class Player : MonoBehaviour
     // ※パンチ／キック／上キック／下キック／必殺技の攻撃力は、下の「攻撃ごとの設定」（各技のヘッダー）へ移動した。
     [Header("投げの攻撃力")]
     [SerializeField] int throwAtk = 5;     // 投げ（つかみ）成立時の固定ダメージ
-    [Tooltip("投げ成立で飛ばされた相手が、着地した後に【やられ状態（行動不能）】になる時間（秒）。" +
+    [Tooltip("投げ成立で飛ばされた相手が、着地した後に【やられ状態（行動不能）】になるフレーム数（60F=1秒）。" +
              "着地した瞬間から数え始める。0だとやられ状態にならない。\n" +
              "※投げ不成立（掴みタイムアウト）で互いに吹き飛んだ場合は対象外。")]
-    [SerializeField] float throwStunDuration = 0.5f;
+    [SerializeField] int throwStunFrames = 30;
 
     //=====================================================
     // ★追加：投げ（掴み）仕様変更に伴う詳細設定
     //   掴み成立→(掴み状態中に脱出できなければ)→投げ飛ばし、という2段階の流れになる。
-    //   throwDurationは「掴んでから実際に投げ飛ばすまでの拘束時間」として引き続き使用する
+    //   throwFramesは「掴んでから実際に投げ飛ばすまでの拘束時間」として引き続き使用する
     //   （Animatorの"Throw-start"モーションの長さと合わせること）。
     //=====================================================
     [Header("投げ（掴み）詳細設定")]
-    [Tooltip("HPが0の時に脱出（掴みを振りほどく）までに必要な時間。値が大きいほど脱出しにくい＝投げられやすい。")]
-    [SerializeField] float escapeTimeAtZeroHp = 1.5f;
-    [Tooltip("HPが満タンの時に脱出（掴みを振りほどく）までに必要な時間。値が小さいほど脱出しやすい＝投げられにくい。")]
-    [SerializeField] float escapeTimeAtFullHp = 0.4f;
-    [Tooltip("掴まれている間、ボタンやスティックを入力する度に、脱出に必要な残り時間からさらに追加で短縮する秒数。")]
-    [SerializeField] float escapeReductionPerInput = 0.15f;
+    [Tooltip("HPが0の時に脱出（掴みを振りほどく）までに必要なフレーム数（60F=1秒）。値が大きいほど脱出しにくい＝投げられやすい。")]
+    [SerializeField] int escapeFramesAtZeroHp = 90;
+    [Tooltip("HPが満タンの時に脱出（掴みを振りほどく）までに必要なフレーム数（60F=1秒）。値が小さいほど脱出しやすい＝投げられにくい。")]
+    [SerializeField] int escapeFramesAtFullHp = 24;
+    [Tooltip("掴まれている間、ボタンやスティックを入力する度に、脱出に必要な残り時間からさらに追加で短縮するフレーム数。")]
+    [SerializeField] int escapeReductionFramesPerInput = 9;
     [Tooltip("投げが成立した瞬間、相手に加える水平方向の初速。攻撃側の移動スティックの倒し方向（前/後）で向きが決まる。")]
     [SerializeField] float throwHorizontalSpeed = 6f;
     [Tooltip("投げが成立した瞬間、相手に加える上方向の初速。大きいほど放物線の弧が高くなる。")]
@@ -299,8 +299,8 @@ public class Player : MonoBehaviour
     [Tooltip("★追加：掴みが成立してから、掴みモーション(Throw-start)を再生し続ける時間。この時間が過ぎたらアニメーションを一時停止し、" +
              "投げ成立(Throw-release)／投げ不成立(Throw-whiff)の瞬間まで掴んだポーズで止め続ける。" +
              "※下のenableThrowStartPlayがONの時だけ使われる。OFFの時は、手が相手に接触した瞬間にアニメーションを即座に止める。")]
-    [SerializeField] float throwStartPlayTime = 0.2f;
-    [Tooltip("★追加：ONにすると、手が相手に接触してから上のthrowStartPlayTime秒だけ掴みモーションを再生し続け、その後に止める。" +
+    [SerializeField] int throwStartPlayFrames = 12;
+    [Tooltip("★追加：ONにすると、手が相手に接触してから上のthrowStartPlayFramesフレームだけ掴みモーションを再生し続け、その後に止める。" +
              "OFF（既定）の時は、手が相手に接触した瞬間にアニメーションを即座に止める。")]
     [SerializeField] bool enableThrowStartPlay = false;
 
@@ -316,16 +316,16 @@ public class Player : MonoBehaviour
     // ★ガード（仁王立ち）成功時の、相手へのスタン設定
     //=====================================================
     [Header("ガード成功時の相手スタン設定")]
-    [Tooltip("仁王立ちでガードに成功した時、攻撃してきた相手を行動不能（スタン）にする時間（秒）。" +
+    [Tooltip("仁王立ちでガードに成功した時、攻撃してきた相手を行動不能（スタン）にするフレーム数（60F=1秒）。" +
              "この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。0だとスタンさせない。\n" +
              "※相手が必殺技・投げ（掴み中）・ダウン中などの場合はスタンさせない。")]
-    [SerializeField] float guardSuccessStunDuration = 0.5f;
+    [SerializeField] int guardSuccessStunFrames = 30;
 
     //=====================================================
     // ★根性復活（ダウン後の復活チャレンジ）設定
     //=====================================================
     [Header("復活（根性）設定")]
-    [SerializeField] float rebornTimeLimit = 5.0f;  // 復活チャレンジの制限時間
+    [SerializeField] int rebornTimeLimitFrames = 300;  // 復活チャレンジの制限フレーム数（300F=5秒）
     [Range(0f, 1f)]
     [SerializeField] float rebornHpRatio = 0.3f;    // 復活成功時に回復するHPの割合（maxHPに対する割合。0.3なら最大HPの3割まで回復）
     [SerializeField] int mashThresholdBase = 11;    // 必要連打数の基準値
@@ -364,13 +364,13 @@ public class Player : MonoBehaviour
     //=====================================================
     [Header("ヒットストップ設定")]
     [SerializeField] bool enableHitStop = true;             // ヒットストップ機能を使うかどうか
-    [Tooltip("CPU(Enemy)の攻撃を受けた時など、攻撃側に個別設定が無い場合に使う、通常被弾時のヒットストップ時間（秒）。\n" +
+    [Tooltip("CPU(Enemy)の攻撃を受けた時など、攻撃側に個別設定が無い場合に使う、通常被弾時のヒットストップのフレーム数（60F=1秒）。\n" +
              "対人戦でPlayerの攻撃を受けた時は、攻撃者側の「攻撃ごとの設定」のヒットストップ時間が使われる。")]
-    [SerializeField] float hitStopDuration = 0.08f;         // 通常被弾時（CPU等の攻撃側設定が無い場合）に少しだけ動けなくなる時間（秒）
-    [SerializeField] float guardHitStopDuration = 0.05f;    // 仁王立ちガード成功時に少しだけ動けなくなる時間（秒）
+    [SerializeField] int hitStopFrames = 5;         // 通常被弾時（CPU等の攻撃側設定が無い場合）に少しだけ動けなくなるフレーム数
+    [SerializeField] int guardHitStopFrames = 3;    // 仁王立ちガード成功時に少しだけ動けなくなるフレーム数
     [SerializeField] bool freezeAnimatorDuringHitStop = true; // ヒットストップ中はアニメーションも一瞬止めるか
 
-    private float hitStopTimer = 0f;   // 残りヒットストップ時間。0より大きい間は入力処理をすべてスキップする
+    private int hitStopTimer = 0;   // 残りヒットストップフレーム数。0より大きい間は入力処理をすべてスキップする
     private bool pendingHeadHitAnimation = false; // ヒットストップ終了時にHeadHitアニメーションを再生するか（ガード成功時はfalse）
     private bool hasPendingKnockback = false;    // ヒットストップ終了時にノックバックを与えるか
     private Vector3 pendingKnockbackVelocity;    // 与えるノックバックの初速（水平＋上方向）
@@ -380,15 +380,15 @@ public class Player : MonoBehaviour
     //   各技のヘッダーの下に、次の順で並べている：
     //     ① 攻撃力 … この技が当たった時に相手へ与えるダメージ（漢気ゲージ補正の前の素の値）
     //     ② 攻撃後のクールダウン（拘束時間）… 攻撃を出した後、次の行動ができるまでの時間
-//        ★空振り時(〇〇MissDuration)と命中時(〇〇HitDuration)を別々に設定できる。
+//        ★空振り時(〇〇MissFrames)と命中時(〇〇HitFrames)を別々に設定できる。
 //        どちらも「攻撃を出した瞬間からの合計時間」。命中した瞬間に、残り時間が命中時の値へ切り替わる。
     //     ③ ヒットストップ … この技を当てられた相手が止まる時間
     //     ④ ノックバック … この技を当てられた相手が飛ぶ量（攻撃者から離れる方向＋上方向）
-    //     ⑤ やられ状態の時間 … この技を当てられた相手が行動不能になる時間（秒）。0ならやられ状態にならない。
+    //     ⑤ やられ状態の時間 … この技を当てられた相手が行動不能になるフレーム数（60F=1秒）。0ならやられ状態にならない。
     //   ③④⑤は「攻撃する側」のInspectorで調整する。
-    //   ※仁王立ちガードで防がれた時は、ヒットストップはguardHitStopDuration、ノックバックは無し。
+    //   ※仁王立ちガードで防がれた時は、ヒットストップはguardHitStopFrames、ノックバックは無し。
     //   ※新しい技を追加する場合は、対応するフィールドを増やし、GetAttackPower() /
-    //     GetCurrentHitStopDuration() / GetCurrentKnockbackSetting() / GetMultiHitSetting() の
+    //     GetCurrentHitStopFrames() / GetCurrentKnockbackSetting() / GetMultiHitSetting() の
     //     switchにもケースを追加すること。
     //=====================================================
     [System.Serializable]
@@ -404,15 +404,14 @@ public class Player : MonoBehaviour
     [Header("パンチ（空中攻撃含む）")]
     [Tooltip("① パンチの攻撃力（ダメージ量）")]
     [SerializeField] int punchAtk = 10;
-    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束時間・秒）。パンチを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
-    [FormerlySerializedAs("punchDuration")]
-    [SerializeField] float punchMissDuration = 0.5f;
-    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束時間・秒）。パンチを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
-    [SerializeField] float punchHitDuration = 0.5f;
-    [Tooltip("⑤ パンチを当てた時の、相手の【やられ状態（行動不能）】の時間（秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
-    [SerializeField] float punchStunDuration = 0.3f;
-    [Tooltip("③ パンチを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
-    [SerializeField] float punchHitStopDuration = 0.08f;
+    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束フレーム数。60F=1秒）。パンチを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [SerializeField] int punchMissFrames = 30;
+    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束フレーム数。60F=1秒）。パンチを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
+    [SerializeField] int punchHitFrames = 30;
+    [Tooltip("⑤ パンチを当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [SerializeField] int punchStunFrames = 18;
+    [Tooltip("③ パンチを当てた時の、相手のヒットストップのフレーム数（60F=1秒）。0だと止まらない。")]
+    [SerializeField] int punchHitStopFrames = 5;
     [Tooltip("④ パンチを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting punchKnockback = new KnockbackSetting { horizontalSpeed = 2.5f, upSpeed = 0f };
 
@@ -420,45 +419,42 @@ public class Player : MonoBehaviour
     [Header("通常キック")]
     [Tooltip("① 通常キックの攻撃力（ダメージ量）")]
     [SerializeField] int kickAtk = 10;
-    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束時間・秒）。キックを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
-    [FormerlySerializedAs("kickDuration")]
-    [SerializeField] float kickMissDuration = 0.6f;
-    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束時間・秒）。キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
-    [SerializeField] float kickHitDuration = 0.6f;
-    [Tooltip("⑤ 通常キックを当てた時の、相手の【やられ状態（行動不能）】の時間（秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
-    [SerializeField] float kickStunDuration = 0.4f;
-    [Tooltip("③ 通常キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
-    [SerializeField] float kickHitStopDuration = 0.08f;
+    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束フレーム数。60F=1秒）。キックを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [SerializeField] int kickMissFrames = 36;
+    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束フレーム数。60F=1秒）。キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
+    [SerializeField] int kickHitFrames = 36;
+    [Tooltip("⑤ 通常キックを当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [SerializeField] int kickStunFrames = 24;
+    [Tooltip("③ 通常キックを当てた時の、相手のヒットストップのフレーム数（60F=1秒）。0だと止まらない。")]
+    [SerializeField] int kickHitStopFrames = 5;
     [Tooltip("④ 通常キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting kickKnockback = new KnockbackSetting { horizontalSpeed = 3.5f, upSpeed = 0f };
 
     [Header("上キック")]
     [Tooltip("① 上キックの攻撃力（ダメージ量）")]
     [SerializeField] int upKickAtk = 10;
-    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束時間・秒）。上キックを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
-    [FormerlySerializedAs("upKickDuration")]
-    [SerializeField] float upKickMissDuration = 0.7f;
-    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束時間・秒）。上キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
-    [SerializeField] float upKickHitDuration = 0.7f;
-    [Tooltip("⑤ 上キックを当てた時の、相手の【やられ状態（行動不能）】の時間（秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
-    [SerializeField] float upKickStunDuration = 0.5f;
-    [Tooltip("③ 上キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
-    [SerializeField] float upKickHitStopDuration = 0.08f;
+    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束フレーム数。60F=1秒）。上キックを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [SerializeField] int upKickMissFrames = 42;
+    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束フレーム数。60F=1秒）。上キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
+    [SerializeField] int upKickHitFrames = 42;
+    [Tooltip("⑤ 上キックを当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [SerializeField] int upKickStunFrames = 30;
+    [Tooltip("③ 上キックを当てた時の、相手のヒットストップのフレーム数（60F=1秒）。0だと止まらない。")]
+    [SerializeField] int upKickHitStopFrames = 5;
     [Tooltip("④ 上キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting upKickKnockback = new KnockbackSetting { horizontalSpeed = 2f, upSpeed = 5f };
 
     [Header("下キック")]
     [Tooltip("① 下キックの攻撃力（ダメージ量）")]
     [SerializeField] int downKickAtk = 10;
-    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束時間・秒）。下キックを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
-    [FormerlySerializedAs("downKickDuration")]
-    [SerializeField] float downKickMissDuration = 0.5f;
-    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束時間・秒）。下キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
-    [SerializeField] float downKickHitDuration = 0.5f;
-    [Tooltip("⑤ 下キックを当てた時の、相手の【やられ状態（行動不能）】の時間（秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
-    [SerializeField] float downKickStunDuration = 0.4f;
-    [Tooltip("③ 下キックを当てた時の、相手のヒットストップ時間（秒）。0だと止まらない。")]
-    [SerializeField] float downKickHitStopDuration = 0.08f;
+    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束フレーム数。60F=1秒）。下キックを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [SerializeField] int downKickMissFrames = 30;
+    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束フレーム数。60F=1秒）。下キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
+    [SerializeField] int downKickHitFrames = 30;
+    [Tooltip("⑤ 下キックを当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [SerializeField] int downKickStunFrames = 24;
+    [Tooltip("③ 下キックを当てた時の、相手のヒットストップのフレーム数（60F=1秒）。0だと止まらない。")]
+    [SerializeField] int downKickHitStopFrames = 5;
     [Tooltip("④ 下キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting downKickKnockback = new KnockbackSetting { horizontalSpeed = 3f, upSpeed = 0f };
 
@@ -467,13 +463,13 @@ public class Player : MonoBehaviour
     [Tooltip("① 必殺技（左足の攻撃判定）が相手に命中した時のダメージ量。パンチ・キック等と同じ仕組みで、" +
              "漢気ゲージによる攻撃力補正（atkPowerPerBar）もこの値を基準に上乗せされる。")]
     [SerializeField] int specialAtk = 20;
-    [Tooltip("③ 必殺技を当てた時の、相手のヒットストップ時間（秒）。多段ヒットごとに毎回かかる点に注意。0だと止まらない。\n" +
-             "※② 必殺技のクールダウン（拘束時間）は、下の「必殺技設定」のspecialDurationで調整する（waza アニメーションの長さと合わせる必要があるため）。")]
-    [SerializeField] float specialHitStopDuration = 0.08f;
+    [Tooltip("③ 必殺技を当てた時の、相手のヒットストップのフレーム数（60F=1秒）。多段ヒットごとに毎回かかる点に注意。0だと止まらない。\n" +
+             "※② 必殺技のクールダウン（拘束時間）は、下の「必殺技設定」のspecialFramesで調整する（waza アニメーションの長さと合わせる必要があるため）。")]
+    [SerializeField] int specialHitStopFrames = 5;
     [Tooltip("④ 必殺技を当てた時の、相手のノックバック量。多段ヒットするため、既定は0（飛ばさない）。")]
     [SerializeField] KnockbackSetting specialKnockback = new KnockbackSetting { horizontalSpeed = 0f, upSpeed = 0f };
-    [Tooltip("⑤ 必殺技を当てた時の、相手の【やられ状態（行動不能）】の時間（秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
-    [SerializeField] float specialStunDuration = 0.5f;
+    [Tooltip("⑤ 必殺技を当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [SerializeField] int specialStunFrames = 30;
 
     //=====================================================
     // ★仁王立ち（ガード）成功エフェクト設定
@@ -538,7 +534,7 @@ public class Player : MonoBehaviour
     //=====================================================
     // ★追加：漢気復活（ダウン中に漢気ゲージを消費して、連打せずに即座に復活する）設定
     //   ダウン中（復活チャレンジの制限時間内）にL1ボタンを押すと、漢気ゲージを消費してその場で復活する。
-    //   復活後は一定時間（reviveAtkBuffDuration）、攻撃力が上昇し、その間は専用エフェクトを出し続ける。
+    //   復活後は一定時間（reviveAtkBuffFrames）、攻撃力が上昇し、その間は専用エフェクトを出し続ける。
     //=====================================================
     [Header("漢気復活設定（ゲージ消費の即時復活）")]
     [Tooltip("ONにすると、ダウン中にL1ボタンで漢気ゲージを消費して即座に復活できる。")]
@@ -547,8 +543,8 @@ public class Player : MonoBehaviour
     [SerializeField] int kankiReviveBarCost = 1;
     [Tooltip("復活後の攻撃力の倍率。1.5なら攻撃力が1.5倍（+50%）、2なら2倍。1以下にすると上昇しない。漢気ゲージ本数による補正と掛け合わせて計算される。")]
     [SerializeField] float reviveAtkMultiplier = 1.5f;
-    [Tooltip("復活後に攻撃力上昇が続く時間（秒）。この間は攻撃力上昇エフェクトも出続ける。")]
-    [SerializeField] float reviveAtkBuffDuration = 10f;
+    [Tooltip("復活後に攻撃力上昇が続くフレーム数（60F=1秒。600F=10秒）。この間は攻撃力上昇エフェクトも出続ける。")]
+    [SerializeField] int reviveAtkBuffFrames = 600;
 
     [Header("漢気復活エフェクト設定")]
     [Tooltip("復活した瞬間に1回だけ出すパーティクル（未設定なら出さない）")]
@@ -564,7 +560,7 @@ public class Player : MonoBehaviour
 
     private bool wantKankiRevive = false;           // ダウン中にL1が押された（漢気復活の要求）
     private bool isReviveBuffed = false;            // 漢気復活による攻撃力上昇中かどうか
-    private float reviveBuffTimer = 0f;             // 攻撃力上昇の残り時間（秒）
+    private int reviveBuffTimer = 0;             // 攻撃力上昇の残りフレーム数
     private ParticleSystem activeReviveBuffEffect;  // 生成中の攻撃力上昇エフェクトの参照（多重生成防止・停止処理用）
 
     //=====================================================
@@ -579,11 +575,11 @@ public class Player : MonoBehaviour
 
     // ※必殺技の攻撃力(specialAtk)は、「攻撃ごとの設定」の「必殺技（waza）」ヘッダーへ移動した。
 
-    [Tooltip("必殺技発動中の拘束時間(秒)。既定値は3秒。\n" +
+    [Tooltip("必殺技発動中の拘束フレーム数(60F=1秒)。既定値は180フレーム（3秒）。\n" +
              "この間は攻撃・ガード・投げ・ジャンプ・必殺技の再発動は一切できず、移動のみ可能。\n" +
              "また、この間は相手からの攻撃を一切受け付けない（無敵）。\n" +
-             "「waza」トリガーで再生される必殺技アニメーションの長さと同じ秒数に合わせること。")]
-    [SerializeField] float specialDuration = 3.0f;
+             "「waza」トリガーで再生される必殺技アニメーションの長さと同じフレーム数に合わせること。")]
+    [SerializeField] int specialFrames = 180;
 
     [Header("必殺技演出（任意設定）")]
     [Tooltip("必殺技発動時に鳴らす効果音（未設定なら鳴らさない）")]
@@ -607,8 +603,8 @@ public class Player : MonoBehaviour
     //=====================================================
     Animator currentanimator;                               //現在のアニメーションを管理する変数
     private PlayerState currentState = PlayerState.Idle;   // 現在の行動状態
-    private float stateTimer;                               // 現在の行動が終わるまでの残り時間（秒）
-    private float currentAttackMissDuration;                // ★追加：今出している通常攻撃の「空振り時」拘束時間（命中時に経過時間を求めるために保持）
+    private int stateTimer;                               // 現在の行動が終わるまでの残りフレーム数
+    private int currentAttackMissFrames;                // ★追加：今出している通常攻撃の「空振り時」拘束時間（命中時に経過時間を求めるために保持）
 
     Rigidbody rb;
     AudioSource se;
@@ -636,9 +632,9 @@ public class Player : MonoBehaviour
     int guardComboCount;             // 仁王立ちで連続して耐えた回数
     bool autoFaceSnapped;            // ★追加：最初に相手を認識した時に、補間なしで即座に向き合わせたか
     bool hasMoveBackwardParam;       // ★追加：Animatorに"MoveBackward"(Bool)が存在するか（存在する時だけ値を送る）
-    bool hasGuardParam;              // ★追加：Animatorに"Guard"(Bool)が存在するか（存在する時だけ値を送る）
-    bool guardAnimApplied;           // ★追加：Animatorへ最後に送った"Guard"の値（変化した時だけ送る）
-    const string GuardParam = "Guard"; // ★仁王立ちアニメーション用のAnimatorパラメータ名（Bool）
+    bool hasGuardParam;              // ★変更：Animatorに"Guard"(Trigger)が存在するか（存在する時だけトリガーを立てる）
+    bool guardAnimApplied;           // ★変更：直前フレームでGuard状態だったか（Guardに入った瞬間だけトリガーを立てるための記録）
+    const string GuardParam = "Guard"; // ★仁王立ちアニメーション用のAnimatorパラメータ名（Trigger）
     bool hasGuardSuccessParam;       // ★追加：Animatorに"Guard-success"(Trigger)が存在するか（存在する時だけ立てる）
     const string GuardSuccessParam = "Guard-success"; // ★仁王立ち成功（ガード成功）アニメーション用のAnimatorパラメータ名（Trigger）
     // ★追加：F6キーでON/OFFする、常時仁王立ちデバッグモードの現在の状態
@@ -650,13 +646,13 @@ public class Player : MonoBehaviour
     // ★追加：投げ（掴み）仕様変更用の相互参照・タイマー
     Player grabbedTarget;            // 自分が今掴んでいる相手（掴む側の時だけ使用。掴んでいなければnull）
     Player grabbingPlayer;           // 自分を今掴んでいる相手（掴まれる側の時だけ使用。掴まれていなければnull）
-    float grabHoldTimer;             // 掴み成立後、掴みモーションを再生し続ける残り時間（0になったら一時停止）
+    int grabHoldTimer;             // 掴み成立後、掴みモーションを再生し続ける残りフレーム数（0になったら一時停止）
     bool grabHoldFrozen;             // 掴みモーションを一時停止中か（trueの間animator.speed=0）
     bool grabStickWasActive;         // 掴まれ中、前フレームでスティックが倒れていたか（押しっぱなしを連打扱いにしないための判定用）
-    float escapeTimer;               // 掴まれている間の、脱出に必要な残り時間（0になったら脱出成功）
+    int escapeTimer;               // 掴まれている間の、脱出に必要な残りフレーム数（0になったら脱出成功）
 
     int rebornCount = 1;             // 復活回数のカウント
-    float rebornTimer;               // 復活チャレンジの経過時間
+    int rebornTimer;               // 復活チャレンジの経過フレーム数
     int mashCount;                   // 復活チャレンジ中のボタン連打回数
 
     //当たり判定の子オブジェクト
@@ -754,23 +750,23 @@ public class Player : MonoBehaviour
     [SerializeField] MultiHitSetting upKickMultiHit = new MultiHitSetting();
     [Tooltip("下キックの多段ヒット設定")]
     [SerializeField] MultiHitSetting downKickMultiHit = new MultiHitSetting();
-    [Tooltip("必殺技（waza／左足攻撃）の多段ヒット設定。既定でON（3秒間で最大5回まで命中可能）。")]
+    [Tooltip("必殺技（waza／左足攻撃）の多段ヒット設定。既定でON（180フレーム＝3秒間で最大5回まで命中可能）。")]
     [SerializeField] MultiHitSetting specialMultiHit = new MultiHitSetting { allowMultiHit = true, maxHitCount = 5 };
-    [Tooltip("必殺技が命中してから、次のヒットが有効になるまでのクールタイム（秒）。多段ヒットの連続ヒット間隔を制御する。")]
-    [SerializeField] float specialHitCooldown = 0.1f;
+    [Tooltip("必殺技が命中してから、次のヒットが有効になるまでのクールタイム（フレーム）。多段ヒットの連続ヒット間隔を制御する。")]
+    [SerializeField] int specialHitCooldownFrames = 6;
 
     // 現在の攻撃で、既に何回ヒットが確定したか。EnterPunch/EnterKick等、新しい攻撃の開始時に0へリセットする。
     private int hitCountThisAttack = 0;
 
-    // 必殺技が最後にヒットを確定した時刻（Time.time）。specialHitCooldownの間隔判定に使用する。
+    // 必殺技が最後にヒットを確定したフレーム（CurrentFrame）。specialHitCooldownFramesの間隔判定に使用する。
     // 新しい攻撃の開始時（ResetMultiHitCount）に十分過去の値へリセットし、前回の攻撃のクールタイムを引きずらないようにする。
-    private float lastSpecialHitTime = -999f;
+    private int lastSpecialHitFrame = -999999;
 
     // 攻撃の開始時（EnterPunch/EnterKick等）に呼び出し、多段ヒットのカウントをリセットする。
     void ResetMultiHitCount()
     {
         hitCountThisAttack = 0;
-        lastSpecialHitTime = -999f;
+        lastSpecialHitFrame = -999999;
     }
 
     // 攻撃の種類（AttackType）に応じた多段ヒット設定を返す。
@@ -805,38 +801,38 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★追加：被弾した相手側（OnTriggerEnter）から、「今出している技のヒットストップ時間（秒）」を問い合わせるための公開メソッド。
-    //   必殺技中はspecialHitStopDuration、それ以外はCurrentAttackTypeに応じた値を返す。
+    // ★追加：被弾した相手側（OnTriggerEnter）から、「今出している技のヒットストップのフレーム数（60F=1秒）」を問い合わせるための公開メソッド。
+    //   必殺技中はspecialHitStopFrames、それ以外はCurrentAttackTypeに応じた値を返す。
     //   攻撃中でない場合（想定外）は、呼び出し側のフォールバックで扱えるよう負の値(-1)を返す。
     //   新しい技を追加した場合は、対応するフィールドを増やし、ここにもケースを追加すること。
-    public float GetCurrentHitStopDuration()
+    public int GetCurrentHitStopFrames()
     {
-        if (currentState == PlayerState.Special) return specialHitStopDuration;
+        if (currentState == PlayerState.Special) return specialHitStopFrames;
 
         switch (CurrentAttackType)
         {
-            case AttackType.Punch: return punchHitStopDuration;
-            case AttackType.Kick: return kickHitStopDuration;
-            case AttackType.UpKick: return upKickHitStopDuration;
-            case AttackType.DownKick: return downKickHitStopDuration;
-            default: return -1f;
+            case AttackType.Punch: return punchHitStopFrames;
+            case AttackType.Kick: return kickHitStopFrames;
+            case AttackType.UpKick: return upKickHitStopFrames;
+            case AttackType.DownKick: return downKickHitStopFrames;
+            default: return -1;
         }
     }
 
-    // ★追加：被弾した相手側（OnTriggerEnter）から、「今出している技のやられ状態の時間（秒）」を問い合わせるための公開メソッド。
-    //   必殺技中はspecialStunDuration、それ以外はCurrentAttackTypeに応じた値を返す。攻撃中でない場合は0（やられ状態にしない）。
+    // ★追加：被弾した相手側（OnTriggerEnter）から、「今出している技のやられ状態のフレーム数」を問い合わせるための公開メソッド。
+    //   必殺技中はspecialStunFrames、それ以外はCurrentAttackTypeに応じた値を返す。攻撃中でない場合は0（やられ状態にしない）。
     //   新しい技を追加した場合は、対応するフィールドを増やし、ここにもケースを追加すること。
-    public float GetCurrentStunDuration()
+    public int GetCurrentStunFrames()
     {
-        if (currentState == PlayerState.Special) return specialStunDuration;
+        if (currentState == PlayerState.Special) return specialStunFrames;
 
         switch (CurrentAttackType)
         {
-            case AttackType.Punch: return punchStunDuration;
-            case AttackType.Kick: return kickStunDuration;
-            case AttackType.UpKick: return upKickStunDuration;
-            case AttackType.DownKick: return downKickStunDuration;
-            default: return 0f;
+            case AttackType.Punch: return punchStunFrames;
+            case AttackType.Kick: return kickStunFrames;
+            case AttackType.UpKick: return upKickStunFrames;
+            case AttackType.DownKick: return downKickStunFrames;
+            default: return 0;
         }
     }
 
@@ -860,30 +856,30 @@ public class Player : MonoBehaviour
             return false;
         }
 
-        // ★追加：必殺技は、命中してから次のヒットが有効になるまでspecialHitCooldown秒のクールタイムを設ける。
+        // ★追加：必殺技は、命中してから次のヒットが有効になるまでspecialHitCooldownFramesフレームのクールタイムを設ける。
         //   多段ヒット許可中でも、同一フレーム／連続フレームでの連続ヒットを防ぐための時間的な間引き。
-        if (isSpecial && Time.time - lastSpecialHitTime < specialHitCooldown)
+        if (isSpecial && CurrentFrame - lastSpecialHitFrame < specialHitCooldownFrames)
         {
-            GaugeDLog($"[{PlayerName}] 必殺技クールタイム中により今回の接触は無効（前回ヒットから{Time.time - lastSpecialHitTime:F3}秒 / クールタイム{specialHitCooldown:F2}秒）");
+            GaugeDLog($"[{PlayerName}] 必殺技クールタイム中により今回の接触は無効（前回ヒットから{CurrentFrame - lastSpecialHitFrame}フレーム / クールタイム{specialHitCooldownFrames}フレーム）");
             return false;
         }
 
         hitCountThisAttack++;
-        if (isSpecial) lastSpecialHitTime = Time.time;
+        if (isSpecial) lastSpecialHitFrame = CurrentFrame;
         return true;
     }
 
-    // ★追加：攻撃種別ごとの「命中時」クールダウン（攻撃開始からの合計秒数）を返す。
+    // ★追加：攻撃種別ごとの「命中時」クールダウン（攻撃開始からの合計フレーム数）を返す。
     //   新しい技を追加したときはここにもケースを追加すること。
-    float GetHitDuration(AttackType type)
+    int GetHitFrames(AttackType type)
     {
         switch (type)
         {
-            case AttackType.Punch: return punchHitDuration;
-            case AttackType.Kick: return kickHitDuration;
-            case AttackType.UpKick: return upKickHitDuration;
-            case AttackType.DownKick: return downKickHitDuration;
-            default: return 0f;
+            case AttackType.Punch: return punchHitFrames;
+            case AttackType.Kick: return kickHitFrames;
+            case AttackType.UpKick: return upKickHitFrames;
+            case AttackType.DownKick: return downKickHitFrames;
+            default: return 0;
         }
     }
 
@@ -894,9 +890,9 @@ public class Player : MonoBehaviour
         //   （必殺技や投げなど、CurrentAttackTypeがNoneの状態では対象外）
         if (!attackLandedThisAttack && CurrentAttackType != AttackType.None)
         {
-            float elapsed = currentAttackMissDuration - stateTimer; // 攻撃開始からの経過時間
-            float newTimer = Mathf.Max(GetHitDuration(CurrentAttackType) - elapsed, 0f);
-            DLog($"[{PlayerName}] 命中によりクールダウン切替：残り{stateTimer:F2}秒 → {newTimer:F2}秒（命中時={GetHitDuration(CurrentAttackType):F2}秒 / 経過={elapsed:F2}秒）");
+            int elapsed = currentAttackMissFrames - stateTimer; // 攻撃開始からの経過フレーム数
+            int newTimer = Mathf.Max(GetHitFrames(CurrentAttackType) - elapsed, 0);
+            DLog($"[{PlayerName}] 命中によりクールダウン切替：残り{stateTimer}F → {newTimer}F（命中時={GetHitFrames(CurrentAttackType)}F / 経過={elapsed}F）");
             stateTimer = newTimer;
         }
 
@@ -1003,11 +999,11 @@ public class Player : MonoBehaviour
                 }
             }
 
-            // ★追加：仁王立ち用の"Guard"(Bool)・ガード成功用の"Guard-success"(Trigger)がAnimatorにあるか調べる。
+            // ★変更：仁王立ち用の"Guard"(Trigger)・ガード成功用の"Guard-success"(Trigger)がAnimatorにあるか調べる。
             //   無ければ警告を1回だけ出し、そのアニメーションの再生は行わない。
             foreach (var param in animator.parameters)
             {
-                if (param.name == GuardParam && param.type == AnimatorControllerParameterType.Bool)
+                if (param.name == GuardParam && param.type == AnimatorControllerParameterType.Trigger)
                 {
                     hasGuardParam = true;
                 }
@@ -1018,7 +1014,7 @@ public class Player : MonoBehaviour
             }
             if (!hasGuardParam)
             {
-                Debug.LogWarning($"[{PlayerName}] Animatorに'{GuardParam}'(Bool)パラメータがありません。仁王立ちのアニメーションは再生されません。", this);
+                Debug.LogWarning($"[{PlayerName}] Animatorに'{GuardParam}'(Trigger)パラメータがありません。仁王立ちのアニメーションは再生されません。", this);
             }
             if (!hasGuardSuccessParam)
             {
@@ -1246,11 +1242,58 @@ public class Player : MonoBehaviour
         wantSpecial = true;
     }
 
+    //=====================================================
+    // ★フレーム管理（60fps固定の「論理フレーム」）
+    //   以前は「秒」で管理していた各種時間（攻撃後のクールダウン・やられ・ヒットストップ・投げ・復活など）を、
+    //   すべて「フレーム数」で管理する。格闘ゲームの慣習どおり 60フレーム = 1秒。
+    //   ・描画のfps（60Hz/144Hz等）に関係なく、Time.deltaTimeを溜めて1/60秒ごとに1フレームを進める。
+    //   ・クロックはstaticで共有するので、P1・P2は常に同じタイミングでフレームが進む。
+    //   ・各タイマーは「Updateの先頭で進んだフレーム数(FrameStep)」だけ減らす（描画が速い時は0のこともある）。
+    //   ・移動速度・回転速度・押しのけ速度・漢気ゲージ減少量など「毎秒あたりの速度」は従来どおり秒基準のまま。
+    //=====================================================
+    public const int FramesPerSecond = 60;
+    const float SecondsPerFrame = 1f / FramesPerSecond;
+    static float frameAccumulator;          // まだフレームに換算していない端数の時間（秒）
+    static int frameClockUnityFrame = -1;   // 最後にクロックを進めたUnityの描画フレーム番号（二重加算防止）
+    static int frameStep;                   // 今回のUpdateで進んだ論理フレーム数（0以上）
+
+    // ゲーム開始からの累計フレーム数（多段ヒットの間隔判定や、見た目の最低表示時間などに使う）
+    public static int CurrentFrame { get; private set; }
+    // 今回のUpdateで進んだ論理フレーム数
+    public static int FrameStep => frameStep;
+    // フレーム数を秒に換算する（UI表示用）
+    public static float FramesToSeconds(int frames) => frames / (float)FramesPerSecond;
+
+    // Play開始のたびにクロックを初期化する（Domain Reloadを切っている場合でも前回の値を引きずらないため）
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetFrameClock()
+    {
+        frameAccumulator = 0f;
+        frameClockUnityFrame = -1;
+        frameStep = 0;
+        CurrentFrame = 0;
+    }
+
+    // Updateの先頭で呼ぶ。同じ描画フレーム内で2人目以降のPlayerが呼んでも二重には進まない。
+    static void AdvanceFrameClock()
+    {
+        if (frameClockUnityFrame == Time.frameCount) return;
+        frameClockUnityFrame = Time.frameCount;
+
+        frameAccumulator += Time.deltaTime;
+        // 1e-4fは、60Hz固定の環境で浮動小数点の誤差により「0フレーム→次に2フレーム」とブレるのを防ぐための補正
+        frameStep = Mathf.FloorToInt(frameAccumulator / SecondsPerFrame + 1e-4f);
+        frameAccumulator -= frameStep * SecondsPerFrame;
+        CurrentFrame += frameStep;
+    }
+
     // Update is called once per frame
     // 毎フレームの更新処理。HPが尽きていれば復活チャレンジへ、
     // そうでなければ現在の状態に応じて「拘束中のタイマー消化」か「新しい行動の受付」を行う。
     void Update()
     {
+        AdvanceFrameClock(); // ★追加：60fps固定の論理フレームを進める（各タイマーはframeStep分だけ減らす）
+
         // ★追加：掴みポーズで止めている最中に、被弾やダウン等でThrow状態から外れた場合の保険として必ず再生を再開する
         if (grabHoldFrozen && currentState != PlayerState.Throw) ResumeGrabHoldAnimation();
 
@@ -1339,7 +1382,7 @@ public class Player : MonoBehaviour
                     isGuarding = false;
                     canThrow = true;
                     currentState = PlayerState.Idle;
-                    stateTimer = 0f;
+                    stateTimer = 0;
                 }
             }
             else
@@ -1425,10 +1468,10 @@ public class Player : MonoBehaviour
         }
 
         // ヒットストップ処理を最優先で消化する。動けない間は他の入力・状態処理を一切行わない。
-        if (hitStopTimer > 0f)
+        if (hitStopTimer > 0)
         {
-            hitStopTimer -= Time.deltaTime;
-            if (hitStopTimer <= 0f)
+            hitStopTimer -= frameStep;
+            if (hitStopTimer <= 0)
             {
                 EndHitStop();
             }
@@ -1698,10 +1741,10 @@ public class Player : MonoBehaviour
     [SerializeField] Texture2D mashButtonNormalImage;            // ★画像の差し込み口①：押していない時
     [Tooltip("ボタンを押した時の画像（mash_button_pressed.png）をここに入れる")]
     [SerializeField] Texture2D mashButtonPressedImage;           // ★画像の差し込み口②：押した時
-    [Tooltip("「押した画像」を出す時間（秒）。1回出したら、連打がどれだけ速くてもこの時間で必ず終わらせる。")]
-    [SerializeField] float mashButtonPressedDuration = 0.06f;
-    [Tooltip("「押していない画像」を最低限出す時間（秒）。押した画像の後に必ずこの時間だけ挟むので、連打中でも押しっぱなしに見えない。")]
-    [SerializeField] float mashButtonReleaseMinDuration = 0.05f;
+    [Tooltip("「押した画像」を出すフレーム数。1回出したら、連打がどれだけ速くてもこの時間で必ず終わらせる。")]
+    [SerializeField] int mashButtonPressedFrames = 4;
+    [Tooltip("「押していない画像」を最低限出すフレーム数。押した画像の後に必ずこの時間だけ挟むので、連打中でも押しっぱなしに見えない。")]
+    [SerializeField] int mashButtonReleaseMinFrames = 3;
     [Tooltip("画像の大きさ（画面の高さに対する割合）。0.22なら画面高さの22%の正方形で表示する。")]
     [SerializeField] float mashButtonSizeRatio = 0.22f;
     [Tooltip("画像を表示するX位置（画面幅に対する割合。0.5で中央）")]
@@ -1710,11 +1753,11 @@ public class Player : MonoBehaviour
     [SerializeField] float mashButtonYRatio = 0.72f;
 
     bool mashButtonVisualPressed;   // 今「押した画像」を出しているか
-    float mashButtonStateEndTime;   // 今の見た目（押した／押していない）を最低限維持する終了時刻（Time.unscaledTime）
+    int mashButtonStateEndFrame;   // 今の見た目（押した／押していない）を最低限維持する終了フレーム（CurrentFrame）
     bool mashButtonPendingPress;    // 押された要求が溜まっている（押していない画像を挟んでから、次の押した画像にする）
 
     // ★追加：ダウン中（復活チャレンジ中）に、復活の制限時間（残り秒数）を画面上部に表示するための設定。
-    //   制限時間は上の「復活（根性）設定」のrebornTimeLimitで、残り時間 = rebornTimeLimit - rebornTimer。
+    //   制限時間は上の「復活（根性）設定」のrebornTimeLimitFramesで、残りフレーム = rebornTimeLimitFrames - rebornTimer。
     [Header("復活制限時間表示設定")]
     [Tooltip("ダウン中に、復活の制限時間（残り秒数）を画面上部に表示するか")]
     [SerializeField] bool showRebornTimeLimit = true;
@@ -1722,8 +1765,8 @@ public class Player : MonoBehaviour
     [SerializeField] string rebornTimeLabel = "復活まで";
     [SerializeField] int rebornTimeFontSize = 56;                        // 文字サイズ
     [SerializeField] Color rebornTimeColor = Color.white;                // 通常時の色
-    [Tooltip("残り時間がこの秒数以下になったら、色を変えて点滅させる")]
-    [SerializeField] float rebornTimeLowThreshold = 1.5f;
+    [Tooltip("残り時間がこのフレーム数以下になったら、色を変えて点滅させる")]
+    [SerializeField] int rebornTimeLowThresholdFrames = 90;
     [SerializeField] Color rebornTimeLowColor = new Color(1f, 0.2f, 0.2f, 1f); // 残りわずかの時の色
     [Tooltip("文字の下に、残り時間に応じて短くなるバーを表示するか")]
     [SerializeField] bool showRebornTimeBar = true;
@@ -1735,9 +1778,10 @@ public class Player : MonoBehaviour
     // ★追加：復活の制限時間（残り秒数）を画面上部に表示する。OnGUIから、ダウン中だけ呼ばれる。
     void DrawRebornTimeLimit(float blink)
     {
-        float remaining = Mathf.Max(rebornTimeLimit - rebornTimer, 0f);
-        float ratio = rebornTimeLimit > 0f ? Mathf.Clamp01(remaining / rebornTimeLimit) : 0f;
-        bool isLow = remaining <= rebornTimeLowThreshold;
+        int remainingFrames = Mathf.Max(rebornTimeLimitFrames - rebornTimer, 0);
+        float remaining = FramesToSeconds(remainingFrames); // 画面表示は見やすいよう秒に換算する
+        float ratio = rebornTimeLimitFrames > 0 ? Mathf.Clamp01((float)remainingFrames / rebornTimeLimitFrames) : 0f;
+        bool isLow = remainingFrames <= rebornTimeLowThresholdFrames;
 
         // 残りわずかの時は色を変えて、明滅させる
         Color baseColor = isLow ? rebornTimeLowColor : rebornTimeColor;
@@ -1792,8 +1836,8 @@ public class Player : MonoBehaviour
     }
 
     // ★追加：連打ボタン画像の「押した／押していない」を毎フレーム切り替える。
-    //   押した画像は mashButtonPressedDuration で必ず終わらせ、
-    //   その後に mashButtonReleaseMinDuration だけ「押していない画像」を必ず挟む。
+    //   押した画像は mashButtonPressedFrames で必ず終わらせ、
+    //   その後に mashButtonReleaseMinFrames だけ「押していない画像」を必ず挟む。
     //   連打が速くて押下要求が溜まっていても、その間は押していない画像を見せるので、押しっぱなしに見えない。
     void TickMashButtonVisual()
     {
@@ -1805,25 +1849,25 @@ public class Player : MonoBehaviour
             return;
         }
 
-        float now = Time.unscaledTime;
+        int now = CurrentFrame;
 
         if (mashButtonVisualPressed)
         {
             // 押した画像は決められた時間で必ず終わらせ、押していない画像へ戻す
-            if (now >= mashButtonStateEndTime)
+            if (now >= mashButtonStateEndFrame)
             {
                 mashButtonVisualPressed = false;
-                mashButtonStateEndTime = now + mashButtonReleaseMinDuration;
+                mashButtonStateEndFrame = now + mashButtonReleaseMinFrames;
             }
         }
         else
         {
             // 押していない画像を最低限の時間出し終えていて、押された要求があれば、次の「押した画像」にする
-            if (mashButtonPendingPress && now >= mashButtonStateEndTime)
+            if (mashButtonPendingPress && now >= mashButtonStateEndFrame)
             {
                 mashButtonPendingPress = false;
                 mashButtonVisualPressed = true;
-                mashButtonStateEndTime = now + mashButtonPressedDuration;
+                mashButtonStateEndFrame = now + mashButtonPressedFrames;
             }
         }
     }
@@ -1930,15 +1974,15 @@ public class Player : MonoBehaviour
     //-----------------------------------------------------
     // ヒットストップ
     //-----------------------------------------------------
-    // durationの間だけ、そのフレームから入力・状態更新を止めて「少しだけ動けない」状態にする。
+    // framesフレームの間だけ、そのフレームから入力・状態更新を止めて「少しだけ動けない」状態にする。
     // すでにヒットストップ中の場合は、残り時間を延ばしすぎないよう長い方の時間を採用する。
     // playHeadHitAnimation: ヒットストップが終わった瞬間に"HeadHit"（被弾）アニメーションを再生するか。
     //   通常被弾はtrue、仁王立ちガード成功時はfalse（ガードのポーズを崩したくないため）を渡す。
-    void StartHitStop(float duration, bool playHeadHitAnimation = true)
+    void StartHitStop(int frames, bool playHeadHitAnimation = true)
     {
-        if (!enableHitStop || duration <= 0f) return;
+        if (!enableHitStop || frames <= 0) return;
 
-        hitStopTimer = Mathf.Max(hitStopTimer, duration);
+        hitStopTimer = Mathf.Max(hitStopTimer, frames);
         pendingHeadHitAnimation = playHeadHitAnimation;
 
         if (freezeAnimatorDuringHitStop && animator != null)
@@ -1950,7 +1994,7 @@ public class Player : MonoBehaviour
             animator.speed = 0f;
         }
 
-        DLog($"[{PlayerName}] ヒットストップ開始 duration={duration}秒");
+        DLog($"[{PlayerName}] ヒットストップ開始 {frames}フレーム");
     }
 
     // ヒットストップ終了時にアニメーション速度を元に戻し、必要ならHeadHitアニメーションを再生する
@@ -1995,8 +2039,8 @@ public class Player : MonoBehaviour
         if (showStunComboDebug) Debug.Log($"[STUN] {message}");
     }
 
-    // 被弾時に呼ぶ。duration=やられ状態の秒数、willBeKnockedDown=この一撃でHPが0になるか
-    void ApplyStun(float duration, bool willBeKnockedDown)
+    // 被弾時に呼ぶ。frames=やられ状態のフレーム数、willBeKnockedDown=この一撃でHPが0になるか
+    void ApplyStun(int frames, bool willBeKnockedDown)
     {
         // 掴み・投げ・ダウン・死亡・必殺技（無敵）中は、やられ状態に置き換えない
         if (currentState == PlayerState.Grabbed || currentState == PlayerState.Thrown
@@ -2017,25 +2061,25 @@ public class Player : MonoBehaviour
         if (alreadyStunned)
         {
             stunComboCount++;
-            stateTimer = Mathf.Max(stateTimer, duration);
+            stateTimer = Mathf.Max(stateTimer, frames);
         }
         else
         {
-            if (duration <= 0f) return; // 0秒設定の技はやられ状態にならない
+            if (frames <= 0) return; // 0フレーム設定の技はやられ状態にならない
             stunComboCount = 1;
-            EnterStunned(duration);
+            EnterStunned(frames);
         }
 
-        StunDLog($"[{PlayerName}] 連続ヒット={stunComboCount} / やられ残り={stateTimer:F2}秒");
+        StunDLog($"[{PlayerName}] 連続ヒット={stunComboCount} / やられ残り={stateTimer}フレーム");
     }
 
     // ★追加：自分の攻撃が相手の仁王立ち（ガード）に防がれた時に、相手側から呼ばれる。
-    //   ガードされた側（攻撃者＝自分）を、指定秒数だけ行動不能（Stunned）にする。
+    //   ガードされた側（攻撃者＝自分）を、指定フレーム数だけ行動不能（Stunned）にする。
     //   通常の被弾（ApplyStun）と違い「連続ヒット数」は増やさない（被弾コンボではないため）。
-    //   すでにやられ状態の場合は、残り時間と指定秒数の長い方に延長する。
-    public void ApplyGuardedStun(float duration)
+    //   すでにやられ状態の場合は、残りフレーム数と指定フレーム数の長い方に延長する。
+    public void ApplyGuardedStun(int frames)
     {
-        if (duration <= 0f) return; // 0秒設定ならスタンさせない
+        if (frames <= 0) return; // 0フレーム設定ならスタンさせない
 
         // 掴み・投げ・ダウン・死亡・必殺技（無敵）中は、やられ状態に置き換えない（ApplyStunと同じ除外条件）
         if (currentState == PlayerState.Grabbed || currentState == PlayerState.Thrown
@@ -2045,18 +2089,18 @@ public class Player : MonoBehaviour
 
         if (currentState == PlayerState.Stunned)
         {
-            stateTimer = Mathf.Max(stateTimer, duration);
+            stateTimer = Mathf.Max(stateTimer, frames);
         }
         else
         {
-            EnterStunned(duration);
+            EnterStunned(frames);
         }
 
-        DLog($"[{PlayerName}] 相手の仁王立ちガードに防がれ、{duration:F2}秒スタン（残り{stateTimer:F2}秒）");
+        DLog($"[{PlayerName}] 相手の仁王立ちガードに防がれ、{frames}フレームスタン（残り{stateTimer}フレーム）");
     }
 
     // 実行中の行動を中断してやられ状態に入る
-    void EnterStunned(float duration)
+    void EnterStunned(int frames)
     {
         StopMoveAnimation();
         ResetAttackTriggers();
@@ -2066,9 +2110,9 @@ public class Player : MonoBehaviour
         throwReaching = false;  // 掴み待ち（まだ掴めていない投げ動作）だった場合は中断
 
         currentState = PlayerState.Stunned;
-        stateTimer = duration;
+        stateTimer = frames;
 
-        DLog($"[{PlayerName}] やられ状態に入りました（{duration:F2}秒）");
+        DLog($"[{PlayerName}] やられ状態に入りました（{frames}フレーム）");
     }
 
     // やられ状態の連続ヒット数を確定する（やられ状態が終わった時・ダウンした時に呼ぶ）
@@ -2091,7 +2135,7 @@ public class Player : MonoBehaviour
         float x = index == 0 ? 20f : Screen.width - width - 20f;
         Rect rect = new Rect(x, Screen.height * 0.3f, width, height);
 
-        string stateText = currentState == PlayerState.Stunned ? $"やられ中（残り{stateTimer:F2}秒）" : "通常";
+        string stateText = currentState == PlayerState.Stunned ? $"やられ中（残り{stateTimer}フレーム）" : "通常";
         string text = $"[{PlayerName}] やられ状態\n状態: {stateText}\n連続ヒット数: {stunComboCount}\n直前のコンボ: {lastStunComboCount} ヒット";
 
         GUIStyle style = new GUIStyle(GUI.skin.label)
@@ -2117,15 +2161,15 @@ public class Player : MonoBehaviour
     // ノックバックを要求する。ヒットストップが有効な場合はその終了時（EndHitStop）に、
     // 無効な場合はその場ですぐにApplyKnockbackを実行する。
     // ※StartHitStopの早期return条件（enableHitStopがfalse、またはヒットストップ時間が0以下）と揃えてある。
-    //   appliedHitStopDuration: 今回の被弾で実際にStartHitStopへ渡したヒットストップ時間。
-    void RequestKnockback(Vector3 velocity, float appliedHitStopDuration)
+    //   appliedHitStopFrames: 今回の被弾で実際にStartHitStopへ渡したヒットストップのフレーム数。
+    void RequestKnockback(Vector3 velocity, int appliedHitStopFrames)
     {
         // ★追加：攻撃が当たった瞬間に、相手(自分)の今の速度をXYZすべて0にする。
         //   前の被弾の吹き飛び中・落下中・移動中の勢いが残ったまま、ノックバックが上乗せされるのを防ぐ。
         //   （ヒットストップ中に前の勢いのまま滑ってしまうのも防ぐ。実際にノックバックを与えるのはその後）
         ZeroRigidbodyVelocity();
 
-        if (enableHitStop && appliedHitStopDuration > 0f)
+        if (enableHitStop && appliedHitStopFrames > 0)
         {
             hasPendingKnockback = true;
             pendingKnockbackVelocity = velocity;
@@ -2546,8 +2590,8 @@ public class Player : MonoBehaviour
 
         ResetAttackTriggers();
         currentState = PlayerState.Punch;
-        stateTimer = punchMissDuration;
-        currentAttackMissDuration = punchMissDuration;
+        stateTimer = punchMissFrames;
+        currentAttackMissFrames = punchMissFrames;
         attackLandedThisAttack = false; // 空振り判定用にリセット
         ResetMultiHitCount();           // 多段ヒットカウントを新しい攻撃用にリセット
 
@@ -2588,8 +2632,8 @@ public class Player : MonoBehaviour
         if (isCrouchInput)
         {
             currentState = PlayerState.DownKick;
-            stateTimer = downKickMissDuration;
-            currentAttackMissDuration = downKickMissDuration;
+            stateTimer = downKickMissFrames;
+            currentAttackMissFrames = downKickMissFrames;
             animator.SetTrigger("DownKick");
             RightFoot.enabled = true;
             RightLeg.enabled = true;
@@ -2601,8 +2645,8 @@ public class Player : MonoBehaviour
         else if (moveInput.y > upKickInputThreshold)
         {
             currentState = PlayerState.UpKick;
-            stateTimer = upKickMissDuration;
-            currentAttackMissDuration = upKickMissDuration;
+            stateTimer = upKickMissFrames;
+            currentAttackMissFrames = upKickMissFrames;
             animator.SetTrigger("UpKick");
             DLog($"[{PlayerName}] UpKick発動：Triggerを立てました（moveInput.y={moveInput.y:F2}）");
             DebugUpKickAnimator(); // ★デバッグ：Animatorが実際にどのステートへ遷移したかを確認する
@@ -2616,8 +2660,8 @@ public class Player : MonoBehaviour
         else
         {
             currentState = PlayerState.Kick;
-            stateTimer = kickMissDuration;
-            currentAttackMissDuration = kickMissDuration;
+            stateTimer = kickMissFrames;
+            currentAttackMissFrames = kickMissFrames;
             animator.SetTrigger("Kick");
             RightFoot.enabled = true;
             RightUpLeg.enabled = true;
@@ -2664,21 +2708,32 @@ public class Player : MonoBehaviour
         DLog($"[{PlayerName}] UpKick発動{delay}秒後：再生中クリップ={clipName}（クリップ長={clipLength:F2}秒） / ステートのSpeed={st.speed} / Multiplier(パラメータ)の現在値={st.speedMultiplier} / 遷移中={animator.IsInTransition(0)} / animator.speed={animator.speed} / レイヤー数={animator.layerCount}");
     }
 
-    // ★追加：Animatorの"Guard"(Bool)を、現在の状態(currentState == Guard)に合わせる。
+    // ★変更：Animatorの"Guard"(Trigger)を、Guard状態に「入った瞬間」だけ立てる。
     //   Guardへ入る／出る経路は複数あるため（通常のガード、被弾、掴まれ、F6デバッグの切り替え等）、
-    //   個々の箇所で出し入れせず、状態だけを見て毎フレーム同期する。値が変わった時だけAnimatorへ送る。
+    //   個々の箇所で出し入れせず、状態だけを見て毎フレーム同期する。
+    //   Boolと違いトリガーは「出る」合図を持たないため、Guardから抜けた時は未消費のトリガーを消すだけにし、
+    //   仁王立ちステートから抜ける遷移はAnimator側（Exit Time等）で設定する。
     void SyncGuardAnimation()
     {
         if (!hasGuardParam || animator == null) return;
 
-        bool wantGuardAnim = currentState == PlayerState.Guard;
-        if (wantGuardAnim == guardAnimApplied) return;
+        bool inGuard = currentState == PlayerState.Guard;
+        if (inGuard == guardAnimApplied) return;
 
-        guardAnimApplied = wantGuardAnim;
-        animator.SetBool(GuardParam, wantGuardAnim);
+        guardAnimApplied = inGuard;
 
-        // ガードを抜けた後に、未消費のGuard-successトリガーが残って後から誤再生されないよう消しておく
-        if (!wantGuardAnim && hasGuardSuccessParam) animator.ResetTrigger(GuardSuccessParam);
+        if (inGuard)
+        {
+            // Guardに入った瞬間：仁王立ちアニメーションを1回発火する
+            animator.SetTrigger(GuardParam);
+        }
+        else
+        {
+            // Guardを抜けた：未消費の"Guard"トリガーが残って後から誤再生されないよう消しておく
+            animator.ResetTrigger(GuardParam);
+            // ガードを抜けた後に、未消費のGuard-successトリガーが残って後から誤再生されないよう消しておく
+            if (hasGuardSuccessParam) animator.ResetTrigger(GuardSuccessParam);
+        }
     }
 
     // 仁王立ち（ガード）処理。ガードフラグを立て、演出用パーティクルを再生する
@@ -2689,7 +2744,7 @@ public class Player : MonoBehaviour
         StopMoveAnimation();
 
         currentState = PlayerState.Guard;
-        stateTimer = guardDuration;
+        stateTimer = guardFrames;
         isGuarding = true;
 
         ParticleSystem newParticle = Instantiate(
@@ -2703,7 +2758,7 @@ public class Player : MonoBehaviour
 
     // 投げ（掴み）処理。★仕様変更：この時点ではまだ投げ飛ばさず、
     //   手の当たり判定が接触した相手を「掴まれ状態(Grabbed)」へ移行させるだけにする。
-    //   実際に相手を投げ飛ばす（放物線状に飛ばす）のは、この掴み拘束(throwDuration)が終わる瞬間
+    //   実際に相手を投げ飛ばす（放物線状に飛ばす）のは、この掴み拘束(throwFrames)が終わる瞬間
     //   （TickBusyState→ResolveThrowLaunch）であり、掴んでいる間の移動スティック入力で方向が決まる。
     void EnterThrow()
     {
@@ -2712,14 +2767,14 @@ public class Player : MonoBehaviour
         StopMoveAnimation();
 
         currentState = PlayerState.Throw;
-        stateTimer = throwDuration;
+        stateTimer = throwFrames;
         animator.SetTrigger("Throw-start"); // 掴み（ホールド）モーション。飛ばす瞬間は別トリガー"Throw-release"を使う
         grabbedTarget = null;
 
         // ★変更：掴みの成立を「間合い(Z距離)の判定」から「手の当たり判定の接触」へ変更した。
         //   投げ動作の間、左手(P-LeftHand)・左前腕(P-LeftForeArm)の当たり判定をONにしておき、
         //   相手の体に触れた瞬間に掴みが成立する（相手側のOnTriggerEnter → OnGrabHitboxContact）。
-        //   触れないまま投げ動作(throwDuration)が終われば空振りで、掴めなかった時と同じく何も起きずにIdleへ戻る。
+        //   触れないまま投げ動作(throwFrames)が終われば空振りで、掴めなかった時と同じく何も起きずにIdleへ戻る。
         throwReaching = true;
         grabHoldFrozen = false;
         if (LeftHand != null) LeftHand.enabled = true;
@@ -2753,24 +2808,24 @@ public class Player : MonoBehaviour
         // 手の当たり判定は役目を終えたのでOFFにする（以降の接触でダメージ判定へ流れないようにする）
         DisableAllHitboxes();
 
-        // 接触した瞬間から数えてthrowDuration後に投げ飛ばす（脱出判定の猶予もこの間）
-        stateTimer = throwDuration;
+        // 接触した瞬間から数えてthrowFrames後に投げ飛ばす（脱出判定の猶予もこの間）
+        stateTimer = throwFrames;
 
         target.transform.Translate(0f, 0f, -0.0025f); // 敵を少し引き寄せる（既存の演出を踏襲）
         target.EnterGrabbed(this);                    // 相手を掴まれ状態へ移行させる（脱出タイマーは相手のHPから決まる）
 
         // ★アニメーションの止め方はInspectorのenableThrowStartPlayで切り替える。
         //   止めたアニメーションは、投げ成立／不成立の瞬間にResumeGrabHoldAnimation()で再開される。
-        if (enableThrowStartPlay && throwStartPlayTime > 0f)
+        if (enableThrowStartPlay && throwStartPlayFrames > 0)
         {
-            // ON：接触後throwStartPlayTime秒だけ再生を続け、その後に止める（TickBusyStateで残り時間を監視）
-            grabHoldTimer = throwStartPlayTime;
+            // ON：接触後throwStartPlayFramesフレームだけ再生を続け、その後に止める（TickBusyStateで残り時間を監視）
+            grabHoldTimer = throwStartPlayFrames;
             grabHoldFrozen = false;
         }
         else
         {
             // OFF：接触した瞬間にアニメーションを止める
-            grabHoldTimer = 0f;
+            grabHoldTimer = 0;
             grabHoldFrozen = true;
             if (animator != null) animator.speed = 0f;
         }
@@ -2793,10 +2848,10 @@ public class Player : MonoBehaviour
 
     // ★追加：現在のHPから、掴まれた際に脱出（振りほどき）に必要な時間を算出する。
     //   HPが高いほど短時間で脱出でき、HPが低いほど脱出に時間がかかる（＝投げられやすい）仕様。
-    float CalculateEscapeTime()
+    int CalculateEscapeFrames()
     {
         float hpRatio = maxHP > 0 ? Mathf.Clamp01((float)HP / maxHP) : 0f;
-        return Mathf.Lerp(escapeTimeAtZeroHp, escapeTimeAtFullHp, hpRatio);
+        return Mathf.RoundToInt(Mathf.Lerp(escapeFramesAtZeroHp, escapeFramesAtFullHp, hpRatio));
     }
 
     // ★追加：相手に掴まれた瞬間に、相手側(grabber)から呼び出される。
@@ -2810,21 +2865,21 @@ public class Player : MonoBehaviour
 
         currentState = PlayerState.Grabbed;
         grabbingPlayer = grabber;
-        escapeTimer = CalculateEscapeTime();
+        escapeTimer = CalculateEscapeFrames();
         // 掴まれた瞬間にスティックを倒していても、それを「抵抗入力」とは数えない
         grabStickWasActive = Mathf.Abs(moveInput.x) >= moveInputThreshold
                           || Mathf.Abs(moveInput.y) >= moveInputThreshold;
 
         animator.SetTrigger("Grabbed"); // ★要Animator追加：掴まれ中（もがき）専用のアニメーション。"Thrown"（飛んでいる間）とは別にする
 
-        DLog($"[{PlayerName}] 掴まれた！脱出に必要な時間={escapeTimer:F2}秒（HP={HP}/{maxHP}）");
+        DLog($"[{PlayerName}] 掴まれた！脱出に必要なフレーム数={escapeTimer}（HP={HP}/{maxHP}）");
     }
 
     // ★追加：掴まれている間、毎フレーム呼ばれる。時間経過に加え、
     //   ボタン（既存の意図フラグ）かスティックの入力があるたびに追加で脱出時間を短縮する。
     void TickGrabbed()
     {
-        escapeTimer -= Time.deltaTime;
+        escapeTimer -= frameStep;
 
         // ★修正：スティックは「倒した瞬間」だけを入力として数える。
         //   以前は倒している間ずっと毎フレーム短縮されていたため、押しっぱなしで一瞬で脱出でき、
@@ -2838,10 +2893,10 @@ public class Player : MonoBehaviour
                    || stickPressedNow;
         if (mashed)
         {
-            escapeTimer -= escapeReductionPerInput;
+            escapeTimer -= escapeReductionFramesPerInput;
         }
 
-        if (escapeTimer <= 0f)
+        if (escapeTimer <= 0)
         {
             EscapeFromGrab();
         }
@@ -2879,7 +2934,7 @@ public class Player : MonoBehaviour
         animator.SetTrigger("Throw-whiff"); // 投げ失敗（逃げられた）演出用トリガー
     }
 
-    // ★追加：掴み拘束(throwDuration)が時間切れになった＝相手が脱出できなかった時に、
+    // ★追加：掴み拘束(throwFrames)が時間切れになった＝相手が脱出できなかった時に、
     //   TickBusyState()から呼ばれる。掴んでいる側が方向入力をしていれば実際にダメージを与えて
     //   放物線状に投げ飛ばす。方向入力が無かった場合は「投げ不成立」として扱い、
     //   （脱出できた時と同様に）お互いを後方へ押し出すだけにする。
@@ -2921,7 +2976,7 @@ public class Player : MonoBehaviour
         //   向きの判定は投げる前の自分の向き(transform.forward)で行う。
         bool isBackThrow = Vector3.Dot(launchDir, transform.forward) < 0f;
 
-        grabbedTarget.LaunchByThrow(launchDir, throwHorizontalSpeed, throwUpSpeed, "Thrown", throwStunDuration);
+        grabbedTarget.LaunchByThrow(launchDir, throwHorizontalSpeed, throwUpSpeed, "Thrown", throwStunFrames);
 
         if (isBackThrow)
         {
@@ -2991,18 +3046,18 @@ public class Player : MonoBehaviour
         return transform.forward;
     }
 
-    private float pendingThrowStunDuration = 0f; // ★追加：投げで飛ばされた後、着地時に入るやられ状態の時間（秒）
+    private int pendingThrowStunFrames = 0; // ★追加：投げで飛ばされた後、着地時に入るやられ状態のフレーム数
 
     // ★追加：投げ技によって、放物線状に吹き飛ばされる処理。掴んでいた相手から呼び出される。
     //   Rigidbodyに初速を与えるだけで、あとは重力(既存のJump同様の物理設定)に任せて放物線を描かせる。
     //   ★変更：投げ成立時（相手を飛ばす）だけでなく、投げ不成立時にお互いが後方へ吹き飛ぶ演出
     //   （PushBackFromGrabFailure）でも共用できるよう、再生するアニメーショントリガーを引数化した。
     //   省略時は従来通り"Thrown"（通常の投げ成立で飛ばされる側のモーション）を使う。
-    public void LaunchByThrow(Vector3 horizontalDirection, float horizontalSpeed, float upSpeed, string animTrigger = "Thrown", float stunAfterLanding = 0f)
+    public void LaunchByThrow(Vector3 horizontalDirection, float horizontalSpeed, float upSpeed, string animTrigger = "Thrown", int stunAfterLanding = 0)
     {
         // ★追加：着地後にやられ状態へ移行する時間を記録する（0なら着地後は通常復帰）。
         //   投げ不成立の吹き飛び(PushBackFromGrabFailure)は引数省略＝0なので、やられ状態にはならない。
-        pendingThrowStunDuration = stunAfterLanding;
+        pendingThrowStunFrames = stunAfterLanding;
 
         StopMoveAnimation();
         DisableAllHitboxes();
@@ -3041,7 +3096,7 @@ public class Player : MonoBehaviour
     void ResumeGrabHoldAnimation()
     {
         grabHoldFrozen = false;
-        if (animator != null && hitStopTimer <= 0f) animator.speed = 1f; // ヒットストップ中ならEndHitStopが戻す
+        if (animator != null && hitStopTimer <= 0) animator.speed = 1f; // ヒットストップ中ならEndHitStopが戻す
     }
 
     // ★追加：投げで吹き飛ばされた後、地面に着地した瞬間にOnCollisionEnterから呼ばれる。
@@ -3053,13 +3108,13 @@ public class Player : MonoBehaviour
 
         // ★追加：投げ成立で飛ばされていた場合、着地した瞬間からやられ状態（行動不能）に入る。
         //   ダメージでHPが0になっている場合は、ダウン処理（HandleKnockedDown）に任せるため入らない。
-        float landStun = pendingThrowStunDuration;
-        pendingThrowStunDuration = 0f;
-        if (landStun > 0f && HP > 0)
+        int landStun = pendingThrowStunFrames;
+        pendingThrowStunFrames = 0;
+        if (landStun > 0 && HP > 0)
         {
             stunComboCount = 1; // 投げを1ヒットとして数える（やられ中にさらに被弾すると加算される）
             EnterStunned(landStun);
-            StunDLog($"[{PlayerName}] 投げ着地→やられ状態 {landStun:F2}秒");
+            StunDLog($"[{PlayerName}] 投げ着地→やられ状態 {landStun}フレーム");
         }
 
         animator.SetTrigger("Thrown-land"); // ★要Animator追加（任意）：着地モーション用トリガー。未設定でも動作に支障はない
@@ -3072,7 +3127,7 @@ public class Player : MonoBehaviour
     }
 
     // 必殺技発動処理。左足（LeftFoot/LeftUpLeg/LeftLeg）の当たり判定をONにして、
-    // その状態で3秒間（specialDuration）だけ攻撃を行う。
+    // その状態でspecialFramesフレーム（既定180F=3秒）だけ攻撃を行う。
     // この間は移動のみ可能（攻撃・ガード・投げ・ジャンプ・必殺技の再発動は不可）で、
     // かつ相手からの攻撃を一切受けない（無敵。OnTriggerEnter側で判定）。
     // 相手に左足の判定が当たった場合のみ、specialAtk（Inspector設定）のダメージを与える。
@@ -3083,15 +3138,15 @@ public class Player : MonoBehaviour
         StopMoveAnimation();
 
         currentState = PlayerState.Special;
-        stateTimer = specialDuration;
+        stateTimer = specialFrames;
         attackLandedThisAttack = false; // 空振り判定用にリセット
         ResetMultiHitCount();           // 多段ヒットカウントを新しい攻撃用にリセット
 
         // ★Animator Controller側に"waza"という名前のTriggerパラメータを追加しておくこと。
         //   currentState=Specialの間、移動以外の入力(攻撃・ガード・投げ・ジャンプ・必殺技)は
-        //   TickBusyState()側で受け付けないため、stateTimer(=specialDuration)が0になって
+        //   TickBusyState()側で受け付けないため、stateTimer(=specialFrames)が0になって
         //   PlayerState.Idleへ戻るまで次の技は出せない（＝アニメーションが終わるまで次の技を出せない）。
-        //   specialDurationは"waza"アニメーションの実際の長さと一致させること。
+        //   specialFramesは"waza"アニメーションの実際の長さと一致させること。
         animator.SetTrigger("waza");
 
         // 左足（3箇所）の攻撃用当たり判定をON。オフに戻す処理はTickBusyState()の
@@ -3129,7 +3184,7 @@ public class Player : MonoBehaviour
         // 自分の漢気ゲージを消費する
         ReduceKankiGauge(specialGaugeCost);
 
-        DLog($"[{PlayerName}] 必殺技発動！（消費ゲージ={specialGaugeCost} / 攻撃力={atk} / 拘束時間={specialDuration}秒 / 無敵）");
+        DLog($"[{PlayerName}] 必殺技発動！（消費ゲージ={specialGaugeCost} / 攻撃力={atk} / 拘束フレーム数={specialFrames} / 無敵）");
     }
 
     // 攻撃系トリガーの予約をすべてクリアする（前の攻撃予約が残って誤発火するのを防ぐ）
@@ -3195,8 +3250,8 @@ public class Player : MonoBehaviour
         // ★追加：やられ状態（行動不能）。時間だけ消化して、終わったらIdleへ戻る。
         if (currentState == PlayerState.Stunned)
         {
-            stateTimer -= Time.deltaTime;
-            if (stateTimer > 0f) return;
+            stateTimer -= frameStep;
+            if (stateTimer > 0) return;
 
             FinishStunCombo();
             currentState = PlayerState.Idle;
@@ -3209,19 +3264,19 @@ public class Player : MonoBehaviour
             MoveDuringSpecial();
         }
 
-        // ★追加：掴み成立後、throwStartPlayTime秒だけ掴みモーションを再生したら、そのポーズで止める
+        // ★追加：掴み成立後、throwStartPlayFramesフレームだけ掴みモーションを再生したら、そのポーズで止める
         if (currentState == PlayerState.Throw && grabbedTarget != null && !grabHoldFrozen)
         {
-            grabHoldTimer -= Time.deltaTime;
-            if (grabHoldTimer <= 0f)
+            grabHoldTimer -= frameStep;
+            if (grabHoldTimer <= 0)
             {
                 grabHoldFrozen = true;
                 if (animator != null) animator.speed = 0f;
             }
         }
 
-        stateTimer -= Time.deltaTime;
-        if (stateTimer > 0f) return;
+        stateTimer -= frameStep;
+        if (stateTimer > 0) return;
 
         // 攻撃系の状態（パンチ/キック/上キック/下キック）が、
         // 一度も命中通知(NotifyAttackLanded)を受けないまま終了したら「空振り」とみなす
@@ -3287,7 +3342,7 @@ public class Player : MonoBehaviour
 
         //gameMNG.PlayerUI(rebornTimer, mashCount);
 
-        rebornTimer += Time.deltaTime;
+        rebornTimer += frameStep;
         Player_status = Status.Reborn;
         if (gameMNG != null) gameMNG.SettestStatus(PlayerName, Status.Reborn);
 
@@ -3299,7 +3354,7 @@ public class Player : MonoBehaviour
         }
 
         // ★追加：漢気復活。制限時間内にL1が押され、漢気ゲージが足りていれば、連打せずに即座に復活する
-        if (wantKankiRevive && rebornTimer < rebornTimeLimit && TryKankiRevive())
+        if (wantKankiRevive && rebornTimer < rebornTimeLimitFrames && TryKankiRevive())
         {
             return;
         }
@@ -3307,7 +3362,7 @@ public class Player : MonoBehaviour
         // 復活に必要な連打回数のしきい値（復活回数が増えるほど厳しくなる）
         int mashThreshold = CurrentMashThreshold();
 
-        if (rebornTimer < rebornTimeLimit)
+        if (rebornTimer < rebornTimeLimitFrames)
         {
             if (mashCount <= mashThreshold)
             {
@@ -3325,7 +3380,7 @@ public class Player : MonoBehaviour
                 HP = Mathf.RoundToInt(maxHP * rebornHpRatio);
                 rebornCount++;
                 mashCount = 0;
-                rebornTimer = 0f;
+                rebornTimer = 0;
                 currentState = PlayerState.Idle;
                 Player_status = Status.Live;
                 //UIにHPを反映させるように指示
@@ -3378,7 +3433,7 @@ public class Player : MonoBehaviour
         HP = Mathf.RoundToInt(maxHP * rebornHpRatio);
         rebornCount++;
         mashCount = 0;
-        rebornTimer = 0f;
+        rebornTimer = 0;
         currentState = PlayerState.Idle;
         Player_status = Status.Live;
 
@@ -3399,7 +3454,7 @@ public class Player : MonoBehaviour
         SpawnKankiReviveEffect(); // 復活した瞬間のエフェクト
         StartReviveBuff();        // 攻撃力上昇（＋上昇中エフェクト）を開始
 
-        DLog($"[{PlayerName}] 漢気復活！（消費ゲージ={cost:F1} / 復活後HP={HP} / 攻撃力={atk} / 上昇時間={reviveAtkBuffDuration}秒）");
+        DLog($"[{PlayerName}] 漢気復活！（消費ゲージ={cost:F1} / 復活後HP={HP} / 攻撃力={atk} / 上昇フレーム数={reviveAtkBuffFrames}）");
         return true;
     }
 
@@ -3428,7 +3483,7 @@ public class Player : MonoBehaviour
     void StartReviveBuff()
     {
         isReviveBuffed = true;
-        reviveBuffTimer = reviveAtkBuffDuration;
+        reviveBuffTimer = reviveAtkBuffFrames;
         UpdateAtkByGauge(); // 上昇倍率をatkへ反映
         StartReviveBuffEffect();
     }
@@ -3439,7 +3494,7 @@ public class Player : MonoBehaviour
         if (!isReviveBuffed) return;
 
         isReviveBuffed = false;
-        reviveBuffTimer = 0f;
+        reviveBuffTimer = 0;
         UpdateAtkByGauge(); // 上昇倍率を外したatkへ戻す
         StopReviveBuffEffect();
 
@@ -3451,8 +3506,8 @@ public class Player : MonoBehaviour
     {
         if (!isReviveBuffed) return;
 
-        reviveBuffTimer -= Time.deltaTime;
-        if (reviveBuffTimer <= 0f) EndReviveBuff();
+        reviveBuffTimer -= frameStep;
+        if (reviveBuffTimer <= 0) EndReviveBuff();
     }
 
     // 攻撃力上昇中のエフェクトを開始する。プレイヤーに追従し、上昇が終わるまでループし続ける。
@@ -3518,7 +3573,7 @@ public class Player : MonoBehaviour
         HP = hp;
         rebornCount++;
         mashCount = 0;
-        rebornTimer = 0f;
+        rebornTimer = 0;
         currentState = PlayerState.Idle;
         Player_status = Status.Live;
 
@@ -3672,7 +3727,7 @@ public class Player : MonoBehaviour
 
             // ガード成功時のヒットストップ（少しだけ動けなくする）。
             // ガードのポーズを崩したくないのでHeadHitアニメーションは再生しない。
-            StartHitStop(guardHitStopDuration, false);
+            StartHitStop(guardHitStopFrames, false);
 
             guardComboCount++;
             if (fightingCamera != null)
@@ -3705,10 +3760,10 @@ public class Player : MonoBehaviour
             if (isEnemyPlayerAttack) attackerPlayer.NotifyAttackLanded();
             else if (attackerEnemy != null) attackerEnemy.NotifyAttackLanded();
 
-            // ★追加：ガード成功で、攻撃してきた相手を guardSuccessStunDuration 秒だけスタン（行動不能）にする。
+            // ★追加：ガード成功で、攻撃してきた相手を guardSuccessStunFrames フレームだけスタン（行動不能）にする。
             //   ※NotifyAttackLanded()の後に呼ぶこと（命中によるクールダウン切替の後で、やられ状態へ上書きするため）。
             //   ※CPU(Enemy)が攻撃者の場合は未対応（Enemy.cs側にApplyGuardedStun()相当が必要）。
-            if (isEnemyPlayerAttack) attackerPlayer.ApplyGuardedStun(guardSuccessStunDuration);
+            if (isEnemyPlayerAttack) attackerPlayer.ApplyGuardedStun(guardSuccessStunFrames);
         }
         else
         {
@@ -3731,12 +3786,12 @@ public class Player : MonoBehaviour
 
             // 通常被弾時のヒットストップ（少しだけ動けなくする）。
             // ★変更：対人戦では、攻撃者の「攻撃ごとの設定」のヒットストップ時間を使う。
-            //   CPU(Enemy)の攻撃、または攻撃種別が取れない場合は、従来のhitStopDurationにフォールバックする。
-            float appliedHitStop = hitStopDuration;
+            //   CPU(Enemy)の攻撃、または攻撃種別が取れない場合は、従来のhitStopFramesにフォールバックする。
+            int appliedHitStop = hitStopFrames;
             if (isEnemyPlayerAttack)
             {
-                float perAttackHitStop = attackerPlayer.GetCurrentHitStopDuration();
-                if (perAttackHitStop >= 0f) appliedHitStop = perAttackHitStop;
+                int perAttackHitStop = attackerPlayer.GetCurrentHitStopFrames();
+                if (perAttackHitStop >= 0) appliedHitStop = perAttackHitStop;
             }
             StartHitStop(appliedHitStop);
 
@@ -3755,10 +3810,10 @@ public class Player : MonoBehaviour
             }
 
             // ★追加：やられ状態（行動不能）。攻撃者の技ごとの「やられ状態の時間」だけ動けなくする。
-            //   ※CPU(Enemy)の攻撃は未対応（Enemy.csにGetCurrentStunDuration()相当が必要）。
+            //   ※CPU(Enemy)の攻撃は未対応（Enemy.csにGetCurrentStunFrames()相当が必要）。
             if (isEnemyPlayerAttack)
             {
-                ApplyStun(attackerPlayer.GetCurrentStunDuration(), HP - attackerAtk <= 0);
+                ApplyStun(attackerPlayer.GetCurrentStunFrames(), HP - attackerAtk <= 0);
             }
 
             Vector3 hitPoint = collision.ClosestPoint(collision.transform.position);
