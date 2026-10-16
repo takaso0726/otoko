@@ -18,6 +18,34 @@ public class HitEffectSpawner : MonoBehaviour
     [Header("任意：常にプレイヤー向きに合わせたい場合はCameraを指定")]
     [SerializeField] private Camera targetCamera;
 
+    //=====================================================
+    // ★追加：キャラの向き別・生成位置の微調整（Inspectorで調整）
+    //   全エフェクト共通の、向きごとの追加オフセット（HitEffectDataのspawnPositionOffsetと、データごとの向き別オフセットに加算される）。
+    //   横＝Z軸、高さ＝Y軸、X＝奥行き。向きはワールドのZ軸の符号で判定する。
+    //   ・Z+を向いている時 ／ Z-を向いている時 のどちらが画面の左右どちらかは、カメラの配置で決まる。
+    //     実際にエフェクトを出して確認し、見た目に合わせて値を入れること。
+    //   ・向きが判定できない時（Z成分がほぼ0）は、どちらも適用しない。
+    //   ・対象：Spawn（被弾者の向き＝攻撃者の方を向いている前提）／SpawnAtDirection（渡した基準方向）／SpawnBehindFacing（facingForward）
+    //=====================================================
+    [Header("向き別の生成位置微調整（HitEffectDataのオフセットに加算）")]
+    [Tooltip("キャラがZ+方向を向いている時の追加オフセット（X=奥行き／Y=高さ／Z=横）。")]
+    [SerializeField] private Vector3 offsetWhenFacingPositiveZ = Vector3.zero;
+    [Tooltip("キャラがZ-方向を向いている時の追加オフセット（X=奥行き／Y=高さ／Z=横）。")]
+    [SerializeField] private Vector3 offsetWhenFacingNegativeZ = Vector3.zero;
+
+    // facingSign: +1=Z+向き／-1=Z-向き／0=不明（追加オフセットなし）
+    private Vector3 GetFacingOffset(int facingSign)
+    {
+        if (facingSign > 0) return offsetWhenFacingPositiveZ;
+        if (facingSign < 0) return offsetWhenFacingNegativeZ;
+        return Vector3.zero;
+    }
+
+    private static int GetFacingSign(float z)
+    {
+        return Mathf.Abs(z) < 0.01f ? 0 : (z > 0f ? 1 : -1);
+    }
+
     // ★追加：allowOverlap=falseなHitEffectDataについて、「今表示中のインスタンス」を1つだけ覚えておく。
     //   同じdataでの新規生成リクエストが来たとき、ここを見て出してよいか判定する。
     private readonly System.Collections.Generic.Dictionary<HitEffectData, HitEffectAnimator> activeInstances
@@ -42,7 +70,9 @@ public class HitEffectSpawner : MonoBehaviour
         baseDir.z = 0f; // 2D格闘想定。3D奥行きを使うならここを調整
         if (baseDir.sqrMagnitude < 0.0001f) baseDir = Vector3.right;
 
-        SpawnAtDirection(data, victimPos, baseDir);
+        // 被弾者は攻撃者の方を向いている前提：被弾者の向き＝被弾者→攻撃者のZ方向
+        int victimFacing = GetFacingSign(attackerPos.z - victimPos.z);
+        SpawnAtDirection(data, victimPos, baseDir, victimFacing);
     }
 
     /// <summary>
@@ -50,6 +80,13 @@ public class HitEffectSpawner : MonoBehaviour
     /// 基準方向を直接渡し、そこから data.baseAngle 分回転させた位置にエフェクトを出す。
     /// </summary>
     public void SpawnAtDirection(HitEffectData data, Vector3 originPos, Vector3 baseDirection)
+    {
+        // 向きは基準方向のZ成分の符号（下のz=0化より前に判定する）
+        SpawnAtDirection(data, originPos, baseDirection, GetFacingSign(baseDirection.z));
+    }
+
+    // facingSign: 向き別オフセット用（+1=Z+／-1=Z-／0=不明）
+    private void SpawnAtDirection(HitEffectData data, Vector3 originPos, Vector3 baseDirection, int facingSign)
     {
         if (data == null || data.effectPrefab == null) return;
 
@@ -79,7 +116,7 @@ public class HitEffectSpawner : MonoBehaviour
         float distance = Random.Range(data.distanceRange.x, data.distanceRange.y);
         Vector3 spawnPos = originPos + spawnDir * distance;
 
-        SpawnInstance(data, spawnPos);
+        SpawnInstance(data, spawnPos, facingSign);
     }
 
     /// <summary>
@@ -107,14 +144,20 @@ public class HitEffectSpawner : MonoBehaviour
         Vector3 spawnDir = backSide * Mathf.Cos(rad) + Vector3.up * Mathf.Sin(rad);
 
         float distance = Random.Range(data.distanceRange.x, data.distanceRange.y);
-        SpawnInstance(data, originPos + spawnDir * distance);
+        SpawnInstance(data, originPos + spawnDir * distance, GetFacingSign(facingForward.z));
     }
 
     // 生成位置が決まった後の共通処理（位置微調整・生成・スケール・アニメーション開始）
-    private void SpawnInstance(HitEffectData data, Vector3 spawnPos)
+    private void SpawnInstance(HitEffectData data, Vector3 spawnPos, int facingSign = 0)
     {
         // 手動での位置微調整（上下左右奥）を反映。HitEffectDataのInspectorで技ごとに調整できる
         spawnPos += data.spawnPositionOffset;
+
+        // ★追加：キャラの向き別の追加オフセット（Inspectorで左右それぞれ調整）
+        spawnPos += GetFacingOffset(facingSign);
+        // 技（HitEffectData）ごとの向き別オフセットも加算
+        if (facingSign > 0) spawnPos += data.offsetWhenFacingPositiveZ;
+        else if (facingSign < 0) spawnPos += data.offsetWhenFacingNegativeZ;
 
         // 生成
         GameObject fx = Instantiate(data.effectPrefab, spawnPos, Quaternion.identity);

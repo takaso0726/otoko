@@ -1685,6 +1685,7 @@ MonoBehaviour:
   enableF7DebugKey: 1
   enableF8DebugKey: 1
   enableF10DebugKey: 1
+  f10DebugFontSize: 18
   enableArrowKeyAnimation: 0
   enableDpadAnimation: 0
   upArrowAnimation:
@@ -1735,7 +1736,14 @@ MonoBehaviour:
   grabFailUpSpeed: 3
   throwStartPlayFrames: 12
   enableThrowStartPlay: 0
-  guardAtkBonusMultiplier: 100
+  throwReleaseRecoveryFrames: 20
+  throwInputStartDelayFrames: 10
+  guardSuccessNextAttackMultiplier: 1.5
+  guardSuccessMaxMultiplier: 0
+  guardFailGaugeGainRate: 0.5
+  guardFailGaugePenaltyFrames: 180
+  guardFailDamageMultiplier: 1.5
+  guardFailDamagePenaltyFrames: 60
   guardSuccessStunFrames: 30
   rebornTimeLimitFrames: 300
   rebornHpRatio: 0.5
@@ -1754,10 +1762,12 @@ MonoBehaviour:
   guardHitEffectData: {fileID: 11400000, guid: 0efc11a881f5de141897cb73e3f94d51, type: 2}
   mashHitEffectData: {fileID: 11400000, guid: 99debc3a56df75648b48c42066c82a73, type: 2}
   missHitEffectData: {fileID: 11400000, guid: 182479a3e4175444d9090102939c91b9, type: 2}
+  hitEffectFacingBasis: 0
   enableHitStop: 1
   hitStopFrames: 5
   guardHitStopFrames: 3
   freezeAnimatorDuringHitStop: 1
+  playHeadHitStateDirectly: 0
   punchAtk: 10
   punchMissFrames: 30
   punchHitFrames: 30
@@ -1833,6 +1843,15 @@ MonoBehaviour:
   enemyPlayer: {fileID: 0}
   animator: {fileID: 321369193941556440}
   fightingCamera: {fileID: 9096632630280813122, guid: 89c452da849cda84489bc37e8a782689, type: 3}
+  downStartTrigger: Down-start
+  downBoolParam: Down
+  downReviveTrigger: Down-revive
+  downFailTrigger: Down-fail
+  rebornStandUpFreezeFrames: 180
+  hideOpponentDuringRebornFreeze: 1
+  enableDualDownLayout: 1
+  dualDownLeftXRatio: 0.25
+  dualDownRightXRatio: 0.75
   punchMultiHit:
     allowMultiHit: 0
     maxHitCount: 1

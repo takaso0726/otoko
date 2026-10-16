@@ -27,6 +27,12 @@ public class HitEffectData : ScriptableObject
     [Tooltip("計算後の生成位置にさらに加算するオフセット。X=左右（右が+）、Y=上下（上が+）、Z=奥行き（奥が+）")]
     public Vector3 spawnPositionOffset = new Vector3(0f, 1.0f, 0f);
 
+    [Header("向き別の生成位置微調整（キャラの向きごと）")]
+    [Tooltip("キャラがZ+方向を向いている時の追加オフセット（X=奥行き／Y=高さ／Z=横）。上のオフセットとHitEffectSpawner側の共通オフセットにさらに加算される。")]
+    public Vector3 offsetWhenFacingPositiveZ = Vector3.zero;
+    [Tooltip("キャラがZ-方向を向いている時の追加オフセット（X=奥行き／Y=高さ／Z=横）。上のオフセットとHitEffectSpawner側の共通オフセットにさらに加算される。")]
+    public Vector3 offsetWhenFacingNegativeZ = Vector3.zero;
+
     [Header("全体の大きさ")]
     [Tooltip("scaleRangeにさらに掛け合わせる全体スケール倍率。1で等倍、大きくすると全体的に大きく表示される")]
     public float overallScale = 1.0f;
