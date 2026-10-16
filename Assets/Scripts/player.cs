@@ -753,7 +753,7 @@ public class Player : MonoBehaviour
     [Header("復活後の停止（自分・相手ともに動けない）")]
     [Tooltip("復活に成功した瞬間から、自分・相手ともに動けなくなるフレーム数（60F=1秒）。\n" +
              "この間、カメラは復活したキャラの正面の引きの画を映す。")]
-    [SerializeField] int rebornStandUpFreezeFrames = 180;
+    [SerializeField] int rebornStandUpFreezeFrames = 60; // ★変更：180F(3秒)→60F(1秒)。従来の1/3
     [Tooltip("ONにすると、復活後の停止中は相手（P2／CPU）を非表示にする。復活演出のカメラに相手が映り込むのを防ぐ。\n" +
              "同時ダウン後の復活はカメラ演出をしないので、非表示にもしない。")]
     [SerializeField] bool hideOpponentDuringRebornFreeze = true;

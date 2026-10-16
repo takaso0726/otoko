@@ -270,6 +270,13 @@ public class GameInputManager : MonoBehaviour
             Debug.LogWarning("[GameInputManager] シーン内にGameMNGが見つからないため、" +
                              "HPバー・漢気ゲージを生成したプレイヤーにつなげませんでした。");
         }
+
+        // マスク方式のゲージ（MaskGauge）にも、生成した1P/2Pを割り当てる（PlayerSlotがP1/P2のもののみ）
+        var gauges = FindObjectsByType<MaskGauge>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var gauge in gauges)
+        {
+            gauge.AssignFromSlot(player1, player2);
+        }
     }
 
     // ---- 生成 ----
