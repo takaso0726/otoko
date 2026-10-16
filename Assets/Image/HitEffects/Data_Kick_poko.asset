@@ -13,13 +13,13 @@ MonoBehaviour:
   m_Name: Data_Kick_poko
   m_EditorClassIdentifier: Assembly-CSharp::HitEffectData
   effectPrefab: {fileID: 6815328702670523096, guid: 3f10fe76e838aab4796aaa4674997eeb, type: 3}
-  baseAngle: -180
-  angleRandomRange: 6.6
-  distanceRange: {x: 2.11, y: 0.17}
-  spawnPositionOffset: {x: -5.8, y: 0.33, z: -2.4}
-  overallScale: 0.28
-  scaleRange: {x: 2.71, y: 2.6}
-  lifeTime: 0.4
+  baseAngle: 180
+  angleRandomRange: 20
+  distanceRange: {x: 0, y: 0}
+  spawnPositionOffset: {x: 0, y: 1, z: -2}
+  overallScale: 1
+  scaleRange: {x: 0.7, y: 0.7}
+  lifeTime: 0.7
   scaleCurve:
     serializedVersion: 2
     m_Curve:

@@ -221,6 +221,11 @@ public class FightingCameraController : MonoBehaviour
     [Tooltip("咆哮するキャラクターのどのあたりを見るか（高さ）")]
     public float rebornRoarLookAtHeight = 1.6f;
 
+    [Header("根性復活演出（復活後の引きカメラ停止）")]
+    [Tooltip("OFF（既定）：復活時に後方へ回り込まず、復活したキャラの正面の引きの画をそのまま映し続ける。\n" +
+             "ON：従来どおり、立ち上がりの瞬間に180度回り込む（上の「立ち上がり180度バレットタイム」の設定を使う）。")]
+    public bool rebornStandUpOrbitEnabled = false;
+
     // 内部状態
     private Vector3 _velocityPos;   // SmoothDamp用
     private float _velocityZoom;    // SmoothDamp用（float）
@@ -245,6 +250,10 @@ public class FightingCameraController : MonoBehaviour
     // 根性復活演出（リバースカム）関連
     private bool _isRebornCloseUpMode = false;
     private bool _isRebornOrbitMode = false;
+    private bool _isRebornHoldMode = false;      // 復活後の「正面・引き」停止カメラ
+    private float _rebornHoldTimer;
+    private float _rebornHoldDuration;
+    private Vector3 _rebornHoldDir;              // 復活した瞬間に確定させた、キャラ正面方向（水平）
     private Transform _rebornTarget;
     private int _rebornLevel = 0;
     private float _rebornCurrentDistance;
@@ -379,6 +388,13 @@ public class FightingCameraController : MonoBehaviour
         if (_isRebornOrbitMode)
         {
             UpdateRebornOrbitCamera();
+            return;
+        }
+
+        // 根性復活：復活後、キャラ正面の引きの画を数秒間映し続ける（回り込まない）
+        if (_isRebornHoldMode)
+        {
+            UpdateRebornHoldCamera();
             return;
         }
 
@@ -885,6 +901,7 @@ public class FightingCameraController : MonoBehaviour
 
         _isRebornCloseUpMode = true;
         _isRebornOrbitMode = false;
+        _isRebornHoldMode = false;
         _rebornTarget = target;
         _rebornLevel = 0;
         _rebornCurrentDistance = rebornCloseUpDistance;
@@ -900,6 +917,35 @@ public class FightingCameraController : MonoBehaviour
     }
 
     /// <summary>
+    /// 根性復活が成功した瞬間に呼び出す。
+    /// 後方へは回り込まず、復活したキャラクターの正面（ダウン中と同じ側）から引きの画を
+    /// holdSeconds秒だけ映し続け、その後は通常の追従カメラへ戻る。
+    /// rebornStandUpOrbitEnabledがONの場合は、従来どおり180度回り込む演出になる。
+    /// </summary>
+    public void TriggerRebornStandUpHold(Transform target, float holdSeconds)
+    {
+        if (target == null) return;
+
+        if (rebornStandUpOrbitEnabled)
+        {
+            TriggerRebornStandUpOrbit(target);
+            return;
+        }
+
+        _isRebornCloseUpMode = false;
+        _isRebornOrbitMode = false;
+        _isRebornHoldMode = true;
+        _rebornTarget = target;
+        _rebornHoldTimer = 0f;
+        _rebornHoldDuration = Mathf.Max(0f, holdSeconds);
+
+        // 復活した瞬間のキャラ正面（水平）を確定させる。以降キャラが向きを変えてもカメラは振られない。
+        Vector3 dir = Quaternion.AngleAxis(rebornCloseUpAngle, Vector3.up) * target.forward;
+        dir.y = 0f;
+        _rebornHoldDir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector3.back;
+    }
+
+    /// <summary>
     /// 根性復活が成功し、キャラが立ち上がった瞬間に呼び出す。
     /// 咆哮するキャラクターを中心に、現在のカメラ位置から180度高速で回り込む。
     /// </summary>
@@ -909,6 +955,7 @@ public class FightingCameraController : MonoBehaviour
 
         _isRebornCloseUpMode = false;
         _isRebornOrbitMode = true;
+        _isRebornHoldMode = false;
         _rebornTarget = target;
         _rebornOrbitTimer = 0f;
 
@@ -926,6 +973,7 @@ public class FightingCameraController : MonoBehaviour
     {
         _isRebornCloseUpMode = false;
         _isRebornOrbitMode = false;
+        _isRebornHoldMode = false;
         _rebornTarget = null;
         _rebornLevel = 0;
     }
@@ -967,6 +1015,40 @@ public class FightingCameraController : MonoBehaviour
         Vector3 lookAtTarget = _rebornTarget.position + Vector3.up * rebornCloseUpHeight;
         transform.LookAt(lookAtTarget);
         _smoothedLookAt = lookAtTarget;
+    }
+
+    /// <summary>
+    /// 復活後の「正面・引き」停止カメラの毎フレーム更新処理。
+    /// ダウン中の最大レベル（rebornPullBackDistance）と同じ距離・高さを保ち、指定秒数が過ぎたら通常カメラへ戻る。
+    /// </summary>
+    private void UpdateRebornHoldCamera()
+    {
+        if (_rebornTarget == null)
+        {
+            ClearReborn();
+            return;
+        }
+
+        _rebornHoldTimer += Time.deltaTime;
+
+        Vector3 desiredPos = _rebornTarget.position + _rebornHoldDir * rebornPullBackDistance;
+        desiredPos.y = _rebornTarget.position.y + rebornCloseUpHeight;
+
+        transform.position = Vector3.SmoothDamp(
+            transform.position,
+            desiredPos,
+            ref _rebornVelocityPos,
+            rebornZoomSmoothTime
+        );
+
+        Vector3 lookAtTarget = _rebornTarget.position + Vector3.up * rebornCloseUpHeight;
+        transform.LookAt(lookAtTarget);
+        _smoothedLookAt = lookAtTarget;
+
+        if (_rebornHoldTimer >= _rebornHoldDuration)
+        {
+            ClearReborn();
+        }
     }
 
     /// <summary>

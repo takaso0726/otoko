@@ -421,6 +421,15 @@ public class Player : MonoBehaviour
     public HitEffectData mashHitEffectData;    // 根性復活の連打1回ごとに出す擬音の設定（未設定なら出さない）
     public HitEffectData missHitEffectData;    // 攻撃が空振りした時に出す擬音の設定（未設定なら出さない）
 
+    // ★追加：被弾擬音を「どのキャラの向き」の反対側に出すか
+    public enum HitEffectFacingBasis
+    {
+        Attacker, // 攻撃したキャラの向き（左を向いて攻撃したら右へ／右を向いて攻撃したら左へ）
+        Victim,   // 被弾したキャラの向き（左を向いている側が殴られたら右へ／右なら左へ）
+    }
+    [Tooltip("被弾した時の擬音を、攻撃したキャラ／被弾したキャラのどちらの向きの反対側に出すか。")]
+    [SerializeField] HitEffectFacingBasis hitEffectFacingBasis = HitEffectFacingBasis.Attacker;
+
     //=====================================================
     // ★ヒットストップ設定
     //=====================================================
@@ -433,7 +442,21 @@ public class Player : MonoBehaviour
     [SerializeField] bool freezeAnimatorDuringHitStop = true; // ヒットストップ中はアニメーションも一瞬止めるか
 
     private int hitStopTimer = 0;   // 残りヒットストップフレーム数。0より大きい間は入力処理をすべてスキップする
-    private bool pendingHeadHitAnimation = false; // ヒットストップ終了時にHeadHitアニメーションを再生するか（ガード成功時はfalse）
+    private bool pendingHeadHitAnimation = false; // ヒットストップ終了時に被弾アニメーションを再生するか（ガード成功時はfalse）
+
+    // ★追加：被弾アニメーションの二重再生を防ぐための設定。
+    //   以前は、被弾した瞬間にTrigger（Hit／Hit-front／Hit-back）で再生を始めたうえで、
+    //   ヒットストップ終了時にHeadHitステートを頭から再生し直していたため、被弾アニメーションが2回再生されていた。
+    //   今は、被弾アニメーションを1つだけ選んで「ヒットストップが終わった瞬間に1回だけ」再生する。
+    // ★変更：既定をON（トリガーOFF）にした。被弾時にHit／Hit-front／Hit-backのTriggerは一切立てず、
+    //   HeadHitステートを「ヒットストップ終了時（ヒットストップ無しならその場）に1回だけ」直接再生する。
+    //   ※Inspectorでこの項目のチェックを外していた場合は、シリアライズ済みの値(OFF)が優先されるので、チェックを入れ直すこと。
+    [Tooltip("ON（既定）：被弾Trigger（Hit／Hit-front／Hit-back）は立てず、HeadHitステートを1回だけ直接再生する。\n" +
+             "OFF：被弾アニメーションをTrigger（Hit／Hit-front／Hit-back）で、ヒットストップ終了時に1回だけ再生する。")]
+    [SerializeField] bool playHeadHitStateDirectly = true;
+    private bool pendingHitTrigger = false;       // 予約中の被弾Triggerがあるか
+    private bool pendingHitHasDirection = false;  // 攻撃者の方向が分かっているか（Hit-front／Hit-backを立てるか）
+    private bool pendingHitFromFront = false;     // 攻撃者が自分の前方にいたか
     private bool hasPendingKnockback = false;    // ヒットストップ終了時にノックバックを与えるか
     private Vector3 pendingKnockbackVelocity;    // 与えるノックバックの初速（水平＋上方向）
 
@@ -723,6 +746,30 @@ public class Player : MonoBehaviour
     [Tooltip("制限時間内に復活できず力尽きた（Dead）瞬間に立てるTrigger名。")]
     [SerializeField] string downFailTrigger = "Down-fail";
     bool downAnimPlayed;             // ダウン中で、ダウン開始アニメーションを開始済みか（復活／死亡でfalseに戻る）
+
+    //=====================================================
+    // ★追加：復活後の停止／同時ダウン時のUI
+    //=====================================================
+    [Header("復活後の停止（自分・相手ともに動けない）")]
+    [Tooltip("復活に成功した瞬間から、自分・相手ともに動けなくなるフレーム数（60F=1秒）。\n" +
+             "この間、カメラは復活したキャラの正面の引きの画を映す。")]
+    [SerializeField] int rebornStandUpFreezeFrames = 180;
+    [Tooltip("ONにすると、復活後の停止中は相手（P2／CPU）を非表示にする。復活演出のカメラに相手が映り込むのを防ぐ。\n" +
+             "同時ダウン後の復活はカメラ演出をしないので、非表示にもしない。")]
+    [SerializeField] bool hideOpponentDuringRebornFreeze = true;
+
+    bool downWasDual;                                                                   // 今回のダウン中に、一度でも同時ダウン（両者HP0）になったか
+    readonly System.Collections.Generic.List<UnityEngine.Renderer> hiddenOpponentRenderers
+        = new System.Collections.Generic.List<UnityEngine.Renderer>();                  // 復活停止中に非表示にしている相手のRenderer
+
+    [Header("同時ダウン時のUI（P1・P2の両方がダウンした時）")]
+    [Tooltip("同時ダウン中は、カメラの引き（クローズアップ）をせず通常カメラのままにし、\n" +
+             "制限時間・ボタン画像・残り連打数をP1は画面左、P2は画面右に表示する。")]
+    [SerializeField] bool enableDualDownLayout = true;
+    [Tooltip("同時ダウン時、P1のUIを表示する横位置（画面幅に対する割合。0.25＝左半分の中央）")]
+    [SerializeField, Range(0f, 1f)] float dualDownLeftXRatio = 0.25f;
+    [Tooltip("同時ダウン時、P2のUIを表示する横位置（画面幅に対する割合。0.75＝右半分の中央）")]
+    [SerializeField, Range(0f, 1f)] float dualDownRightXRatio = 0.75f;
     bool canThrow = true;            // 投げの多重発生を防ぐフラグ
     bool throwReaching;              // ★追加：投げ動作中で、まだ掴みが成立しておらず手の当たり判定の接触を待っている間（接触した瞬間にfalseになる）
 
@@ -1206,7 +1253,7 @@ public class Player : MonoBehaviour
         // 攻撃者がいないので、常にプレイヤーの正面方向を基準にHitEffectData側のBase Angleで散らす。
         if (HitEffectSpawner.Instance != null && mashHitEffectData != null)
         {
-            HitEffectSpawner.Instance.SpawnAtDirection(mashHitEffectData, transform.position, transform.forward);
+            HitEffectSpawner.Instance.SpawnBehindFacing(mashHitEffectData, transform.position, transform.forward); // 向きと反対側の斜め上へ
             EffectDLog($"[{PlayerName}] 連打擬音エフェクト発生 pos={transform.position}");
         }
     }
@@ -1356,7 +1403,18 @@ public class Player : MonoBehaviour
         frameClockUnityFrame = -1;
         frameStep = 0;
         CurrentFrame = 0;
+        rebornFreezeEndFrame = 0;
     }
+
+    //=====================================================
+    // ★追加：復活時の全員停止
+    //   復活に成功した瞬間から、一定フレームの間、自分・相手ともに操作・状態更新を止める。
+    //   その間カメラは、復活したキャラの正面の引きの画を映す（FightingCameraController.TriggerRebornStandUpHold）。
+    //   staticなので、P1・P2のどちらが復活しても両方に効く。
+    //   CPU(Enemy)側はEnemy.csのUpdate先頭で Player.IsRebornFreezing を見て、trueの間は何もせず return すること。
+    //=====================================================
+    static int rebornFreezeEndFrame;
+    public static bool IsRebornFreezing => CurrentFrame < rebornFreezeEndFrame;
 
     // Updateの先頭で呼ぶ。同じ描画フレーム内で2人目以降のPlayerが呼んでも二重には進まない。
     static void AdvanceFrameClock()
@@ -1378,12 +1436,18 @@ public class Player : MonoBehaviour
     {
         AdvanceFrameClock(); // ★追加：60fps固定の論理フレームを進める（各タイマーはframeStep分だけ減らす）
 
+        // ★追加：復活後の停止が終わったら、非表示にしていた相手を再表示する
+        if (hiddenOpponentRenderers.Count > 0 && !IsRebornFreezing) ShowOpponentAfterReborn();
+
         // ★追加：掴みポーズで止めている最中に、被弾やダウン等でThrow状態から外れた場合の保険として必ず再生を再開する
         if (grabHoldFrozen && currentState != PlayerState.Throw) ResumeGrabHoldAnimation();
 
         MaintainKankiChargeEffect(); // ★追加：漢気ゲージ1本以上の間、追従エフェクトを出し続ける
-        TickReviveBuff();            // ★追加：漢気復活後の攻撃力上昇の残り時間を消化する
-        TickGuardFailPenalty();      // ★追加：ガード失敗ペナルティ（ゲージ増加率ダウン／被ダメージ増加）の残り時間を消化する
+        if (!IsRebornFreezing)       // ★追加：復活後の停止中は、攻撃力上昇・ペナルティの残り時間も進めない
+        {
+            TickReviveBuff();        // ★追加：漢気復活後の攻撃力上昇の残り時間を消化する
+            TickGuardFailPenalty();  // ★追加：ガード失敗ペナルティ（ゲージ増加率ダウン／被ダメージ増加）の残り時間を消化する
+        }
         TickMashButtonVisual();      // ★追加：連打ボタン画像の押した／押していない切り替え
         if (!isResultMode) ResolveOpponentIfMissing();  // ★追加：プレハブ化・再配置等で相手(enemyPlayer/enemy)の参照が切れていたら自動で探し直す
         // ★修正：しゃがみの見た目（コライダー・アニメーター）は、
@@ -1560,6 +1624,15 @@ public class Player : MonoBehaviour
             {
                 EndHitStop();
             }
+            ClearInputIntents();
+            return;
+        }
+
+        // ★追加：復活後の停止中は、自分・相手ともに入力・状態更新を一切行わない。
+        //   ただしダウン中（HP0）のプレイヤーは止めない。同時ダウン中に片方だけ復活しても、
+        //   もう一方の復活の制限時間（rebornTimer）と連打は止めずに進める。
+        if (IsRebornFreezing && !(HP <= 0 && !isResultMode))
+        {
             ClearInputIntents();
             return;
         }
@@ -1861,7 +1934,7 @@ public class Player : MonoBehaviour
     [SerializeField] float rebornTimeYRatio = 0.03f;
 
     // ★追加：復活の制限時間（残り秒数）を画面上部に表示する。OnGUIから、ダウン中だけ呼ばれる。
-    void DrawRebornTimeLimit(float blink)
+    void DrawRebornTimeLimit(float blink, float centerX, bool dualLayout)
     {
         int remainingFrames = Mathf.Max(rebornTimeLimitFrames - rebornTimer, 0);
         float remaining = FramesToSeconds(remainingFrames); // 画面表示は見やすいよう秒に換算する
@@ -1886,7 +1959,7 @@ public class Player : MonoBehaviour
         float width = 800f;
         float height = rebornTimeFontSize * 1.4f;
         float top = Screen.height * rebornTimeYRatio;
-        Rect rect = new Rect((Screen.width - width) / 2f, top, width, height);
+        Rect rect = new Rect(centerX - width / 2f, top, width, height);
 
         // 縁取り（黒）を少しずらして重ね描きし、背景が明るくても読めるようにする
         GUIStyle outlineStyle = new GUIStyle(style)
@@ -1903,9 +1976,9 @@ public class Player : MonoBehaviour
         // 残り時間に応じて右から短くなるバー
         if (showRebornTimeBar)
         {
-            float barWidth = Screen.width * rebornTimeBarWidthRatio;
+            float barWidth = Screen.width * rebornTimeBarWidthRatio * (dualLayout ? 0.5f : 1f); // 同時ダウン時は半分の画面に収める
             float barHeight = Mathf.Max(Screen.height * 0.015f, 8f);
-            float barX = (Screen.width - barWidth) / 2f;
+            float barX = centerX - barWidth / 2f;
             float barY = top + height + 4f;
 
             Color prevColor = GUI.color;
@@ -1929,6 +2002,7 @@ public class Player : MonoBehaviour
         // ダウン中以外は状態をリセットしておく（次のダウン時に前回の押下が残らないようにする）
         if (currentState != PlayerState.KnockedDown)
         {
+            downWasDual = false; // ダウン中でなければ同時ダウンの記録は不要
             if (downAnimPlayed)
             {
                 // ★追加：復活／死亡の処理を通らずにダウンを抜けた場合の保険。ダウン中Boolが残らないようにする
@@ -1973,13 +2047,21 @@ public class Player : MonoBehaviour
         // 明滅させて視認性・緊張感を出す
         float blink = 0.6f + 0.4f * Mathf.Sin(Time.time * 10f);
 
+        // ★追加：同時ダウン中は、P1＝画面左／P2＝画面右にUIを分けて表示する。
+        //   個別に変わる部分（制限時間・ボタン画像・残り連打数）は各自の側に、
+        //   2人で同じ内容の文言（mashPromptText）は画面中央に1つだけ表示する。
+        bool dualDown = IsDualKnockedDown();
+        bool rightSide = IsRightSidePlayer();
+        float uiCenterX = Screen.width * 0.5f;
+        if (dualDown) uiCenterX = Screen.width * (rightSide ? dualDownRightXRatio : dualDownLeftXRatio);
+
         // ★追加：復活の制限時間（残り秒数）を画面上部に表示する
         if (showRebornTimeLimit)
         {
-            DrawRebornTimeLimit(blink);
+            DrawRebornTimeLimit(blink, uiCenterX, dualDown);
         }
 
-        if (showMashPrompt)
+        if (showMashPrompt && (!dualDown || !rightSide)) // 同時ダウン時は中央に1つだけ（P1側のインスタンスが描く）
         {
             GUIStyle style = new GUIStyle(GUI.skin.label)
             {
@@ -2025,7 +2107,7 @@ public class Player : MonoBehaviour
             float width = 400f;
             float height = mashRemainingFontSize * 1.4f;
             Rect rect = new Rect(
-                (Screen.width - width) / 2f,
+                uiCenterX - width / 2f,
                 Screen.height * mashRemainingYRatio - height / 2f,
                 width, height);
 
@@ -2052,8 +2134,9 @@ public class Player : MonoBehaviour
             if (tex != null)
             {
                 float size = Screen.height * mashButtonSizeRatio;
+                float buttonCenterX = dualDown ? uiCenterX : Screen.width * mashButtonXRatio;
                 Rect rect = new Rect(
-                    Screen.width * mashButtonXRatio - size / 2f,
+                    buttonCenterX - size / 2f,
                     Screen.height * mashButtonYRatio - size / 2f,
                     size, size);
 
@@ -2065,6 +2148,41 @@ public class Player : MonoBehaviour
     //-----------------------------------------------------
     // ヒットストップ
     //-----------------------------------------------------
+    // ★追加：被弾アニメーション（Trigger）を予約する。実際に立てるのはFirePendingHitAnimation()。
+    void RequestHitAnimation(bool hasDirection, bool fromFront)
+    {
+        pendingHitTrigger = true;
+        pendingHitHasDirection = hasDirection;
+        pendingHitFromFront = fromFront;
+    }
+
+    // ★追加：予約していた被弾Triggerを、ここで1回だけ立てる。
+    //   この一撃でHPが0になった場合は被弾アニメーションを再生しない（直後にダウン開始のアニメーションが再生されるため）。
+    void FirePendingHitAnimation()
+    {
+        if (!pendingHitTrigger) return;
+        pendingHitTrigger = false;
+
+        if (animator == null || HP <= 0) return;
+
+        animator.SetTrigger("Hit");
+        if (pendingHitHasDirection)
+        {
+            // 反対側の未消費フラグが残っていると、次の被弾で誤ったアニメーションに遷移しうるので先に消す
+            animator.ResetTrigger(pendingHitFromFront ? "Hit-back" : "Hit-front");
+            animator.SetTrigger(pendingHitFromFront ? "Hit-front" : "Hit-back");
+            DLog($"[{PlayerName}] 被弾アニメーション再生：攻撃者は{(pendingHitFromFront ? "前方" : "後方")}（{(pendingHitFromFront ? "Hit-front" : "Hit-back")}）");
+        }
+    }
+
+    // ★追加：Triggerを使わず、HeadHitステートを頭から1回だけ直接再生する。
+    //   この一撃でHPが0になった場合は再生しない（直後にダウン開始のアニメーションが再生されるため）。
+    void PlayHeadHitDirect()
+    {
+        if (animator == null || HP <= 0) return;
+        animator.Play("HeadHit", 0, 0.0f);
+    }
+
     // framesフレームの間だけ、そのフレームから入力・状態更新を止めて「少しだけ動けない」状態にする。
     // すでにヒットストップ中の場合は、残り時間を延ばしすぎないよう長い方の時間を採用する。
     // playHeadHitAnimation: ヒットストップが終わった瞬間に"HeadHit"（被弾）アニメーションを再生するか。
@@ -2095,13 +2213,14 @@ public class Player : MonoBehaviour
         {
             // ★追加：掴みポーズで止めている最中は、ヒットストップが終わっても止めたままにする
             animator.speed = grabHoldFrozen ? 0f : 1f;
+        }
 
-            // ヒットストップで一瞬止めていたぶん、止まった直後に被弾（HeadHit）アニメーションを再生する。
-            // ガード成功時のヒットストップ（pendingHeadHitAnimation=false）ではここは実行されない。
-            if (pendingHeadHitAnimation)
-            {
-                animator.Play("HeadHit", 0, 0.0f);
-            }
+        // ヒットストップで一瞬止めていたぶん、止まった直後に被弾アニメーションを「1回だけ」再生する。
+        // ガード成功時のヒットストップ（pendingHeadHitAnimation=false）ではここは実行されない。
+        if (pendingHeadHitAnimation && animator != null)
+        {
+            if (playHeadHitStateDirectly) PlayHeadHitDirect();
+            else FirePendingHitAnimation();
         }
 
         // ★追加：ヒットストップ中は相手もアニメーションも止まっているので、
@@ -3595,6 +3714,23 @@ public class Player : MonoBehaviour
         return Mathf.Max(mashThreshold + 1 - mashCount, 0);
     }
 
+    // ★追加：P1・P2が同時にダウンしている（両方HP0で、どちらもまだ死亡していない）か。
+    //   同時ダウン中はカメラの引き（クローズアップ）をせず、UIを左右に分けて表示する。
+    //   ※片方が先にダウンして、もう片方が後から0になる場合は同時ダウンとは扱わない（先に復活／死亡が決まるため）。
+    bool IsDualKnockedDown()
+    {
+        if (!enableDualDownLayout || isResultMode || enemyPlayer == null) return false;
+        return HP <= 0 && enemyPlayer.HP <= 0
+            && currentState != PlayerState.Dead && enemyPlayer.currentState != PlayerState.Dead;
+    }
+
+    // ★追加：画面右側（P2側）のプレイヤーか。PlayerInputのindexが1、またはPlayerNameが"P2"ならP2とみなす。
+    bool IsRightSidePlayer()
+    {
+        int index = playerInput != null ? playerInput.playerIndex : 0;
+        return index == 1 || PlayerName == "P2";
+    }
+
     // ★追加：Animatorにその名前・型のパラメータがあるか（無い名前でSetTrigger/SetBoolすると警告が出るため先に確認する）
     bool HasAnimatorParam(string paramName, AnimatorControllerParameterType type)
     {
@@ -3634,11 +3770,83 @@ public class Player : MonoBehaviour
     void OnDownRevive()
     {
         downAnimPlayed = false;
+        bool wasDual = downWasDual;
+        downWasDual = false;
+        StartRebornFreeze(!wasDual); // ★追加：復活の瞬間から、自分・相手ともに動けなくする（同時ダウン後でなければ相手を非表示にする）
         if (animator == null) return;
 
         SetDownBool(downBoolParam, false);
         SetDownTrigger(downReviveTrigger);
         DLog($"[{PlayerName}] 復活アニメーション（{downReviveTrigger} / {downBoolParam}=false）");
+    }
+
+    // ★追加：復活した瞬間のカメラ。
+    //   同時ダウン後の復活：カメラが寄る・引く演出は一切せず、通常の追従カメラへ戻す。
+    //   それ以外：後方へ回り込まず、復活したキャラ正面の引きの画を停止時間ぶん映す。
+    void StartRebornStandUpCamera()
+    {
+        if (fightingCamera == null) return;
+
+        if (downWasDual)
+        {
+            fightingCamera.ClearReborn();
+            return;
+        }
+
+        fightingCamera.TriggerRebornStandUpHold(transform, FramesToSeconds(rebornStandUpFreezeFrames));
+    }
+
+    // ★追加：復活停止中、相手（P2またはCPU）の見た目を隠す。隠す前に有効だったRendererだけを記録し、後で元に戻す。
+    void HideOpponentForReborn()
+    {
+        if (hiddenOpponentRenderers.Count > 0) return; // すでに隠している
+
+        Component opponent = enemyPlayer != null ? (Component)enemyPlayer : (Component)enemy;
+        if (opponent == null) return;
+
+        foreach (UnityEngine.Renderer r in opponent.GetComponentsInChildren<UnityEngine.Renderer>(true))
+        {
+            if (r == null || !r.enabled) continue;
+            r.enabled = false;
+            hiddenOpponentRenderers.Add(r);
+        }
+    }
+
+    // ★追加：非表示にしていた相手のRendererを元に戻す。
+    void ShowOpponentAfterReborn()
+    {
+        foreach (UnityEngine.Renderer r in hiddenOpponentRenderers)
+        {
+            if (r != null) r.enabled = true;
+        }
+        hiddenOpponentRenderers.Clear();
+    }
+
+    // ★追加：復活の瞬間から rebornStandUpFreezeFrames の間、自分・相手ともに動けなくする。
+    //   動作の途中だった相手の攻撃は、当たり判定を消して待機に戻す（止まったまま当たり判定が残らないように）。
+    void StartRebornFreeze(bool hideOpponent)
+    {
+        if (rebornStandUpFreezeFrames <= 0) return;
+
+        rebornFreezeEndFrame = CurrentFrame + rebornStandUpFreezeFrames;
+        CancelAttackForFreeze();
+        if (enemyPlayer != null) enemyPlayer.CancelAttackForFreeze();
+        if (hideOpponent && hideOpponentDuringRebornFreeze) HideOpponentForReborn(); // 復活演出のカメラに相手が映り込まないようにする
+
+        DLog($"[{PlayerName}] 復活：{rebornStandUpFreezeFrames}フレーム、全員停止");
+    }
+
+    // ★追加：全員停止の開始時に、攻撃動作の途中だった場合だけ待機に戻す。
+    void CancelAttackForFreeze()
+    {
+        if (currentState != PlayerState.Punch && currentState != PlayerState.Kick
+            && currentState != PlayerState.UpKick && currentState != PlayerState.DownKick) return;
+
+        DisableAllHitboxes();
+        ResetAttackTriggers();
+        StopMoveAnimation();
+        stateTimer = 0;
+        currentState = PlayerState.Idle;
     }
 
     // ★追加：復活失敗（Dead）の瞬間に呼ぶ。ダウン中Boolをfalseに戻し、復活失敗Triggerを立てる。
@@ -3671,8 +3879,17 @@ public class Player : MonoBehaviour
             OnDownStart();
         }
 
+        // ★追加：同時ダウン中はカメラの引き（クローズアップ）をしない。すでに始めていた場合は通常カメラへ戻す
+        bool dualDown = IsDualKnockedDown();
+        if (dualDown) downWasDual = true; // 復活時にカメラ演出をしないための記録
+        if (dualDown && rebornCamStarted && fightingCamera != null)
+        {
+            fightingCamera.ClearReborn();
+            rebornCamStarted = false;
+        }
+
         //ダウンした瞬間、一度だけ顔・拳へのクローズアップカメラを開始する
-        if (!rebornCamStarted && fightingCamera != null)
+        if (!dualDown && !rebornCamStarted && fightingCamera != null)
         {
             fightingCamera.StartRebornCloseUp(transform);
             rebornCamStarted = true;
@@ -3692,7 +3909,7 @@ public class Player : MonoBehaviour
             if (mashCount <= mashThreshold)
             {
                 //連打の進捗に応じて復活レベルを算出し、カメラを徐々に引かせる
-                if (fightingCamera != null && mashThreshold > 0)
+                if (fightingCamera != null && mashThreshold > 0 && !dualDown)
                 {
                     float progress = (float)mashCount / mashThreshold;
                     int level = Mathf.Clamp(Mathf.FloorToInt(progress * fightingCamera.rebornMaxLevel), 0, fightingCamera.rebornMaxLevel);
@@ -3714,7 +3931,7 @@ public class Player : MonoBehaviour
                 if (fightingCamera != null)
                 {
                     fightingCamera.SetRebornLevel(fightingCamera.rebornMaxLevel);
-                    fightingCamera.TriggerRebornStandUpOrbit(transform);
+                    StartRebornStandUpCamera(); // 同時ダウン後はカメラ演出なし／それ以外は正面の引きを映す
                 }
                 rebornCamStarted = false; //次回のダウンに備えてリセット
                 OnDownRevive(); // ★追加：復活アニメーション
@@ -3774,7 +3991,7 @@ public class Player : MonoBehaviour
         if (fightingCamera != null)
         {
             fightingCamera.SetRebornLevel(fightingCamera.rebornMaxLevel);
-            fightingCamera.TriggerRebornStandUpOrbit(transform);
+            StartRebornStandUpCamera(); // 同時ダウン後はカメラ演出なし／それ以外は正面の引きを映す
         }
         rebornCamStarted = false; // 次回のダウンに備えてリセット
         OnDownRevive(); // ★追加：復活アニメーション
@@ -3912,7 +4129,7 @@ public class Player : MonoBehaviour
         if (fightingCamera != null)
         {
             fightingCamera.SetRebornLevel(fightingCamera.rebornMaxLevel);
-            fightingCamera.TriggerRebornStandUpOrbit(transform);
+            StartRebornStandUpCamera(); // 同時ダウン後はカメラ演出なし／それ以外は正面の引きを映す
         }
         rebornCamStarted = false; //次回のダウンに備えてリセット
         OnDownRevive(); // ★追加：復活アニメーション
@@ -4111,19 +4328,15 @@ public class Player : MonoBehaviour
         {
             // ガードしていない状態で被弾した場合の処理
             guardComboCount = 0;
-            animator.SetTrigger("Hit");
-
-            // ★追加：攻撃者が自分の前方にいたか後方にいたかで、被弾アニメーション用のフラグを分けて立てる。
+            // ★変更：被弾アニメーションはここでは再生せず「予約」し、ヒットストップが終わった瞬間に1回だけ再生する
+            //   （即座にTriggerを立てたうえでHeadHitも再生し直していたため、二重に再生されていた）。
             //   "Hit-front" = 前から攻撃された（相手が自分の正面にいる）／"Hit-back" = 後ろから攻撃された（相手が背後にいる）。
-            //   既存の"Hit"は従来どおり立てたまま、それに加えてどちらか一方だけを立てる。
-            Transform hitAttackerTf = isEnemyPlayerAttack ? attackerPlayer.transform : (attackerEnemy != null ? attackerEnemy.transform : null);
-            if (hitAttackerTf != null)
+            if (!playHeadHitStateDirectly)
             {
-                bool attackerInFront = IsOpponentInFront(hitAttackerTf);
-                // 反対側の未消費フラグが残っていると、次の被弾で誤ったアニメーションに遷移しうるので先に消す
-                animator.ResetTrigger(attackerInFront ? "Hit-back" : "Hit-front");
-                animator.SetTrigger(attackerInFront ? "Hit-front" : "Hit-back");
-                DLog($"[{PlayerName}] 被弾方向：攻撃者は{(attackerInFront ? "前方" : "後方")}（{(attackerInFront ? "Hit-front" : "Hit-back")}フラグを立てました）");
+                Transform hitAttackerTf = isEnemyPlayerAttack ? attackerPlayer.transform : (attackerEnemy != null ? attackerEnemy.transform : null);
+                bool hasHitDir = hitAttackerTf != null;
+                bool hitFromFront = hasHitDir && IsOpponentInFront(hitAttackerTf);
+                RequestHitAnimation(hasHitDir, hitFromFront);
             }
 
             // 通常被弾時のヒットストップ（少しだけ動けなくする）。
@@ -4136,6 +4349,12 @@ public class Player : MonoBehaviour
                 if (perAttackHitStop >= 0) appliedHitStop = perAttackHitStop;
             }
             StartHitStop(appliedHitStop);
+            if (hitStopTimer <= 0)
+            {
+                // ヒットストップが無い設定の時は、そのまま今再生する（トリガーOFFならHeadHitを直接再生）
+                if (playHeadHitStateDirectly) PlayHeadHitDirect();
+                else FirePendingHitAnimation();
+            }
 
             // ★追加：ノックバック。攻撃者（相手Player）の技ごとの設定に従って、
             //   攻撃者から離れる方向（Z軸）＋上方向へ飛ばす。
@@ -4185,7 +4404,8 @@ public class Player : MonoBehaviour
 
             if (HitEffectSpawner.Instance != null && selectedHitEffect != null)
             {
-                HitEffectSpawner.Instance.SpawnBehindFacing(selectedHitEffect, hitPoint, transform.forward); // 向きと反対側の斜め上へ
+                Transform effectFacingTf = hitEffectFacingBasis == HitEffectFacingBasis.Attacker ? attackerTf : transform;
+                HitEffectSpawner.Instance.SpawnBehindFacing(selectedHitEffect, hitPoint, effectFacingTf.forward); // 向きと反対側の斜め上へ
                 EffectDLog($"[{PlayerName}] 被弾擬音エフェクト発生 pos={hitPoint}");
             }
 

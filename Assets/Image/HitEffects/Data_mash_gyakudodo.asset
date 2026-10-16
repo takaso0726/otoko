@@ -13,13 +13,13 @@ MonoBehaviour:
   m_Name: Data_mash_gyakudodo
   m_EditorClassIdentifier: Assembly-CSharp::HitEffectData
   effectPrefab: {fileID: 6815328702670523096, guid: 300fbefd18f8fee4eada6bae9b438132, type: 3}
-  baseAngle: 47
-  angleRandomRange: 23.7
-  distanceRange: {x: 0.28, y: 3.56}
-  spawnPositionOffset: {x: 0, y: 1, z: 0}
-  overallScale: 0.17
-  scaleRange: {x: 1.71, y: 1.55}
-  lifeTime: 0.33
+  baseAngle: 180
+  angleRandomRange: 20
+  distanceRange: {x: 0, y: 0}
+  spawnPositionOffset: {x: 0, y: 1, z: -2}
+  overallScale: 1
+  scaleRange: {x: 0.7, y: 0.7}
+  lifeTime: 0.7
   scaleCurve:
     serializedVersion: 2
     m_Curve:

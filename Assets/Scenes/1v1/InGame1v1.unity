@@ -979,21 +979,22 @@ MonoBehaviour:
   guardImpactHoldDuration: 0.6
   guardImpactSlowEnabled: 1
   guardImpactSlowTimeScale: 0.1
-  guardImpactSlowDuration: 0.15
+  guardImpactSlowDurationFrames: 9
   guardImpactSlowRecoverDuration: 0.2
   guardImpactVolume: {fileID: 832575518}
   guardImpactVolumeWeight: 1
   volumeWeightSmoothSpeed: 8
-  rebornCloseUpDistance: 0.8
-  rebornPullBackDistance: 4
+  rebornCloseUpDistance: 2.5
+  rebornPullBackDistance: 5
   rebornCloseUpHeight: 1.4
-  rebornCloseUpAngle: 15
-  rebornZoomSmoothTime: 0.35
+  rebornCloseUpAngle: 0
+  rebornZoomSmoothTime: 0.3
   rebornMaxLevel: 3
-  rebornOrbitDuration: 0.45
+  rebornOrbitDuration: 1
   rebornOrbitRadius: 3.5
   rebornOrbitHeight: 1.8
   rebornRoarLookAtHeight: 1.6
+  rebornStandUpOrbitEnabled: 0
 --- !u!1 &367276193 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 326522464027483504, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
@@ -2061,7 +2062,7 @@ MonoBehaviour:
   gameOverSceneName: GameOver
   gameClearSceneName: GameClear
   inGame1v1ResultSceneName: Judgment
-  gameOverTime: 2
+  gameOverTime: 5
 --- !u!4 &750834239
 Transform:
   m_ObjectHideFlags: 0
@@ -3421,13 +3422,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1195980006}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 3.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 180, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1238327488
 PrefabInstance:
   m_ObjectHideFlags: 0

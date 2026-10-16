@@ -15,17 +15,17 @@ MonoBehaviour:
   effectPrefab: {fileID: 6815328702670523096, guid: 0cf321337e00024408ad87a0bd92e211, type: 3}
   baseAngle: 180
   angleRandomRange: 20
-  distanceRange: {x: 1.14, y: 5.32}
-  spawnPositionOffset: {x: 0, y: 1.37, z: 3.08}
-  overallScale: 0.22
-  scaleRange: {x: 2.43, y: 2.37}
-  lifeTime: 0.48
+  distanceRange: {x: 0, y: 0}
+  spawnPositionOffset: {x: 0, y: 1, z: -2}
+  overallScale: 1
+  scaleRange: {x: 0.7, y: 0.7}
+  lifeTime: 0.7
   scaleCurve:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
-      time: 0.012498983
-      value: 0.1976112
+      time: 0
+      value: 0
       inSlope: 0
       outSlope: 0
       tangentMode: 0
@@ -35,8 +35,8 @@ MonoBehaviour:
     - serializedVersion: 3
       time: 1
       value: 1
-      inSlope: 0
-      outSlope: 0
+      inSlope: 2
+      outSlope: 2
       tangentMode: 0
       weightedMode: 0
       inWeight: 0

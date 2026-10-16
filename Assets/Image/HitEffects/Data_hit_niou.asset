@@ -15,11 +15,11 @@ MonoBehaviour:
   effectPrefab: {fileID: 6815328702670523096, guid: b5835017e600c06438f7472f3d1076cc, type: 3}
   baseAngle: 180
   angleRandomRange: 20
-  distanceRange: {x: 1.14, y: 2.1}
-  spawnPositionOffset: {x: 0, y: 1, z: 0}
+  distanceRange: {x: 0, y: 0}
+  spawnPositionOffset: {x: 0, y: 1, z: -2}
   overallScale: 1
-  scaleRange: {x: 2.71, y: 2.6}
-  lifeTime: 0.4
+  scaleRange: {x: 0.7, y: 0.7}
+  lifeTime: 0.7
   scaleCurve:
     serializedVersion: 2
     m_Curve:
