@@ -111,6 +111,16 @@ public class Enemy : MonoBehaviour
         Idle,       //何もしない(様子見)
     }
 
+    // ★追加: 向き合い設定（Player.csの「自動向き合い設定」に対応）
+    [Header("向き合い設定")]
+    [Tooltip("ONにすると、常にプレイヤーの方向へ自動で向きを変える。")]
+    public bool enableAutoFacing = true;
+    [Tooltip("向きを変える速さ。大きいほど素早く振り向く。")]
+    public float turnSpeed = 15f;
+    [Tooltip("プレイヤーとのZ軸の距離がこの値より小さい時は向きを変えない（真横で重なった時のブレ防止）。")]
+    public float autoFaceDeadZone = 0.05f;
+    private bool autoFaceSnapped; // 最初に向き合わせる時だけ補間なしで即座に向くための記録
+
     // 距離の閾値。この値を境に「近距離/中距離/遠距離」を切り替える
     [Header("CPU AI設定")]
     public float nearRange = 1.8f;
@@ -144,6 +154,20 @@ public class Enemy : MonoBehaviour
     // 投げ攻撃などCPU側の与ダメージにかかる倍率
     private float damageMultiplier = 1.0f;
 
+    // ---- 移動設定 ----
+    [Header("移動設定（接近・後退をなめらかな歩きにする）")]
+    [Tooltip("接近する時の速さ(ユニット/秒)。プレイヤーの歩く速さに合わせて調整する")]
+    public float approachSpeed = 1.5f;
+    [Tooltip("後退する時の速さ(ユニット/秒)")]
+    public float retreatSpeed = 0.8f;
+    [Tooltip("移動中にtrueにするAnimatorのBoolパラメータ名(歩きアニメ用)。Animatorに無い場合や空欄の場合は何もしない")]
+    public string walkBoolParameter = "Walk";
+
+    // 現在の移動方向。+1=接近 / -1=後退 / 0=停止
+    private int moveDirection = 0;
+    private bool walkParamChecked = false;
+    private bool hasWalkParam = false;
+
     // ---- 漢気ゲージ(必殺技ゲージ) ----
     [Header("漢気ゲージ設定")]
     [Tooltip("ゲージ1本分の最大値")]
@@ -170,8 +194,29 @@ public class Enemy : MonoBehaviour
         if (cameraController == null)
             cameraController = FindAnyObjectByType<FightingCameraController>();
 
+        // ★追加: キャラクター選択画面で選んだCPUの強さがあれば、Inspectorの値より優先して反映する
+        ApplyDifficultyFromCharacterSelect();
+
         // difficultyの選択に応じてパラメータを自動設定する
         ApplyDifficultyPreset();
+    }
+
+    // ★追加: キャラクター選択シーンで保存された「CPUの強さ」(CpuSelectionResult)を difficulty に変換する。
+    //   ・選択画面を経由せずにインゲームシーンを直接再生した場合(IsValid=false)は、
+    //     Inspectorで設定した difficulty をそのまま使う。
+    //   ・difficulties配列のインデックス(0が最弱)を Easy / Normal / Hard に対応させる。
+    //     0 → Easy, 1 → Normal, 2以上 → Hard
+    private void ApplyDifficultyFromCharacterSelect()
+    {
+        if (!CharacterSelect_SFC_Controller.CpuSelectionResult.IsValid) return;
+
+        int index = CharacterSelect_SFC_Controller.CpuSelectionResult.CpuDifficultyIndex;
+        if (index <= 0)      difficulty = Difficulty.Easy;
+        else if (index == 1) difficulty = Difficulty.Normal;
+        else                 difficulty = Difficulty.Hard;
+
+        Debug.Log("[Enemy] キャラ選択のCPUの強さを反映: " +
+                  CharacterSelect_SFC_Controller.CpuSelectionResult.CpuDifficultyName + " → " + difficulty);
     }
 
     // ★追加: 外部(難易度選択UIなど)から難易度を切り替えたい場合に呼び出す。
@@ -230,6 +275,8 @@ public class Enemy : MonoBehaviour
     void Start()
     {
         
+        ResolvePlayer(); // ★追加: 操作中のPlayerを確実に取得してから初期化する
+
         ActionTimer = 0.0f;
         //rand = Random.Range(1, 6);
         rb = GetComponent<Rigidbody>();		//EnemyのRigidbodyを取得
@@ -307,6 +354,9 @@ public class Enemy : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        // ★追加: 操作中のキャラが切り替わっていても追従できるよう、毎フレーム参照を確認する
+        ResolvePlayer();
+
         // ★追加: プレイヤーのHPが前フレームより減っていたら、
         //   自分(Enemy)の攻撃(パンチ・キック・投げ等)が当たったとみなして漢気ゲージを増やす。
         //   Player.csを直接編集しなくても、パンチ/キック含む全ての攻撃命中を検知できる。
@@ -319,9 +369,12 @@ public class Enemy : MonoBehaviour
             lastPlayerHP = player.HP;
         }
 
-        // ★追加: プレイヤーが背後に回り込んだら振り向く。
-        //   AIの行動判断(reactionInterval)とは別に、毎フレームチェックして即座に反応させる。
-        FaceTowardsPlayerIfBehind();
+        // ★変更: 常にプレイヤーの方向を向く（Player.AutoFaceOpponentと同じ方式）。
+        //   AIの行動判断(reactionInterval)とは別に、毎フレーム即座に反応させる。
+        FaceTowardsPlayer();
+
+        // ★追加: 接近・後退を毎フレーム少しずつ動かす(なめらかな歩き)
+        UpdateMovement();
 
         //タイマー加算
         ActionTimer += Time.deltaTime;
@@ -344,6 +397,7 @@ public class Enemy : MonoBehaviour
             AtkHitboxOFF();
             Menflag = false;
             Enemy_Status = Status.Neutral;
+            moveDirection = 0; // 新しい行動を選ぶ前に移動もいったん止める
             currentAttackAction = ActionType.Idle; // 新しい行動を選ぶ前に攻撃タイプ情報もリセット
 
             if(animator.GetBool("Crouch"))
@@ -418,30 +472,102 @@ public class Enemy : MonoBehaviour
     }
 
        
-    // ★追加: プレイヤーが自分の背後(正面と逆側)に回り込んでいたら、その場でプレイヤーの方を向く。
-    //   Translate(0,0,±)はローカル座標基準で移動するため、向きを直すことで
-    //   以降のApproach/Retreatも自然にプレイヤー側へ進むようになる。
-    private void FaceTowardsPlayerIfBehind()
+    // ★追加: 接近・後退の連続移動。プレイヤーの方向(Z軸)を基準に、毎フレーム少しずつ動く。
+    private void UpdateMovement()
     {
-        if (player == null) return;
+        bool moving = moveDirection != 0 && player != null && HP > 0 && Enemy_Status == Status.Neutral;
 
-        Vector3 toPlayer = player.transform.position - transform.position;
-        toPlayer.y = 0.0f; // 水平方向のみで判定(高さは無視)
-
-        if (toPlayer.sqrMagnitude < 0.0001f) return; // ほぼ同じ位置なら判定しない
-
-        toPlayer.Normalize();
-
-        // 自分の正面ベクトルとプレイヤー方向の内積。
-        // 0より小さい = プレイヤーは正面より後ろ側にいる(背後に回り込まれた)
-        float facingDot = Vector3.Dot(transform.forward, toPlayer);
-
-        if (facingDot < 0.0f)
+        if (moving)
         {
-            // ★変更: プレイヤーの厳密な方向へ向き直す(LookRotation)のではなく、
-            //   正面をプレイヤー側へ180度反転させるだけにする(2D格闘ゲーム的な「振り向き」)
-            transform.Rotate(0.0f, 180.0f, 0.0f);
+            float deltaZ = player.transform.position.z - transform.position.z;
+            float distance = Mathf.Abs(deltaZ);
+
+            if (moveDirection > 0 && distance <= nearRange)
+            {
+                // 近距離の間合いに入ったら、それ以上は詰めずに止まる
+                moveDirection = 0;
+                moving = false;
+            }
+            else
+            {
+                float speed = moveDirection > 0 ? approachSpeed : retreatSpeed;
+                float dirZ = Mathf.Sign(deltaZ) * moveDirection; // +なら+Z方向 / -なら-Z方向
+                transform.position += new Vector3(0.0f, 0.0f, dirZ * speed * Time.deltaTime);
+            }
         }
+
+        SetWalkAnimation(moving);
+    }
+
+    // 歩きアニメ(Bool)の切り替え。Animatorにパラメータが無い場合は何もしない(エラー防止)
+    private void SetWalkAnimation(bool walking)
+    {
+        if (animator == null || string.IsNullOrEmpty(walkBoolParameter)) return;
+
+        if (!walkParamChecked)
+        {
+            walkParamChecked = true;
+            foreach (AnimatorControllerParameter p in animator.parameters)
+            {
+                if (p.name == walkBoolParameter && p.type == AnimatorControllerParameterType.Bool)
+                {
+                    hasWalkParam = true;
+                    break;
+                }
+            }
+        }
+
+        if (hasWalkParam && animator.GetBool(walkBoolParameter) != walking)
+        {
+            animator.SetBool(walkBoolParameter, walking);
+        }
+    }
+
+    // ★追加: 「今プレイヤーが操作しているキャラ」を player に設定する。
+    //   ・player が未設定、または非アクティブ(別キャラに切り替わった等)の場合だけ、
+    //     シーン内のアクティブな Player を探し直す。
+    //   ・参照が変わった時は、向きのスナップとHP検知用の値もリセットする。
+    private void ResolvePlayer()
+    {
+        if (player != null && player.gameObject.activeInHierarchy) return;
+
+        Player[] candidates = FindObjectsByType<Player>(FindObjectsSortMode.None);
+        foreach (Player p in candidates)
+        {
+            if (p == null || p.gameObject == gameObject) continue;
+            if (!p.gameObject.activeInHierarchy) continue;
+
+            player = p;
+            lastPlayerHP = p.HP;
+            autoFaceSnapped = false; // 新しい相手には補間なしで即座に向き合う
+            return;
+        }
+    }
+
+    // ★変更: 常にプレイヤーの方向へ向きを変える（Player.csのAutoFaceOpponentと同じ考え方）。
+    //   ・向きは「プレイヤーが+Z側にいれば+Z、-Z側にいれば-Z」の2択（間合いはZ軸で決まる仕様に合わせている）。
+    //   ・Translate(0,0,±)はローカル座標基準で動くため、向きが合っていればApproach/Retreatも自然に動く。
+    //   ・最初の1回だけは補間せず即座に向き合わせる（開始直後にゆっくり回る見た目を防ぐ）。
+    //   ・以前は「背後に回られた時だけ180度反転」だったため、初期の向きがZ軸とズレていると向き合わなかった。
+    private void FaceTowardsPlayer()
+    {
+        if (!enableAutoFacing) return;
+        if (player == null) return;
+        if (HP <= 0) return; // 倒れた後は向きを変えない
+
+        float deltaZ = player.transform.position.z - transform.position.z;
+        if (Mathf.Abs(deltaZ) < autoFaceDeadZone) return; // ほぼ同じ位置：今の向きを維持（向きのブレ防止）
+
+        Quaternion targetRotation = Quaternion.LookRotation(new Vector3(0.0f, 0.0f, Mathf.Sign(deltaZ)), Vector3.up);
+
+        if (!autoFaceSnapped)
+        {
+            transform.rotation = targetRotation;
+            autoFaceSnapped = true;
+            return;
+        }
+
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, turnSpeed * Time.deltaTime);
     }
 
     // 距離とプレイヤーの状態から、次に取る行動を重み付き抽選で決める
@@ -562,14 +688,14 @@ public class Enemy : MonoBehaviour
                 break;
 
             case ActionType.Approach:
-                //移動(前進) ※大胆さを出すため歩幅を拡大
-                transform.Translate(0.0f, 0.0f, 0.2f);
+                //移動(前進) ※1回の瞬間移動ではなく、次の判断まで歩き続ける
+                moveDirection = 1;
                 ActionTimer = 0.0f;
                 break;
 
             case ActionType.Retreat:
-                //移動(後退) ※下がる歩幅は控えめにして引きすぎないようにする
-                transform.Translate(0.0f, 0.0f, -0.08f);
+                //移動(後退) ※次の判断まで下がり続ける(速さは retreatSpeed で控えめに)
+                moveDirection = -1;
                 ActionTimer = 0.0f;
 
                 //敵(プレイヤー)から離れる行動なので漢気ゲージを減らす
@@ -622,6 +748,7 @@ public class Enemy : MonoBehaviour
             
             //体力を表示
             Debug.Log("エネミーのHP : " + HP);
+            moveDirection = 0; // 被弾したら歩きを止める
             if(Menflag)
             {
                 atk += player.atk;
