@@ -92,14 +92,18 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
     {
         public string label;           // "自分" / "CPU" など表示用
         [Header("カーソル")]
-        [Tooltip("カーソルのプレハブ（ルートはRectTransform）。設定すると開始時に生成され、下の cursor に自動で入る")]
+        [Tooltip("カーソルのプレハブ（UIでもSpriteRendererでもOK）。設定すると開始時に生成され、下の cursor に自動で入る")]
         public GameObject cursorPrefab;
         [Tooltip("カーソルを生成する親。未設定なら最初のキャラのアンカーと同じ親になる")]
         public Transform cursorParent;
         [Tooltip("シーン上のカーソルを直接使う場合はここに設定（cursorPrefab を設定した場合は不要）")]
-        public RectTransform cursor;
+        public Transform cursor;
+        [Tooltip("カーソルを、キャラのアンカー位置からどれだけずらすか（ワールド座標）。位置ずれの調整用")]
+        public Vector3 cursorOffset = Vector3.zero;
         [Header("READYマーク")]
-        public GameObject readyMark;   // 決定後に表示する「READY」表示（Inspectorで非アクティブにしておく。自分用とCPU用で別オブジェクトにすること）
+        public GameObject readyMark;   // 決定後に表示する「READY」表示。シーン上のオブジェクトでもプレハブでもOK（プレハブなら表示時に自動生成される）
+        [Tooltip("readyMark がプレハブの場合に、生成する親。未設定なら最初のキャラのアンカーと同じ親になる")]
+        public Transform readyMarkParent;
         [Tooltip("READYマークを選択キャラのアンカー位置からどれだけずらすか。同じキャラを選んでも重ならないよう、自分とCPUで違う値にしておく")]
         public Vector2 readyMarkOffset;
         [Header("ドアップ表示位置")]
@@ -144,17 +148,29 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
     [SerializeField] CharacterSelector cpu;      // ② CPU
     [SerializeField] float cursorMoveSpeed = 12f;
 
+    [Header("キャラ選択フレーム")]
+    [Tooltip("キャラクター選択のフレームのプレハブ（またはシーン上のオブジェクト）。カーソル・READYマークより後ろに表示される。未設定なら何もしない")]
+    [SerializeField] GameObject framePrefab;
+    [Tooltip("フレームを生成する親。未設定なら最初のキャラのアンカーと同じ親になる")]
+    [SerializeField] Transform frameParent;
+    [Tooltip("親の中心からのズレ。UIプレハブならanchoredPosition、それ以外はlocalPosition")]
+    [SerializeField] Vector3 frameOffset = Vector3.zero;
+    [Tooltip("フレームの拡大率。プレハブ自身のスケールに掛け算される")]
+    [SerializeField] float frameScale = 1f;
+
     [Header("CPUの強さ選択")]
     [Tooltip("弱い順に並べる（配列のインデックスがそのまま強さのレベルになる）")]
     [SerializeField] DifficultyEntry[] difficulties;
     [Tooltip("強さ選択UI全体の親。③のステップの時だけ表示される（未設定でもOK）")]
     [SerializeField] GameObject difficultyRoot;
-    [Tooltip("強さ選択用カーソルのプレハブ（ルートはRectTransform）。設定すると開始時に生成され、下の difficultyCursor に自動で入る")]
+    [Tooltip("強さ選択用カーソルのプレハブ（UIでもSpriteRendererでもOK）。設定すると開始時に生成され、下の difficultyCursor に自動で入る")]
     [SerializeField] GameObject difficultyCursorPrefab;
     [Tooltip("強さ選択用カーソルを生成する親。未設定なら最初の強さボタンのアンカーと同じ親になる")]
     [SerializeField] Transform difficultyCursorParent;
     [Tooltip("シーン上のカーソルを直接使う場合はここに設定（プレハブを設定した場合は不要）")]
-    [SerializeField] RectTransform difficultyCursor;
+    [SerializeField] Transform difficultyCursor;
+    [Tooltip("強さ選択カーソルを、アンカー位置からどれだけずらすか（ワールド座標）。位置ずれの調整用")]
+    [SerializeField] Vector3 difficultyCursorOffset = Vector3.zero;
     [SerializeField] int difficultyStartIndex = 1;
 
     [Header("SE")]
@@ -168,6 +184,7 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
     [SerializeField] float transitionDelay = 0.7f;
 
     SelectStep step;
+    GameObject frameInstance;
     int difficultyIndex;
     bool isTransitioning;
     bool initialized;
@@ -196,7 +213,7 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
             return;
         }
 
-        if (player.readyMark != null && player.readyMark == cpu.readyMark)
+        if (player.readyMark != null && player.readyMark == cpu.readyMark && player.readyMark.scene.IsValid())
         {
             Debug.LogWarning("[CharacterSelect_SFC_Controller] player と cpu に同じ readyMark が設定されています。別々のオブジェクトを割り当ててください。", this);
         }
@@ -206,6 +223,14 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
 
         // カーソルがプレハブ指定ならここで生成する
         EnsureCursors();
+
+        // READYマークがプレハブなら、ここで生成して非表示にしておく（表示は決定したタイミングで）
+        EnsureReadyMark(player);
+        EnsureReadyMark(cpu);
+
+        // キャラ選択フレームを生成し、カーソル・READYマークより後ろへ回す
+        EnsureFrame();
+        ApplyLayerOrder();
 
         initialized = true;
         ResetSelectionPositions();
@@ -225,7 +250,89 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
         }
     }
 
-    RectTransform EnsureCursor(RectTransform existing, GameObject prefab, Transform parent)
+    // フレームのプレハブをシーン上に生成する（シーン上のオブジェクトが設定されていればそのまま使う）
+    void EnsureFrame()
+    {
+        if (framePrefab == null || frameInstance != null) return;
+
+        if (framePrefab.scene.IsValid())
+        {
+            frameInstance = framePrefab;
+        }
+        else
+        {
+            var parent = frameParent != null
+                ? frameParent
+                : (characters[0].anchor != null ? characters[0].anchor.parent : transform);
+
+            frameInstance = Instantiate(framePrefab, parent, false);
+            PlaceInstance(frameInstance, frameOffset, frameScale);
+        }
+
+        frameInstance.SetActive(true);
+    }
+
+    // 重なり順を、奥から次の順に揃える：
+    //   フレーム → 自分のカーソル → 自分のREADY → CPUのカーソル → CPUのREADY
+    //  ・UI(Image等)       : 同じ親の中で、この順に最前面へ並べ直す（後のものほど手前）
+    //  ・SpriteRenderer等 : 前のレイヤーの最大 sortingOrder より後のレイヤーの最小値が大きくなるようにする
+    void ApplyLayerOrder()
+    {
+        var layers = new List<GameObject>();
+        if (frameInstance != null) layers.Add(frameInstance);
+        if (player.cursor != null) layers.Add(player.cursor.gameObject);
+        if (player.readyMark != null) layers.Add(player.readyMark);
+        if (cpu.cursor != null) layers.Add(cpu.cursor.gameObject);
+        if (cpu.readyMark != null) layers.Add(cpu.readyMark);
+
+        // UI：順番に最前面へ送ると、最終的に「後ろに書いたものほど手前」になる
+        foreach (var go in layers)
+        {
+            go.transform.SetAsLastSibling();
+        }
+
+        // SpriteRenderer等
+        int prevMax = int.MinValue;
+        foreach (var go in layers)
+        {
+            var renderers = go.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0) continue;
+
+            int min = int.MaxValue, max = int.MinValue;
+            foreach (var r in renderers)
+            {
+                min = Mathf.Min(min, r.sortingOrder);
+                max = Mathf.Max(max, r.sortingOrder);
+            }
+
+            if (prevMax != int.MinValue)
+            {
+                int delta = prevMax + 1 - min;
+                if (delta > 0)
+                {
+                    foreach (var r in renderers) r.sortingOrder += delta;
+                    max += delta;
+                }
+            }
+            prevMax = max;
+        }
+    }
+
+    // readyMark がプレハブ（シーン外のアセット）なら、シーン上に生成して差し替え、非表示にする
+    void EnsureReadyMark(CharacterSelector s)
+    {
+        if (s == null || s.readyMark == null) return;
+        if (s.readyMark.scene.IsValid()) return; // すでにシーン上のオブジェクト
+
+        var parent = s.readyMarkParent != null
+            ? s.readyMarkParent
+            : (characters[0].anchor != null ? characters[0].anchor.parent : transform);
+
+        s.readyMark = Instantiate(s.readyMark, parent, false);
+        s.readyMark.SetActive(false);
+    }
+
+    Transform EnsureCursor(Transform existing, GameObject prefab, Transform parent)
     {
         if (existing != null) return existing; // 既にある（シーン上のカーソル／生成済み）
         if (prefab == null) return null;
@@ -233,12 +340,8 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
         var instance = Instantiate(prefab, parent, false);
         instance.transform.SetAsLastSibling(); // 他のUIの裏に隠れないよう最前面へ
 
-        var rt = instance.transform as RectTransform;
-        if (rt == null)
-        {
-            Debug.LogWarning($"[CharacterSelect_SFC_Controller] カーソルのプレハブ「{prefab.name}」のルートが RectTransform ではありません。UI要素(Canvas内)のプレハブにしてください。", this);
-        }
-        return rt;
+        // UI(RectTransform)でもSpriteRendererなどの通常のTransformでもOK
+        return instance.transform;
     }
 
     void ResetSelectionPositions()
@@ -251,20 +354,20 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
             ? Mathf.Clamp(difficultyStartIndex, 0, difficulties.Length - 1)
             : 0;
 
-        SnapCursor(player.cursor, characters[player.currentIndex].anchor);
-        SnapCursor(cpu.cursor, characters[cpu.currentIndex].anchor);
+        SnapCursor(player.cursor, characters[player.currentIndex].anchor, player.cursorOffset);
+        SnapCursor(cpu.cursor, characters[cpu.currentIndex].anchor, cpu.cursorOffset);
         if (difficulties != null && difficulties.Length > 0)
         {
-            SnapCursor(difficultyCursor, difficulties[difficultyIndex].anchor);
+            SnapCursor(difficultyCursor, difficulties[difficultyIndex].anchor, difficultyCursorOffset);
         }
 
         UpdateSelectionDisplay(player);
         ApplyStepVisuals();
     }
 
-    void SnapCursor(RectTransform cursor, Transform anchor)
+    void SnapCursor(Transform cursor, Transform anchor, Vector3 offset)
     {
-        if (cursor != null && anchor != null) cursor.position = anchor.position;
+        if (cursor != null && anchor != null) cursor.position = anchor.position + offset;
     }
 
     // 指定した側（1=自分 / 2=CPU）がこのキャラクターを選択できるか
@@ -366,7 +469,7 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
                 if (s.cursor != null && characters[nextIndex].anchor != null)
                 {
                     if (routine != null) StopCoroutine(routine);
-                    routine = StartCoroutine(MoveCursorSmooth(s.cursor, characters[nextIndex].anchor.position));
+                    routine = StartCoroutine(MoveCursorSmooth(s.cursor, characters[nextIndex].anchor.position + s.cursorOffset));
                 }
 
                 UpdateSelectionDisplay(s);
@@ -401,7 +504,7 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
                 if (difficultyCursor != null && difficulties[nextIndex].anchor != null)
                 {
                     if (difficultyCursorRoutine != null) StopCoroutine(difficultyCursorRoutine);
-                    difficultyCursorRoutine = StartCoroutine(MoveCursorSmooth(difficultyCursor, difficulties[nextIndex].anchor.position));
+                    difficultyCursorRoutine = StartCoroutine(MoveCursorSmooth(difficultyCursor, difficulties[nextIndex].anchor.position + difficultyCursorOffset));
                 }
             }
         }
@@ -440,6 +543,8 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
         // 強さ選択: ③の間だけ表示
         if (difficultyRoot != null) difficultyRoot.SetActive(step == SelectStep.Difficulty);
         if (difficultyCursor != null) difficultyCursor.gameObject.SetActive(step == SelectStep.Difficulty);
+
+        ApplyLayerOrder();
     }
 
     // 強さ選択が無い場合に、CPUのREADYマークだけ見せるための補助
@@ -452,10 +557,28 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
     // READYマークの表示切り替え（表示する時は選択キャラの位置へ移動してから出す）
     void SetReady(CharacterSelector s, bool active)
     {
-        if (s == null || s.readyMark == null) return;
+        if (s == null) return;
+
+        if (s.readyMark == null)
+        {
+            if (active)
+            {
+                Debug.LogWarning($"[CharacterSelect_SFC_Controller] {s.label} の readyMark が未設定です。シーン上のオブジェクトを割り当ててください。", this);
+            }
+            return;
+        }
+
+        // 念のため：まだプレハブのままなら生成する（プレハブのアセット自体はSetActiveしない）
+        EnsureReadyMark(s);
 
         if (active) PlaceReadyMarkOnSelectedCharacter(s);
         s.readyMark.SetActive(active);
+
+        // 自身をアクティブにしても、親が非アクティブだと画面には出ない
+        if (active && !s.readyMark.activeInHierarchy)
+        {
+            Debug.LogWarning($"[CharacterSelect_SFC_Controller] {s.label} の readyMark の親が非アクティブのため表示されません。", s.readyMark);
+        }
     }
 
     // READYマークを、選択しているキャラクターの位置へ移動させる
@@ -468,17 +591,31 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
         if (anchor == null) return;
 
         s.readyMark.transform.position = anchor.position + (Vector3)s.readyMarkOffset;
-
-        // 他のUIの裏に隠れないよう、同じ親の中で最前面へ持ってくる
-        s.readyMark.transform.SetAsLastSibling();
     }
 
     void SetCursorVisible(CharacterSelector s, bool visible)
     {
-        if (s != null && s.cursor != null)
+        if (s == null) return;
+
+        if (s.cursor == null)
         {
-            s.cursor.gameObject.SetActive(visible);
+            if (visible)
+            {
+                Debug.LogWarning($"[CharacterSelect_SFC_Controller] {s.label} のカーソルが null です。cursorPrefab か cursor を設定してください。", this);
+            }
+            return;
         }
+
+        if (visible)
+        {
+            // 表示する瞬間に現在のキャラの位置へ合わせる（Start時はレイアウト未確定でズレることがあるため）
+            if (s.currentIndex >= 0 && s.currentIndex < characters.Length)
+            {
+                SnapCursor(s.cursor, characters[s.currentIndex].anchor, s.cursorOffset);
+            }
+        }
+
+        s.cursor.gameObject.SetActive(visible);
     }
 
     // 現在位置(fromAnchor)から見て、dir方向にある「一番近い選択肢」のインデックスを返す。見つからなければ-1。
@@ -642,7 +779,7 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
         }
     }
 
-    IEnumerator MoveCursorSmooth(RectTransform cursor, Vector3 target)
+    IEnumerator MoveCursorSmooth(Transform cursor, Vector3 target)
     {
         while (Vector3.Distance(cursor.position, target) > 0.5f)
         {
