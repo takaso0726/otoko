@@ -703,6 +703,26 @@ public class Player : MonoBehaviour
     // ★追加：F6キーでON/OFFする、常時仁王立ちデバッグモードの現在の状態
     private bool debugAlwaysGuard = false;
     bool rebornCamStarted;           // 根性復活のクローズアップカメラを開始済みか
+
+    //=====================================================
+    // ★追加：ダウン関連のアニメーション（開始／ダウン中／復活／復活失敗）
+    //   ・ダウン開始：Trigger。ダウンした瞬間に1回だけ立てる
+    //   ・ダウン中　：Bool。ダウンしている間ずっとtrue、復活／死亡で必ずfalseに戻す
+    //   ・復活　　　：Trigger。復活成功（連打・漢気復活・F4デバッグ復活）の瞬間に立てる
+    //   ・復活失敗　：Trigger。制限時間内に復活できず力尽きた（Dead）瞬間に立てる
+    //   パラメータ名はInspectorで変更できる。空にするとその演出は何もしない。
+    //   Animatorに存在しない名前を指定した場合も警告を出さずに無視する。
+    //=====================================================
+    [Header("ダウン時のアニメーション（Animatorのパラメータ名）")]
+    [Tooltip("ダウンした瞬間に1回だけ立てるTrigger名。")]
+    [SerializeField] string downStartTrigger = "Down-start";
+    [Tooltip("ダウンしている間ずっとtrueにするBool名（復活／死亡でfalseに戻る）。")]
+    [SerializeField] string downBoolParam = "Down";
+    [Tooltip("根性復活・漢気復活に成功した瞬間に立てるTrigger名。")]
+    [SerializeField] string downReviveTrigger = "Down-revive";
+    [Tooltip("制限時間内に復活できず力尽きた（Dead）瞬間に立てるTrigger名。")]
+    [SerializeField] string downFailTrigger = "Down-fail";
+    bool downAnimPlayed;             // ダウン中で、ダウン開始アニメーションを開始済みか（復活／死亡でfalseに戻る）
     bool canThrow = true;            // 投げの多重発生を防ぐフラグ
     bool throwReaching;              // ★追加：投げ動作中で、まだ掴みが成立しておらず手の当たり判定の接触を待っている間（接触した瞬間にfalseになる）
 
@@ -1909,6 +1929,12 @@ public class Player : MonoBehaviour
         // ダウン中以外は状態をリセットしておく（次のダウン時に前回の押下が残らないようにする）
         if (currentState != PlayerState.KnockedDown)
         {
+            if (downAnimPlayed)
+            {
+                // ★追加：復活／死亡の処理を通らずにダウンを抜けた場合の保険。ダウン中Boolが残らないようにする
+                downAnimPlayed = false;
+                SetDownBool(downBoolParam, false);
+            }
             mashButtonVisualPressed = false;
             mashButtonPendingPress = false;
             return;
@@ -3516,7 +3542,7 @@ public class Player : MonoBehaviour
                 //出す位置の調整
                 Vector3 transkunn = transform.position;
                 transkunn.y += 2.0f;
-                HitEffectSpawner.Instance.SpawnAtDirection(missHitEffectData, transkunn, transform.forward);
+                HitEffectSpawner.Instance.SpawnBehindFacing(missHitEffectData, transkunn, transform.forward); // 向きと反対側の斜め上へ
                 EffectDLog($"[{PlayerName}] 空振り擬音エフェクト発生 pos={transkunn}");
             }
         }
@@ -3569,6 +3595,63 @@ public class Player : MonoBehaviour
         return Mathf.Max(mashThreshold + 1 - mashCount, 0);
     }
 
+    // ★追加：Animatorにその名前・型のパラメータがあるか（無い名前でSetTrigger/SetBoolすると警告が出るため先に確認する）
+    bool HasAnimatorParam(string paramName, AnimatorControllerParameterType type)
+    {
+        if (animator == null || string.IsNullOrEmpty(paramName)) return false;
+        foreach (var param in animator.parameters)
+        {
+            if (param.type == type && param.name == paramName) return true;
+        }
+        return false;
+    }
+
+    void SetDownTrigger(string paramName)
+    {
+        if (HasAnimatorParam(paramName, AnimatorControllerParameterType.Trigger)) animator.SetTrigger(paramName);
+    }
+
+    void SetDownBool(string paramName, bool value)
+    {
+        if (HasAnimatorParam(paramName, AnimatorControllerParameterType.Bool)) animator.SetBool(paramName, value);
+    }
+
+    // ★追加：ダウン開始（ダウンした瞬間に1回だけ呼ぶ）。Triggerを立て、ダウン中Boolをtrueにする。
+    //   移動・攻撃のアニメーションが残っているとダウンに遷移できないことがあるので、先に止める。
+    void OnDownStart()
+    {
+        if (animator == null) return;
+
+        StopMoveAnimation();
+        ResetAttackTriggers();
+
+        SetDownBool(downBoolParam, true);
+        SetDownTrigger(downStartTrigger);
+        DLog($"[{PlayerName}] ダウン開始アニメーション（{downStartTrigger} / {downBoolParam}=true）");
+    }
+
+    // ★追加：復活成功の瞬間に呼ぶ。ダウン中Boolをfalseに戻し、復活Triggerを立てる。
+    void OnDownRevive()
+    {
+        downAnimPlayed = false;
+        if (animator == null) return;
+
+        SetDownBool(downBoolParam, false);
+        SetDownTrigger(downReviveTrigger);
+        DLog($"[{PlayerName}] 復活アニメーション（{downReviveTrigger} / {downBoolParam}=false）");
+    }
+
+    // ★追加：復活失敗（Dead）の瞬間に呼ぶ。ダウン中Boolをfalseに戻し、復活失敗Triggerを立てる。
+    void OnDownFail()
+    {
+        downAnimPlayed = false;
+        if (animator == null) return;
+
+        SetDownBool(downBoolParam, false);
+        SetDownTrigger(downFailTrigger);
+        DLog($"[{PlayerName}] 復活失敗アニメーション（{downFailTrigger} / {downBoolParam}=false）");
+    }
+
     // HPが0になった際に毎フレーム呼ばれる、根性復活（ボタン連打による復活）の処理
     void HandleKnockedDown()
     {
@@ -3580,6 +3663,13 @@ public class Player : MonoBehaviour
         rebornTimer += frameStep;
         Player_status = Status.Reborn;
         if (gameMNG != null) gameMNG.SettestStatus(PlayerName, Status.Reborn);
+
+        // ★追加：ダウンした瞬間、一度だけダウン開始アニメーション（Trigger）を立て、ダウン中Boolをtrueにする
+        if (!downAnimPlayed)
+        {
+            downAnimPlayed = true;
+            OnDownStart();
+        }
 
         //ダウンした瞬間、一度だけ顔・拳へのクローズアップカメラを開始する
         if (!rebornCamStarted && fightingCamera != null)
@@ -3627,6 +3717,7 @@ public class Player : MonoBehaviour
                     fightingCamera.TriggerRebornStandUpOrbit(transform);
                 }
                 rebornCamStarted = false; //次回のダウンに備えてリセット
+                OnDownRevive(); // ★追加：復活アニメーション
             }
         }
         else
@@ -3642,6 +3733,7 @@ public class Player : MonoBehaviour
                 fightingCamera.ClearReborn();
             }
             rebornCamStarted = false;
+            OnDownFail(); // ★追加：復活失敗アニメーション
         }
     }
 
@@ -3685,6 +3777,7 @@ public class Player : MonoBehaviour
             fightingCamera.TriggerRebornStandUpOrbit(transform);
         }
         rebornCamStarted = false; // 次回のダウンに備えてリセット
+        OnDownRevive(); // ★追加：復活アニメーション
 
         SpawnKankiReviveEffect(); // 復活した瞬間のエフェクト
         StartReviveBuff();        // 攻撃力上昇（＋上昇中エフェクト）を開始
@@ -3822,6 +3915,7 @@ public class Player : MonoBehaviour
             fightingCamera.TriggerRebornStandUpOrbit(transform);
         }
         rebornCamStarted = false; //次回のダウンに備えてリセット
+        OnDownRevive(); // ★追加：復活アニメーション
 
         Debug.Log($"[{PlayerName}] [デバッグ]{debugKeyName}キーにより強制復活しました（HP={HP}）");
     }
@@ -3987,7 +4081,7 @@ public class Player : MonoBehaviour
             Transform guardAttackerTf = isEnemyPlayerAttack ? attackerPlayer.transform : attackerEnemy.transform;
             if (HitEffectSpawner.Instance != null && guardHitEffectData != null)
             {
-                HitEffectSpawner.Instance.Spawn(guardHitEffectData, guardAttackerTf.position, transform.position);
+                HitEffectSpawner.Instance.SpawnBehindFacing(guardHitEffectData, transform.position, transform.forward); // 向きと反対側の斜め上へ
                 EffectDLog($"[{PlayerName}] ガード成功擬音エフェクト発生 pos={transform.position}");
             }
 
@@ -4091,7 +4185,7 @@ public class Player : MonoBehaviour
 
             if (HitEffectSpawner.Instance != null && selectedHitEffect != null)
             {
-                HitEffectSpawner.Instance.Spawn(selectedHitEffect, attackerTf.position, hitPoint);
+                HitEffectSpawner.Instance.SpawnBehindFacing(selectedHitEffect, hitPoint, transform.forward); // 向きと反対側の斜め上へ
                 EffectDLog($"[{PlayerName}] 被弾擬音エフェクト発生 pos={hitPoint}");
             }
 

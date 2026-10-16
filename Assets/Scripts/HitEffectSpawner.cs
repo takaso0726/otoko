@@ -79,6 +79,40 @@ public class HitEffectSpawner : MonoBehaviour
         float distance = Random.Range(data.distanceRange.x, data.distanceRange.y);
         Vector3 spawnPos = originPos + spawnDir * distance;
 
+        SpawnInstance(data, spawnPos);
+    }
+
+    /// <summary>
+    /// ★追加：キャラの向きの「反対側」の斜め上へ出す。
+    ///   横＝Z軸、高さ＝Y軸。Z+を向いている → Z-側の斜め上／Z-を向いている → Z+側の斜め上。
+    /// カメラの向きには依存しない（ワールドのZ軸だけで決まる）。
+    /// 角度はdata.baseAngle：0°で真横（Z軸方向）、45°で斜め上（既定）、90°で真上。
+    /// 距離（distanceRange）・ばらつき（angleRandomRange）・位置微調整（spawnPositionOffset）は従来どおりHitEffectDataで調整する。
+    /// </summary>
+    /// <param name="originPos">基準位置（この位置から斜め上へ離して出す）</param>
+    /// <param name="facingForward">出す対象のキャラの向き（通常はtransform.forward）</param>
+    public void SpawnBehindFacing(HitEffectData data, Vector3 originPos, Vector3 facingForward)
+    {
+        if (data == null || data.effectPrefab == null) return;
+        if (!CanSpawn(data)) return;
+
+        // Z軸方向の向き。Z成分がほぼ0で判定できない時はZ+向き扱い
+        float facingSign = Mathf.Abs(facingForward.z) < 0.01f ? 1f : Mathf.Sign(facingForward.z);
+
+        // 向きと反対側のZ方向
+        Vector3 backSide = Vector3.forward * -facingSign;
+
+        float angle = data.baseAngle + Random.Range(-data.angleRandomRange, data.angleRandomRange);
+        float rad = angle * Mathf.Deg2Rad;
+        Vector3 spawnDir = backSide * Mathf.Cos(rad) + Vector3.up * Mathf.Sin(rad);
+
+        float distance = Random.Range(data.distanceRange.x, data.distanceRange.y);
+        SpawnInstance(data, originPos + spawnDir * distance);
+    }
+
+    // 生成位置が決まった後の共通処理（位置微調整・生成・スケール・アニメーション開始）
+    private void SpawnInstance(HitEffectData data, Vector3 spawnPos)
+    {
         // 手動での位置微調整（上下左右奥）を反映。HitEffectDataのInspectorで技ごとに調整できる
         spawnPos += data.spawnPositionOffset;
 
