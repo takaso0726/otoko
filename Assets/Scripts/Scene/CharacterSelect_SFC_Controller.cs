@@ -138,6 +138,18 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
     {
         public string difficultyName;  // 表示名（例: EASY / NORMAL / HARD）
         public Transform anchor;   // 強さ選択の位置（空のGameObjectでもUI要素でもOK）
+
+        [Header("カーソル位置")]
+        [Tooltip("強さ選択カーソルの移動先にする空のオブジェクト（その座標が使われる）。未設定なら上の anchor の位置を使う")]
+        public Transform cursorPoint;
+
+        [Header("アイコン")]
+        [Tooltip("この強さのアイコンのプレハブ。アンカーの子として生成され、強さ選択の間だけ表示される。未設定なら何も出さない")]
+        public GameObject iconPrefab;
+        [Tooltip("アンカーの中心からのズレ。UIプレハブならanchoredPosition、それ以外はlocalPosition")]
+        public Vector3 iconOffset = Vector3.zero;
+        [Tooltip("アイコンの拡大率。プレハブ自身のスケールに掛け算される")]
+        public float iconScale = 1f;
     }
 
     [Header("キャラクター一覧（グリッド順）")]
@@ -185,6 +197,7 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
 
     SelectStep step;
     GameObject frameInstance;
+    List<GameObject> difficultyIcons;
     int difficultyIndex;
     bool isTransitioning;
     bool initialized;
@@ -232,6 +245,9 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
         EnsureFrame();
         ApplyLayerOrder();
 
+        // 強さのアイコンを生成する（表示は強さ選択の間だけ）
+        EnsureDifficultyIcons();
+
         initialized = true;
         ResetSelectionPositions();
     }
@@ -248,6 +264,50 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
             var diffParent = difficulties[0].anchor != null ? difficulties[0].anchor.parent : transform;
             difficultyCursor = EnsureCursor(difficultyCursor, difficultyCursorPrefab, difficultyCursorParent != null ? difficultyCursorParent : diffParent);
         }
+    }
+
+    // 強さのアイコンのプレハブを、各強さのアンカーの子として生成する
+    void EnsureDifficultyIcons()
+    {
+        if (difficulties == null || difficulties.Length == 0) return;
+        if (difficultyIcons != null) return; // 生成済み
+
+        difficultyIcons = new List<GameObject>();
+
+        // difficulties と同じ並び・同じ数にする（アイコンが無い要素は null を入れて、インデックスを揃える）
+        foreach (var d in difficulties)
+        {
+            if (d == null || d.iconPrefab == null || d.anchor == null)
+            {
+                difficultyIcons.Add(null);
+                continue;
+            }
+
+            var icon = Instantiate(d.iconPrefab, d.anchor, false);
+            PlaceInstance(icon, d.iconOffset, d.iconScale);
+            icon.SetActive(false);
+            difficultyIcons.Add(icon);
+        }
+    }
+
+    // 強さ選択カーソルの移動先の基準（ワールド座標）。
+    // 各強さの「cursorPoint」（空のオブジェクト）の位置を返す。未設定なら anchor の位置を使う。
+    Vector3? DifficultyPosition(int index)
+    {
+        if (difficulties == null || index < 0 || index >= difficulties.Length) return null;
+
+        var d = difficulties[index];
+        if (d == null) return null;
+
+        if (d.cursorPoint != null) return d.cursorPoint.position;
+        if (d.anchor != null) return d.anchor.position;
+        return null;
+    }
+
+    // カーソルをワールド座標へ移動する（offsetはカーソル自身の位置ずれ調整）
+    void SnapCursorTo(Transform cursor, Vector3? position, Vector3 offset)
+    {
+        if (cursor != null && position.HasValue) cursor.position = position.Value + offset;
     }
 
     // フレームのプレハブをシーン上に生成する（シーン上のオブジェクトが設定されていればそのまま使う）
@@ -284,6 +344,14 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
         if (player.readyMark != null) layers.Add(player.readyMark);
         if (cpu.cursor != null) layers.Add(cpu.cursor.gameObject);
         if (cpu.readyMark != null) layers.Add(cpu.readyMark);
+        if (difficultyIcons != null)
+        {
+            foreach (var icon in difficultyIcons)
+            {
+                if (icon != null) layers.Add(icon);
+            }
+        }
+        if (difficultyCursor != null) layers.Add(difficultyCursor.gameObject);
 
         // UI：順番に最前面へ送ると、最終的に「後ろに書いたものほど手前」になる
         foreach (var go in layers)
@@ -358,7 +426,7 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
         SnapCursor(cpu.cursor, characters[cpu.currentIndex].anchor, cpu.cursorOffset);
         if (difficulties != null && difficulties.Length > 0)
         {
-            SnapCursor(difficultyCursor, difficulties[difficultyIndex].anchor, difficultyCursorOffset);
+            SnapCursorTo(difficultyCursor, DifficultyPosition(difficultyIndex), difficultyCursorOffset);
         }
 
         UpdateSelectionDisplay(player);
@@ -488,27 +556,30 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
     // 強さ選択ステップの処理
     void HandleDifficultyStep(Vector2Int inputDir, bool decide)
     {
-        Vector2Int navDir = inputDir.x != 0 ? new Vector2Int(inputDir.x, 0) : new Vector2Int(0, inputDir.y);
-
-        if (navDir != Vector2Int.zero)
+        // 強さ選択は上下だけで操作する
+        if (inputDir.y != 0)
         {
-            int nextIndex = FindNearest(
-                difficulties[difficultyIndex].anchor, new Vector2(navDir.x, navDir.y), difficultyIndex, difficulties.Length,
-                i => difficulties[i].anchor, null);
+            var from = DifficultyPosition(difficultyIndex);
+            int nextIndex = from.HasValue
+                ? FindNearestByPosition(from.Value, new Vector2(0, inputDir.y), difficultyIndex, difficulties.Length,
+                                        DifficultyPosition, null)
+                : -1;
 
             if (nextIndex >= 0)
             {
                 difficultyIndex = nextIndex;
                 PlaySE(moveSE);
 
-                if (difficultyCursor != null && difficulties[nextIndex].anchor != null)
+                var target = DifficultyPosition(nextIndex);
+                if (difficultyCursor != null && target.HasValue)
                 {
                     if (difficultyCursorRoutine != null) StopCoroutine(difficultyCursorRoutine);
-                    difficultyCursorRoutine = StartCoroutine(MoveCursorSmooth(difficultyCursor, difficulties[nextIndex].anchor.position + difficultyCursorOffset));
+                    difficultyCursorRoutine = StartCoroutine(MoveCursorSmooth(difficultyCursor, target.Value + difficultyCursorOffset));
                 }
             }
         }
 
+        // 決定したらシーン遷移
         if (decide)
         {
             StartCoroutine(FinalDecideAndTransition());
@@ -542,7 +613,37 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
 
         // 強さ選択: ③の間だけ表示
         if (difficultyRoot != null) difficultyRoot.SetActive(step == SelectStep.Difficulty);
-        if (difficultyCursor != null) difficultyCursor.gameObject.SetActive(step == SelectStep.Difficulty);
+        bool showDifficulty = step == SelectStep.Difficulty;
+        bool hasDifficulty = difficulties != null && difficulties.Length > 0;
+        if (difficultyCursor != null)
+        {
+            if (showDifficulty && hasDifficulty)
+            {
+                // 表示する瞬間に、今選んでいる強さの位置へ合わせる
+                SnapCursor(difficultyCursor, difficulties[difficultyIndex].anchor, difficultyCursorOffset);
+            }
+            difficultyCursor.gameObject.SetActive(showDifficulty);
+        }
+        else if (showDifficulty && hasDifficulty)
+        {
+            Debug.LogWarning("[CharacterSelect_SFC_Controller] 強さ選択のカーソルが未設定です。difficultyCursorPrefab か difficultyCursor を設定してください。", this);
+        }
+
+        // 強さのアイコン: ③の間だけ表示
+        if (difficultyIcons != null)
+        {
+            foreach (var icon in difficultyIcons)
+            {
+                if (icon != null) icon.SetActive(step == SelectStep.Difficulty);
+            }
+        }
+
+        // 強さ選択に入った時は、アイコンを表示した後でカーソルを現在の項目のアイコン位置へ合わせる
+        if (step == SelectStep.Difficulty && difficulties != null && difficulties.Length > 0)
+        {
+            Canvas.ForceUpdateCanvases(); // レイアウトが確定してから位置を取る
+            SnapCursorTo(difficultyCursor, DifficultyPosition(difficultyIndex), difficultyCursorOffset);
+        }
 
         ApplyLayerOrder();
     }
@@ -627,7 +728,20 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
     {
         if (fromAnchor == null) return -1;
 
-        Vector2 currentPos = fromAnchor.position;
+        return FindNearestByPosition(fromAnchor.position, dir, fromIndex, count,
+            i =>
+            {
+                var a = anchorOf(i);
+                return a != null ? (Vector3?)a.position : null;
+            },
+            allowed);
+    }
+
+    // 位置（ワールド座標）ベースの本体。positionOf が null を返す選択肢は無視する。
+    int FindNearestByPosition(Vector3 fromPosition, Vector2 dir, int fromIndex, int count,
+                              System.Func<int, Vector3?> positionOf, System.Func<int, bool> allowed)
+    {
+        Vector2 currentPos = fromPosition;
         Vector2 dirNormalized = dir.normalized;
         Vector2 perpAxis = new Vector2(-dirNormalized.y, dirNormalized.x); // dirに直交する軸
 
@@ -639,10 +753,10 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
             if (i == fromIndex) continue;
             if (allowed != null && !allowed(i)) continue;
 
-            var anchor = anchorOf(i);
-            if (anchor == null) continue;
+            var pos = positionOf(i);
+            if (!pos.HasValue) continue;
 
-            Vector2 offset = (Vector2)anchor.position - currentPos;
+            Vector2 offset = (Vector2)pos.Value - currentPos;
 
             float primary = Vector2.Dot(offset, dirNormalized);
             if (primary <= 0.01f) continue; // 指定方向とは逆・同位置にあるものは除外
