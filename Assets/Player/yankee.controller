@@ -285,7 +285,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Crouch
-  m_Speed: 1
+  m_Speed: 10
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: -7344619989413499043}
@@ -299,7 +299,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: 1c059c9fd5ebc52488eea9f6775f1ca4, type: 3}
+  m_Motion: {fileID: 1827226128182048838, guid: a754518e957587a44a561cbc78441ba0, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -2980,7 +2980,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: CrouchFacingRight
-  m_Speed: 2
+  m_Speed: 10
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: -1560861771076652912}
@@ -2994,7 +2994,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: 1c059c9fd5ebc52488eea9f6775f1ca4, type: 3}
+  m_Motion: {fileID: 1827226128182048838, guid: a754518e957587a44a561cbc78441ba0, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
