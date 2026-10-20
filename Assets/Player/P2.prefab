@@ -1706,6 +1706,7 @@ MonoBehaviour:
   turnSpeed: 180
   enableAutoFacing: 1
   autoFaceDeadZone: 0.05
+  autoFaceFlipThreshold: 1
   lockFacingDuringAction: 0
   isResultMode: 0
   autoDetectResultScene: 1

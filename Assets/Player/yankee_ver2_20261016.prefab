@@ -1446,6 +1446,7 @@ MonoBehaviour:
   turnSpeed: 180
   enableAutoFacing: 1
   autoFaceDeadZone: 0.05
+  autoFaceFlipThreshold: 1
   lockFacingDuringAction: 0
   isResultMode: 0
   autoDetectResultScene: 1
@@ -1455,8 +1456,8 @@ MonoBehaviour:
   minMoveAnimSpeed: 0.6
   maxMoveAnimSpeed: 1.4
   minMoveSpeedRatio: 0.4
-  minPosition: {x: -1, y: 0.2, z: -10}
-  maxPosition: {x: 1, y: 10, z: 10}
+  minPosition: {x: 0, y: 0.2, z: -10}
+  maxPosition: {x: 0, y: 10, z: 10}
   force: {x: 0, y: 500, z: 0}
   Jumpflag: 1
   HP: 1000

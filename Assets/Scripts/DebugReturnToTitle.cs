@@ -5,15 +5,15 @@ using UnityEngine.SceneManagement;
 //=====================================================
 // 【デバッグ】F12キーで、どのシーンからでもタイトル画面へ戻る。
 //
-// ■ Unityエディタ上
-//   ・シーンへの配置は不要。再生時に自動で常駐オブジェクトが作られ、どのシーンから再生しても F12 で戻れる。
+// ■ Unityエディタ上／ビルド後（共通）
+//   ・シーンへの配置は不要。起動時（最初のシーンの読み込み後）に自動で常駐オブジェクトが作られ、
+//     どのシーンからでも F12 で戻れる。ビルド後（Development Buildでないものも含む）でも同じ。
+//   ・一度生成されたものはシーンをまたいで残る（DontDestroyOnLoad）。
 //
-// ■ ビルド後
-//   ・タイトル画面（Build Settingsの最初のシーン）の「空のGameObject」にこのコンポーネントをアタッチし、
-//     Inspectorの [Enable In Build] をONにした時だけ、ビルド後でも F12 で戻れる。
-//   ・OFFのままなら、ビルド後は何も起きない（Development Buildも同じ）。
-//   ・一度生成されたものはシーンをまたいで残る（DontDestroyOnLoad）ので、他のシーンには置かなくてよい。
-//   ・リリース用のビルドでは [Enable In Build] をOFFにすること。
+// ■ ビルド後に無効にしたい時（リリース用のビルドなど）
+//   ・下の enableInBuild の初期値を false にする。
+//   ・★注意：シーンに既にこのコンポーネントを置いている場合は、Inspectorに保存された
+//     [Enable In Build] の値が使われる（初期値より優先される）。ONにするか、シーン側のものを削除すること。
 //
 // ■ 設定
 //   ・Title Scene Name … 戻り先のシーン名（Build Settingsに登録されていること）。
@@ -30,22 +30,25 @@ public class DebugReturnToTitle : MonoBehaviour
     [SerializeField] Key returnKey = Key.F12;
 
     [Header("ビルド後の挙動")]
-    [Tooltip("ONにすると、ビルド後の実行でもキーでタイトルへ戻れます。OFFならビルド後は無効です（エディタ上では常に有効）。")]
-    [SerializeField] bool enableInBuild = false;
+    [Tooltip("ONにすると、ビルド後の実行でもキーでタイトルへ戻れます。OFFならビルド後は無効です（エディタ上では常に有効）。" +
+             "※自動生成されるものは、ここのコード上の初期値(true)が使われます。")]
+    [SerializeField] bool enableInBuild = true;
 
     static DebugReturnToTitle instance;
     bool isLoading; // シーン読み込み中の連打防止
 
-#if UNITY_EDITOR
-    // エディタでは、どのシーンから再生しても使えるように、無ければ自動で生成する
+    // エディタでもビルド後でも、どのシーンから起動しても使えるように、無ければ自動で生成する
+    // （以前はエディタ専用だったため、ビルド後はシーンに手動で配置しないと動かなかった）
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void BootstrapInEditor()
+    static void Bootstrap()
     {
         if (instance != null) return;
 
+        // 無効設定のコンポーネントが既にシーン上にあるのに、自動生成で上書きしないようにする
+        if (FindAnyObjectByType<DebugReturnToTitle>(FindObjectsInactive.Include) != null) return;
+
         new GameObject("[Debug] ReturnToTitle").AddComponent<DebugReturnToTitle>();
     }
-#endif
 
     void Awake()
     {

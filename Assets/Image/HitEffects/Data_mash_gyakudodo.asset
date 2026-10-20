@@ -13,10 +13,10 @@ MonoBehaviour:
   m_Name: Data_mash_gyakudodo
   m_EditorClassIdentifier: Assembly-CSharp::HitEffectData
   effectPrefab: {fileID: 6815328702670523096, guid: 300fbefd18f8fee4eada6bae9b438132, type: 3}
-  baseAngle: 180
+  baseAngle: 0
   angleRandomRange: 20
   distanceRange: {x: 0, y: 0}
-  spawnPositionOffset: {x: 0, y: 1, z: 0}
+  spawnPositionOffset: {x: 0, y: 2.91, z: 0}
   offsetWhenFacingPositiveZ: {x: 0, y: 0, z: -3}
   offsetWhenFacingNegativeZ: {x: 0, y: 0, z: 2.5}
   overallScale: 1
