@@ -71,6 +71,12 @@ public class CharacterSelectController : MonoBehaviour
         [Header("ドアップ表示")]
         [Tooltip("カーソルを合わせた時に表示するドアップ用プレハブ（1P・2P共通）。各プレイヤーの portraitRoot の子として生成される。Image/アニメーション/Spine等、中身は自由")]
         public GameObject portraitPrefab;
+        [Tooltip("このキャラのドアップ位置の微調整（1P側）。PlayerSelector.portraitOffset に【加算】される。0なら調整なし")]
+        public Vector3 portraitOffsetP1 = Vector3.zero;
+        [Tooltip("このキャラのドアップ位置の微調整（2P側）。PlayerSelector.portraitOffset に【加算】される。0なら調整なし")]
+        public Vector3 portraitOffsetP2 = Vector3.zero;
+        [Tooltip("このキャラ専用の拡大率（1P・2P共通）。PlayerSelector.portraitScale とプレハブ自身のスケールに掛け算される。1=等倍")]
+        public float portraitScaleMultiplier = 1f;
 
         [Header("名前表示（画像）")]
         public Sprite nameImage;      // キャラ名を表す画像（ロゴ・ロゴタイプ等）。選択中にnameImageObjectへ反映する
@@ -379,7 +385,7 @@ public class CharacterSelectController : MonoBehaviour
 
         var entry = characters[p.currentIndex];
 
-        ShowPortrait(p, p.currentIndex);
+        ShowPortrait(p, p.currentIndex, playerNumber);
 
         if (p.nameImageObject != null)
         {
@@ -393,7 +399,7 @@ public class CharacterSelectController : MonoBehaviour
 
     // 選択中キャラのドアップ用プレハブを表示する。
     // 初回はportraitRootの子として生成し、2回目以降は生成済みインスタンスのアクティブ切り替えだけを行う。
-    void ShowPortrait(PlayerSelector p, int characterIndex)
+    void ShowPortrait(PlayerSelector p, int characterIndex, int playerNumber)
     {
         if (p.portraitRoot == null) return;
 
@@ -416,31 +422,107 @@ public class CharacterSelectController : MonoBehaviour
         if (!p.portraitInstances.TryGetValue(characterIndex, out var instance) || instance == null)
         {
             instance = Instantiate(prefab, p.portraitRoot, false);
-            PlacePortrait(instance, p);
             p.portraitInstances[characterIndex] = instance;
         }
+
+        // 位置・拡大率は表示のたびに適用する（キャラ別の調整値をInspectorで実行中に変えても反映される）
+        PlacePortrait(instance, prefab, p, characters[characterIndex], playerNumber);
 
         instance.SetActive(true);
         p.currentPortrait = instance;
     }
 
-    // 生成したドアッププレハブを portraitRoot の中心（＋offset）に配置し、拡大率を反映する。
-    // プレハブ自身の位置は上書きされるが、回転とスケールはプレハブの設定を活かす。
-    void PlacePortrait(GameObject instance, PlayerSelector p)
+    // ドアッププレハブを portraitRoot の中心に配置し、拡大率を反映する。
+    // 位置 = プレイヤー共通の portraitOffset + キャラ別のオフセット（1P用/2P用）
+    // 拡大率 = プレハブ自身のスケール × プレイヤー共通の portraitScale × キャラ別の portraitScaleMultiplier
+    // スケールはプレハブの元の値から毎回計算するので、何度呼んでも掛け算が積み重ならない。
+    void PlacePortrait(GameObject instance, GameObject prefab, PlayerSelector p, CharacterEntry entry, int playerNumber)
     {
         var t = instance.transform;
 
+        Vector3 characterOffset = playerNumber == 1 ? entry.portraitOffsetP1 : entry.portraitOffsetP2;
+        Vector3 position = p.portraitOffset + characterOffset;
+
         if (t is RectTransform rt)
         {
-            rt.anchoredPosition3D = p.portraitOffset;
+            rt.anchoredPosition3D = position;
         }
         else
         {
-            t.localPosition = p.portraitOffset;
+            t.localPosition = position;
         }
 
-        float scale = p.portraitScale > 0f ? p.portraitScale : 1f;
-        t.localScale = t.localScale * scale;
+        float playerScale = p.portraitScale > 0f ? p.portraitScale : 1f;
+        float characterScale = entry.portraitScaleMultiplier > 0f ? entry.portraitScaleMultiplier : 1f;
+        t.localScale = prefab.transform.localScale * (playerScale * characterScale);
+    }
+
+    // ---- ドアップ位置の調整補助 ----
+
+    // 再生中にInspectorの値（キャラ別オフセット／拡大率、プレイヤー共通の値）を変えたら、
+    // カーソルを動かさなくても今表示中のドアップへ即反映する。
+    // ※ここではInstantiateはせず、すでに表示中のインスタンスの位置・スケールだけを更新する。
+    void OnValidate()
+    {
+        if (!Application.isPlaying || !initialized) return;
+        RefreshPortraitPlacement(player1, 1);
+        RefreshPortraitPlacement(player2, 2);
+    }
+
+    void RefreshPortraitPlacement(PlayerSelector p, int playerNumber)
+    {
+        if (p == null || p.currentPortrait == null || characters == null) return;
+        if (p.currentIndex < 0 || p.currentIndex >= characters.Length) return;
+
+        var entry = characters[p.currentIndex];
+        if (entry.portraitPrefab == null) return;
+
+        PlacePortrait(p.currentPortrait, entry.portraitPrefab, p, entry, playerNumber);
+    }
+
+    // 再生中にSceneビューでドアップをドラッグ／拡縮して見た目を合わせたあと、
+    // 右クリックメニュー（Inspectorのコンポーネント名の「︙」）から実行すると、
+    // その時の配置を「表示中のキャラ」のキャラ別オフセット／拡大率へ書き戻す。
+    // 再生を止めると変更は消えるので、実行後は「Copy Component」→停止→「Paste Component Values」で保存すること。
+    [ContextMenu("ドアップ位置: 表示中の配置を設定値へ書き戻す")]
+    void WriteBackPortraitPlacement()
+    {
+        if (!Application.isPlaying || !initialized)
+        {
+            Debug.LogWarning("[CharacterSelectController] 再生中にのみ実行できます。", this);
+            return;
+        }
+
+        WriteBackPortraitPlacement(player1, 1);
+        WriteBackPortraitPlacement(player2, 2);
+
+        Debug.Log("[CharacterSelectController] 表示中のドアップ配置を設定値へ書き戻しました。再生停止で消えるため、Copy Component → 停止 → Paste Component Values で保存してください。", this);
+    }
+
+    void WriteBackPortraitPlacement(PlayerSelector p, int playerNumber)
+    {
+        if (p == null || p.currentPortrait == null || characters == null) return;
+        if (p.currentIndex < 0 || p.currentIndex >= characters.Length) return;
+
+        var entry = characters[p.currentIndex];
+        if (entry.portraitPrefab == null) return;
+
+        var t = p.currentPortrait.transform;
+        Vector3 current = t is RectTransform rt ? (Vector3)rt.anchoredPosition3D : t.localPosition;
+        Vector3 diff = current - p.portraitOffset; // プレイヤー共通分を引いた「キャラ別」の差分
+
+        if (playerNumber == 1) entry.portraitOffsetP1 = diff;
+        else entry.portraitOffsetP2 = diff;
+
+        // 拡大率は1P・2P共通の値なので、2Pが同じキャラを表示中の場合は1Pの値を優先して上書きしない
+        if (playerNumber == 2 && player1.currentIndex == player2.currentIndex) return;
+
+        float playerScale = p.portraitScale > 0f ? p.portraitScale : 1f;
+        float baseScale = entry.portraitPrefab.transform.localScale.x * playerScale;
+        if (baseScale > 0f)
+        {
+            entry.portraitScaleMultiplier = t.localScale.x / baseScale;
+        }
     }
 
     // AudioClipがInspectorで未設定の場合にPlayOneShot(null)警告が出るのを防ぐ
