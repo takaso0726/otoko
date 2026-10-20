@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 6657734604422724538}
   - component: {fileID: 7054748690614782587}
   - component: {fileID: 512457747581684265}
-  m_Layer: 10
+  m_Layer: 12
   m_Name: P-LeftFoot
   m_TagString: P1Attack
   m_Icon: {fileID: 0}
@@ -564,7 +564,7 @@ GameObject:
   - component: {fileID: 8168167807247024436}
   - component: {fileID: 9154690903699107793}
   - component: {fileID: 2829886259480315762}
-  m_Layer: 10
+  m_Layer: 12
   m_Name: P-RightFoot
   m_TagString: P1Attack
   m_Icon: {fileID: 0}
@@ -1205,6 +1205,18 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.65
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1.65
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.65
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
       propertyPath: m_LocalPosition.x
       value: -4.68165
       objectReference: {fileID: 0}
@@ -1244,9 +1256,21 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
       propertyPath: m_Name
       value: yankee_ver2_20261016
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      propertyPath: m_Layer
+      value: 12
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      propertyPath: m_TagString
+      value: P1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1290,7 +1314,25 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -6678718136732925401, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
       insertIndex: 0
       addedObject: {fileID: 8504064318334911011}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1081807262524717777}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -342749866353020021}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -5547412484320612038}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -2721650272226217460}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -394478000501007050}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -4620012376882408678}
   m_SourcePrefab: {fileID: 100100000, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
 --- !u!4 &133110526159512629 stripped
 Transform:
@@ -1357,3 +1399,439 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8713979448678144278, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
   m_PrefabInstance: {fileID: 8114933592203906235}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &8961988206862004714 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+  m_PrefabInstance: {fileID: 8114933592203906235}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1081807262524717777
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8961988206862004714}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10851af5d3775e249a0132d6b6ce3467, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Player
+  enableDebugLog: 1
+  enableF2DebugKey: 1
+  enableF3DebugKey: 1
+  enableF4DebugKey: 0
+  enableF5DebugKey: 0
+  enableF6DebugKey: 0
+  enableF7DebugKey: 0
+  enableF8DebugKey: 0
+  enableF10DebugKey: 0
+  f10DebugFontSize: 18
+  enableArrowKeyAnimation: 0
+  enableDpadAnimation: 0
+  upArrowAnimation:
+    animationName: Anim-Up
+    useTrigger: 1
+  leftArrowAnimation:
+    animationName: Anim-Left
+    useTrigger: 1
+  rightArrowAnimation:
+    animationName: Anim-Right
+    useTrigger: 1
+  downArrowAnimation:
+    animationName: Anim-Down
+    useTrigger: 1
+  PlayerName: 
+  PLayerTagName: 
+  moveSpeed: 3
+  turnSpeed: 15
+  enableAutoFacing: 1
+  autoFaceDeadZone: 0.05
+  lockFacingDuringAction: 0
+  isResultMode: 0
+  autoDetectResultScene: 1
+  moveInputThreshold: 0.03
+  crouchInputThreshold: -0.43
+  upKickInputThreshold: 0.25
+  minMoveAnimSpeed: 0.4
+  maxMoveAnimSpeed: 1.4
+  minMoveSpeedRatio: 0.4
+  minPosition: {x: -10, y: -10, z: -10}
+  maxPosition: {x: 10, y: 10, z: 10}
+  force: {x: 0, y: 0, z: 0}
+  Jumpflag: 1
+  HP: 100
+  maxHP: 100
+  atk: 10
+  Player_status: 0
+  guardFrames: 30
+  throwFrames: 90
+  throwAtk: 5
+  throwStunFrames: 30
+  escapeFramesAtZeroHp: 90
+  escapeFramesAtFullHp: 24
+  escapeReductionFramesPerInput: 9
+  throwHorizontalSpeed: 6
+  throwUpSpeed: 5
+  grabFailHorizontalSpeed: 3
+  grabFailUpSpeed: 3
+  throwStartPlayFrames: 12
+  enableThrowStartPlay: 0
+  throwReleaseRecoveryFrames: 20
+  throwInputStartDelayFrames: 10
+  guardSuccessNextAttackMultiplier: 1.5
+  guardSuccessMaxMultiplier: 0
+  guardFailGaugeGainRate: 0.5
+  guardFailGaugePenaltyFrames: 180
+  guardFailDamageMultiplier: 1.5
+  guardFailDamagePenaltyFrames: 60
+  guardSuccessStunFrames: 30
+  rebornTimeLimitFrames: 300
+  rebornHpRatio: 0.3
+  mashThresholdBase: 11
+  mashWithAnyButton: 1
+  mashThresholdStep: 3
+  standHeight: 2
+  standCenter: {x: 0, y: 1, z: 0}
+  crouchHeight: 0.65
+  crouchCenter: {x: 0, y: 0.5, z: 0}
+  MenBlock_se: {fileID: 0}
+  Men_particle: {fileID: 0}
+  Hit_particle: {fileID: 0}
+  punchHitEffectData: {fileID: 0}
+  kickHitEffectData: {fileID: 0}
+  guardHitEffectData: {fileID: 0}
+  mashHitEffectData: {fileID: 0}
+  missHitEffectData: {fileID: 0}
+  hitEffectFacingBasis: 0
+  enableHitStop: 1
+  hitStopFrames: 5
+  guardHitStopFrames: 3
+  freezeAnimatorDuringHitStop: 1
+  playHeadHitStateDirectly: 1
+  punchAtk: 10
+  punchMissFrames: 30
+  punchHitFrames: 30
+  punchStunFrames: 18
+  punchHitStopFrames: 5
+  punchKnockback:
+    horizontalSpeed: 2.5
+    upSpeed: 0
+  kickAtk: 10
+  kickMissFrames: 36
+  kickHitFrames: 36
+  kickStunFrames: 24
+  kickHitStopFrames: 5
+  kickKnockback:
+    horizontalSpeed: 3.5
+    upSpeed: 0
+  upKickAtk: 10
+  upKickMissFrames: 42
+  upKickHitFrames: 42
+  upKickStunFrames: 30
+  upKickHitStopFrames: 5
+  upKickKnockback:
+    horizontalSpeed: 2
+    upSpeed: 5
+  downKickAtk: 10
+  downKickMissFrames: 30
+  downKickHitFrames: 30
+  downKickStunFrames: 24
+  downKickHitStopFrames: 5
+  downKickKnockback:
+    horizontalSpeed: 3
+    upSpeed: 0
+  specialAtk: 20
+  specialHitStopFrames: 5
+  specialKnockback:
+    horizontalSpeed: 0
+    upSpeed: 0
+  specialStunFrames: 30
+  enableGuardSuccessEffect: 1
+  guardSuccessEffectPrefab: {fileID: 0}
+  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
+  guardSuccessEffectLifetime: 1
+  enableGuardBuffEffect: 1
+  guardBuffEffectPrefab: {fileID: 0}
+  guardBuffEffectOffset: {x: 0, y: 1, z: 0}
+  kankiGaugePerBar: 100
+  kankiGaugeBarCount: 2
+  gaugeGainOnHit: 15
+  gaugeGainOnGuard: 10
+  gaugeLossOnRetreat: 5
+  atkPowerPerBar: 0.25
+  enableKankiChargeEffect: 1
+  kankiChargeEffectPrefab: {fileID: 6396199705279390725, guid: 3033e5beaf41edf45b102dad69361753, type: 3}
+  kankiChargeEffectOffset: {x: 0, y: 0, z: 0}
+  kankiChargeEffectFollowLocal: 1
+  enableKankiRevive: 1
+  kankiReviveBarCost: 1
+  reviveAtkMultiplier: 1.5
+  reviveAtkBuffFrames: 600
+  kankiReviveEffectPrefab: {fileID: 0}
+  kankiReviveEffectOffset: {x: 0, y: 1, z: 0}
+  kankiReviveEffectLifetime: 2
+  reviveBuffEffectPrefab: {fileID: 0}
+  reviveBuffEffectOffset: {x: 0, y: 1, z: 0}
+  specialRequiredGauge: 200
+  specialGaugeCost: 200
+  specialFrames: 180
+  specialSe: {fileID: 0}
+  specialEffectPrefab: {fileID: 0}
+  specialEffectOffset: {x: 0, y: 1, z: 0}
+  specialEffectLifetime: 1.5
+  enemy: {fileID: 0}
+  enemyPlayer: {fileID: 0}
+  animator: {fileID: 0}
+  fightingCamera: {fileID: 0}
+  downStartTrigger: Down-start
+  downBoolParam: Down
+  downReviveTrigger: Down-revive
+  downFailTrigger: Down-fail
+  rebornStandUpFreezeFrames: 60
+  hideOpponentDuringRebornFreeze: 1
+  enableDualDownLayout: 1
+  dualDownLeftXRatio: 0.25
+  dualDownRightXRatio: 0.75
+  punchMultiHit:
+    allowMultiHit: 0
+    maxHitCount: 1
+  kickMultiHit:
+    allowMultiHit: 0
+    maxHitCount: 1
+  upKickMultiHit:
+    allowMultiHit: 0
+    maxHitCount: 1
+  downKickMultiHit:
+    allowMultiHit: 0
+    maxHitCount: 1
+  specialMultiHit:
+    allowMultiHit: 1
+    maxHitCount: 5
+  specialHitCooldownFrames: 6
+  enablePlayerPush: 1
+  pushSkinWidth: 0.02
+  maxPushSpeed: 20
+  showMashPrompt: 1
+  mashPromptText: "\u30DC\u30BF\u30F3\u3092\u9023\u6253\u3057\u308D\uFF01"
+  mashPromptFontSize: 64
+  mashPromptColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  showMashRemainingCount: 1
+  mashRemainingFontSize: 150
+  mashRemainingColor: {r: 1, g: 1, b: 1, a: 1}
+  mashRemainingYRatio: 0.42
+  showMashButtonImage: 1
+  mashButtonNormalImage: {fileID: 0}
+  mashButtonPressedImage: {fileID: 0}
+  mashButtonPressedFrames: 4
+  mashButtonReleaseMinFrames: 3
+  mashButtonSizeRatio: 0.22
+  mashButtonXRatio: 0.5
+  mashButtonYRatio: 0.72
+  showRebornTimeLimit: 1
+  rebornTimeLabel: "\u5FA9\u6D3B\u307E\u3067"
+  rebornTimeFontSize: 56
+  rebornTimeColor: {r: 1, g: 1, b: 1, a: 1}
+  rebornTimeLowThresholdFrames: 90
+  rebornTimeLowColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  showRebornTimeBar: 1
+  rebornTimeBarWidthRatio: 0.4
+  rebornTimeYRatio: 0.03
+--- !u!54 &-342749866353020021
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8961988206862004714}
+  serializedVersion: 5
+  m_Mass: 0.58
+  m_LinearDamping: 0
+  m_AngularDamping: 0.98
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!136 &-5547412484320612038
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8961988206862004714}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.31
+  m_Height: 1.7
+  m_Direction: 1
+  m_Center: {x: 0, y: 0.67, z: 0}
+--- !u!95 &-2721650272226217460
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8961988206862004714}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: fd0682e02a0f2b74fb09f350dc131989, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
+--- !u!82 &-394478000501007050
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8961988206862004714}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+--- !u!114 &-4620012376882408678
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8961988206862004714}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62899f850307741f2a39c98a8b639597, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.PlayerInput
+  m_Actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  m_NotificationBehavior: 0
+  m_UIInputModule: {fileID: 0}
+  m_DeviceLostEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  m_DeviceRegainedEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  m_ControlsChangedEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  m_ActionEvents: []
+  m_NeverAutoSwitchControlSchemes: 0
+  m_DefaultControlScheme: 
+  m_DefaultActionMap: 
+  m_SplitScreenIndex: -1
+  m_Camera: {fileID: 0}
