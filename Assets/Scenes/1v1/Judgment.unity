@@ -440,6 +440,8 @@ MonoBehaviour:
     displayObject: {fileID: 6758519040437653269, guid: aa90d0cad5f0e2e49a621f84ddd6fc4d, type: 3}
   - characterName: Player2
     displayObject: {fileID: 5939530159737485577, guid: c5323318139c20442940e84b82dfc630, type: 3}
+  - characterName: YANGKY
+    displayObject: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
   winnerSpawnPoint: {fileID: 865107448}
   fallbackWinnerDisplay: {fileID: 0}
   winnerAppearDelay: 0

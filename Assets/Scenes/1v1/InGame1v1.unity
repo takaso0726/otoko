@@ -942,10 +942,16 @@ MonoBehaviour:
   targets:
   - {fileID: 0}
   - {fileID: 0}
+  autoRegisterByTag: 0
+  autoRegisterPlayerTag: Player
+  autoRegisterEnemyTag: Enemy
+  autoRegisterInterval: 0.5
   centerHeightRatio: 1
   characterHeightEstimate: 0.98
   followSmoothTime: 0.06
   baseOffset: {x: 10, y: 0, z: 0}
+  fixedZoomEnabled: 0
+  fixedZoomDistance: 10
   minZoomDistance: 6
   maxZoomDistance: 20
   spreadToDistanceMultiplier: 1.22
@@ -1796,7 +1802,7 @@ MonoBehaviour:
   - characterName: Player2
     prefab: {fileID: 5939530159737485577, guid: c5323318139c20442940e84b82dfc630, type: 3}
   - characterName: YANGKY
-    prefab: {fileID: 5715634008164873377, guid: 3f6a51e26e540b747a73747a5a712a93, type: 3}
+    prefab: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
   player1SpawnPoint: {fileID: 1435874237}
   player2SpawnPoint: {fileID: 1195980007}
   fallbackPrefab: {fileID: 0}
@@ -3819,6 +3825,10 @@ MonoBehaviour:
     clipReactions: 03000000
     seClips:
     - {fileID: 8300000, guid: 9b55e4768b577174399dd5e41851e504, type: 3}
+  - situation: 4
+    clipReactions: 
+    seClips:
+    - {fileID: 8300000, guid: fdfba6da84ab837468c15b7814a318a5, type: 3}
   seAudioSource: {fileID: 905618911}
   seFadeOutDuration: 0.5
   seProtectedSituations: 08000000
