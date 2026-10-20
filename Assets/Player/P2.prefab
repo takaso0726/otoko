@@ -1770,34 +1770,34 @@ MonoBehaviour:
   freezeAnimatorDuringHitStop: 1
   playHeadHitStateDirectly: 0
   punchAtk: 10
-  punchMissFrames: 30
-  punchHitFrames: 30
-  punchStunFrames: 18
-  punchHitStopFrames: 5
+  punchMissFrames: 15
+  punchHitFrames: 15
+  punchStunFrames: 9
+  punchHitStopFrames: 2
   punchKnockback:
     horizontalSpeed: 1
     upSpeed: 5
-  kickAtk: 30
-  kickMissFrames: 36
-  kickHitFrames: 36
-  kickStunFrames: 24
-  kickHitStopFrames: 5
+  kickAtk: 60
+  kickMissFrames: 18
+  kickHitFrames: 18
+  kickStunFrames: 12
+  kickHitStopFrames: 2
   kickKnockback:
     horizontalSpeed: 5
     upSpeed: 5
-  upKickAtk: 40
-  upKickMissFrames: 42
-  upKickHitFrames: 42
-  upKickStunFrames: 30
-  upKickHitStopFrames: 5
+  upKickAtk: 80
+  upKickMissFrames: 21
+  upKickHitFrames: 21
+  upKickStunFrames: 15
+  upKickHitStopFrames: 2
   upKickKnockback:
     horizontalSpeed: 5
     upSpeed: 10
-  downKickAtk: 10
-  downKickMissFrames: 30
-  downKickHitFrames: 30
-  downKickStunFrames: 24
-  downKickHitStopFrames: 5
+  downKickAtk: 20
+  downKickMissFrames: 15
+  downKickHitFrames: 15
+  downKickStunFrames: 12
+  downKickHitStopFrames: 2
   downKickKnockback:
     horizontalSpeed: 5
     upSpeed: 0

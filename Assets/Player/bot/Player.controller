@@ -181,7 +181,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Flaying-kick
-  m_Speed: 3
+  m_Speed: 4.08
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: -6697419997084879344}
@@ -1103,10 +1103,10 @@ AnimatorStateMachine:
     m_Position: {x: -180, y: 570, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 7866437742052082912}
-    m_Position: {x: -20, y: 1110, z: 0}
+    m_Position: {x: -50, y: 1090, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 5318771206481818412}
-    m_Position: {x: -50, y: 1280, z: 0}
+    m_Position: {x: -70, y: 1240, z: 0}
   - serializedVersion: 1
     m_State: {fileID: 2232993036938047542}
     m_Position: {x: -470, y: 790, z: 0}
@@ -1360,7 +1360,7 @@ AnimatorState:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: hariken
-  m_Speed: 0.89
+  m_Speed: 2.08
   m_CycleOffset: 0
   m_Transitions:
   - {fileID: -1170421461461944106}
@@ -2903,7 +2903,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: 2b63782cc76540b44a054c45a7340b6f, type: 3}
+  m_Motion: {fileID: -203655887218126122, guid: fae56690b09d5014787293bf5659981d, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
