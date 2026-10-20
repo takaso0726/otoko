@@ -116,7 +116,9 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
         [Header("ネームアップ表示位置")]
         [Tooltip("ネームアップ用プレハブを映す場所（親）。自分用とCPU用で別々の場所を指定する")]
         public Transform nameRoot;
-        [Tooltip("nameRoot の中心からのズレ。UIプレハブならanchoredPosition、それ以外はlocalPosition")]
+        [Tooltip("ネームアップを表示する位置にする空のオブジェクト（その座標が使われる）。未設定なら従来どおり nameRoot の中心＋nameOffset の位置に出る。nameRoot が未設定なら、このオブジェクトの親の子として生成される")]
+        public Transform namePoint;
+        [Tooltip("namePoint 未設定時：nameRoot の中心からのズレ（UIプレハブならanchoredPosition、それ以外はlocalPosition）。namePoint 設定時：namePoint の座標に足すズレ（ワールド座標）")]
         public Vector3 nameOffset = Vector3.zero;
         [Tooltip("ネームアップの拡大率。プレハブ自身のスケールに掛け算される")]
         public float nameScale = 1f;
@@ -826,7 +828,7 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
         if (s.portraitInstances == null) s.portraitInstances = new Dictionary<int, GameObject>();
 
         ShowPrefab(s.portraitInstances, ref s.currentPortrait, s.portraitRoot,
-                   characters[characterIndex].portraitPrefab, characterIndex, s.portraitOffset, s.portraitScale);
+                   characters[characterIndex].portraitPrefab, characterIndex, s.portraitOffset, s.portraitScale, null);
     }
 
     // 選択中キャラのネームアップ用プレハブを表示する。
@@ -834,14 +836,18 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
     {
         if (s.nameInstances == null) s.nameInstances = new Dictionary<int, GameObject>();
 
-        ShowPrefab(s.nameInstances, ref s.currentName, s.nameRoot,
-                   characters[characterIndex].namePrefab, characterIndex, s.nameOffset, s.nameScale);
+        // nameRoot が未設定でも namePoint があれば、その親を生成先に使う
+        var root = s.nameRoot != null ? s.nameRoot : (s.namePoint != null ? s.namePoint.parent : null);
+
+        ShowPrefab(s.nameInstances, ref s.currentName, root,
+                   characters[characterIndex].namePrefab, characterIndex, s.nameOffset, s.nameScale, s.namePoint);
     }
 
     // ドアップ／ネームアップ共通の表示処理。
     // 初回はroot の子として生成し、2回目以降は生成済みインスタンスのアクティブ切り替えだけを行う。
+    // point が指定されている場合は、表示のたびにその座標（＋offset）へ移動させる。
     void ShowPrefab(Dictionary<int, GameObject> cache, ref GameObject current, Transform root,
-                    GameObject prefab, int characterIndex, Vector3 offset, float scale)
+                    GameObject prefab, int characterIndex, Vector3 offset, float scale, Transform point)
     {
         if (root == null) return;
 
@@ -860,6 +866,13 @@ public class CharacterSelect_SFC_Controller : MonoBehaviour
             instance = Instantiate(prefab, root, false);
             PlaceInstance(instance, offset, scale);
             cache[characterIndex] = instance;
+        }
+
+        // 位置用の空オブジェクトが指定されていれば、表示のたびにその座標へ合わせる
+        // （Start時はレイアウト未確定でズレることがあるため、生成時だけでなく毎回合わせる）
+        if (point != null)
+        {
+            instance.transform.position = point.position + offset;
         }
 
         instance.SetActive(true);

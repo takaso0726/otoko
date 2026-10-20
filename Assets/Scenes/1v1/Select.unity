@@ -550,7 +550,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -490, y: -249}
+  m_AnchoredPosition: {x: -298, y: -249}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &802211630
@@ -859,14 +859,14 @@ RectTransform:
   m_GameObject: {fileID: 1047786490}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1.6, y: 1.4, z: 1.5}
+  m_LocalScale: {x: 1.62, y: 2.01, z: 1.875}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1488218539}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -683.7, y: -249}
+  m_AnchoredPosition: {x: -680, y: -255}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1047786492
@@ -1031,17 +1031,26 @@ MonoBehaviour:
     anchor: {fileID: 1047786491}
     selectableBy: 1
     portraitPrefab: {fileID: 6758519040437653269, guid: 9b94bbaf73fe5aa45982a36823d7fd4a, type: 3}
+    portraitOffsetP1: {x: 0, y: 0, z: 0}
+    portraitOffsetP2: {x: 0, y: 0, z: 0}
+    portraitScaleMultiplier: 1
     nameImage: {fileID: 21300000, guid: 6d94763c859627644bbdfd0c515465d1, type: 3}
   - characterName: Player2
     anchor: {fileID: 1047786491}
     selectableBy: 2
     portraitPrefab: {fileID: 5939530159737485577, guid: f254ac76668bacc4aaea9cf843b98b83, type: 3}
+    portraitOffsetP1: {x: 0, y: 0, z: 0}
+    portraitOffsetP2: {x: 0, y: 0, z: 0}
+    portraitScaleMultiplier: 1
     nameImage: {fileID: 21300000, guid: 6d94763c859627644bbdfd0c515465d1, type: 3}
   - characterName: YANGKY
-    anchor: {fileID: 802211629}
+    anchor: {fileID: 1826866024}
     selectableBy: 0
-    portraitPrefab: {fileID: 5715634008164873377, guid: 3f6a51e26e540b747a73747a5a712a93, type: 3}
-    nameImage: {fileID: 0}
+    portraitPrefab: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
+    portraitOffsetP1: {x: 0, y: 0, z: 0}
+    portraitOffsetP2: {x: 0, y: 0, z: 0}
+    portraitScaleMultiplier: 1
+    nameImage: {fileID: 21300000, guid: 6c11f61f6fa31294b97445ad79a53490, type: 3}
   player1:
     playerName: Player1
     cursor: {fileID: 1317837554}
@@ -1524,8 +1533,9 @@ RectTransform:
   - {fileID: 991903144}
   - {fileID: 872115381}
   - {fileID: 1476998676}
-  - {fileID: 1047786491}
   - {fileID: 802211629}
+  - {fileID: 1047786491}
+  - {fileID: 1826866024}
   - {fileID: 712184761}
   - {fileID: 1084280243}
   - {fileID: 1317837554}
@@ -1537,6 +1547,81 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!1 &1826866023
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1826866024}
+  - component: {fileID: 1826866026}
+  - component: {fileID: 1826866025}
+  m_Layer: 5
+  m_Name: YANGKY
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1826866024
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1826866023}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1.42, y: 1.42, z: 1.42}
+  m_ConstrainProportionsScale: 1
+  m_Children: []
+  m_Father: {fileID: 1488218539}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -489, y: -250}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1826866025
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1826866023}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 41d4f4f9d8daf464c8ba11bbac71e90b, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1826866026
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1826866023}
+  m_CullTransparentMesh: 1
 --- !u!1 &1841750654
 GameObject:
   m_ObjectHideFlags: 0
