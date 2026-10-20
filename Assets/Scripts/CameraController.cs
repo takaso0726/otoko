@@ -41,6 +41,21 @@ public class FightingCameraController : MonoBehaviour
     [Tooltip("現在出場中のキャラクターのTransformリスト。動的に増減してOK")]
     public List<Transform> targets = new List<Transform>();
 
+    [Header("自動ターゲット登録（CPU戦用の保険・任意）")]
+    [Tooltip("ONなら、下の2つのタグを持つオブジェクトを定期的に探して targets へ自動登録する。\n" +
+             "CPU戦でエネミー側の RegisterTarget() / SetVersusTargets() 呼び出しが漏れている場合の保険。\n" +
+             "※タグはTag Managerに定義済みであること。子オブジェクト（当たり判定など）に同じタグを付けていると、それも登録されてしまうので注意。")]
+    public bool autoRegisterByTag = false;
+
+    [Tooltip("プレイヤーのタグ")]
+    public string autoRegisterPlayerTag = "Player";
+
+    [Tooltip("エネミー（CPU）のタグ")]
+    public string autoRegisterEnemyTag = "Enemy";
+
+    [Tooltip("タグ検索を行う間隔（秒）")]
+    public float autoRegisterInterval = 0.5f;
+
     [Header("中心点の高さ調整")]
     [Tooltip("中心点の高さ位置。0=足元、1=頭とした比率で指定する（0.5なら腰〜胸あたり）")]
     [Range(0f, 1f)]
@@ -55,6 +70,13 @@ public class FightingCameraController : MonoBehaviour
 
     [Tooltip("中心点から見たカメラの基本オフセット（ローカル方向）")]
     public Vector3 baseOffset = new Vector3(0f, 3f, -8f);
+
+    [Header("ズーム固定設定")]
+    [Tooltip("ONなら、キャラクター間の距離に関係なくカメラ距離を常に一定にする（下の固定距離を使う）。OFFなら従来どおり距離に応じてズームする。CPU戦の開始時に SetFixedZoom(true)、1v1では SetFixedZoom(false) を呼んで切り替える")]
+    public bool fixedZoomEnabled = false;
+
+    [Tooltip("ズーム固定時のカメラ距離")]
+    public float fixedZoomDistance = 10f;
 
     [Header("ズーム（距離）調整設定")]
     [Tooltip("キャラクター間の最大距離がこの値のときの最小カメラ距離倍率")]
@@ -262,6 +284,11 @@ public class FightingCameraController : MonoBehaviour
     private float _rebornOrbitTimer;
     private float _rebornOrbitStartAngle;
 
+    // 自動ターゲット登録関連
+    // 一度登録したものは記録しておき、撃破で UnregisterTarget された後に再登録されないようにする
+    private readonly HashSet<Transform> _autoRegisteredOnce = new HashSet<Transform>();
+    private float _autoRegisterTimer;
+
     // スロー演出関連
     private Coroutine _slowCoroutine;
     private float _normalTimeScale = 1f;
@@ -285,7 +312,9 @@ public class FightingCameraController : MonoBehaviour
 
     void Start()
     {
-        _currentDistance = (maxZoomDistance + minZoomDistance) * 0.5f;
+        _currentDistance = fixedZoomEnabled
+            ? fixedZoomDistance
+            : (maxZoomDistance + minZoomDistance) * 0.5f;
         _smoothedLookAt = CalculateCenterPoint();
 
         // 回転固定用の向きを確定する
@@ -377,6 +406,9 @@ public class FightingCameraController : MonoBehaviour
         // Volumeの重みは常にスムーズに追従させる（演出のON/OFFに関わらず処理）
         UpdateGuardImpactVolume();
 
+        // CPU戦などで登録漏れがあっても、タグでプレイヤー／エネミーを拾えるようにする（OFFなら何もしない）
+        AutoRegisterTick();
+
         // 仁王立ちで攻撃を受け止めた直後は、最優先でローアングルの被弾カメラを処理する
         if (_isGuardImpactMode)
         {
@@ -425,12 +457,21 @@ public class FightingCameraController : MonoBehaviour
         Vector3 centerPoint = CalculateCenterPoint();
 
         // 2. キャラクター間の広がり（最大距離）を算出してズーム量を決定
-        float spread = CalculateMaxSpread(centerPoint);
-        float targetDistance = Mathf.Clamp(
-            spread * spreadToDistanceMultiplier,
-            minZoomDistance,
-            maxZoomDistance
-        );
+        float targetDistance;
+        if (fixedZoomEnabled)
+        {
+            // 距離に関係なく一定（ジャンプ演出の追加距離は別途加算される）
+            targetDistance = fixedZoomDistance;
+        }
+        else
+        {
+            float spread = CalculateMaxSpread(centerPoint);
+            targetDistance = Mathf.Clamp(
+                spread * spreadToDistanceMultiplier,
+                minZoomDistance,
+                maxZoomDistance
+            );
+        }
 
         _currentDistance = Mathf.SmoothDamp(
             _currentDistance,
@@ -511,6 +552,7 @@ public class FightingCameraController : MonoBehaviour
     {
         targets.RemoveAll(t => t == null);
         _manualJumpers.RemoveWhere(t => t == null);
+        _autoRegisteredOnce.RemoveWhere(t => t == null);
 
         // 破棄されたキャラの接地Y記録も掃除する（毎フレームの無駄を避けるため、件数がずれたときだけ）
         if (_groundY.Count > targets.Count)
@@ -1133,6 +1175,90 @@ public class FightingCameraController : MonoBehaviour
         {
             _groundY.Remove(t);
             _manualJumpers.Remove(t);
+        }
+    }
+
+    /// <summary>
+    /// ズーム固定のON/OFFを切り替える（CPU戦限定で固定したい場合に使う）。
+    /// CPU戦の開始時：SetFixedZoom(true) / 1v1の開始時：SetFixedZoom(false)
+    /// 距離を変えたいときは distance も渡す（省略時はインスペクターの fixedZoomDistance のまま）。
+    /// </summary>
+    public void SetFixedZoom(bool enabled, float distance = -1f)
+    {
+        fixedZoomEnabled = enabled;
+        if (distance > 0f) fixedZoomDistance = distance;
+    }
+
+    /// <summary>
+    /// 1v1・CPU戦どちらでも使える「対戦する2人をカメラに映す」ための登録メソッド。
+    /// 現在の追従対象をいったん空にして、プレイヤーとエネミー（相手）だけを登録し直す。
+    /// 試合開始時（キャラ生成後）やリマッチ時に、GameMNG等から1回呼べばOK。
+    /// 例）cameraController.SetVersusTargets(playerTransform, cpuTransform);
+    /// </summary>
+    public void SetVersusTargets(Transform player, Transform enemy)
+    {
+        targets.Clear();
+        _groundY.Clear();
+        _manualJumpers.Clear();
+
+        RegisterTarget(player);
+        RegisterTarget(enemy);
+
+        // タグ自動登録が後から同じキャラを重複登録しないよう記録しておく
+        if (player != null) _autoRegisteredOnce.Add(player);
+        if (enemy != null) _autoRegisteredOnce.Add(enemy);
+    }
+
+    /// <summary>
+    /// 自動登録の記録をリセットする（リマッチ等で、撃破済みだったキャラを再び自動登録の対象に戻したいとき用）
+    /// </summary>
+    public void ResetAutoRegisterHistory()
+    {
+        _autoRegisteredOnce.Clear();
+        _autoRegisterTimer = 0f;
+    }
+
+    /// <summary>
+    /// autoRegisterByTagがONのとき、一定間隔でプレイヤー／エネミーのタグを持つオブジェクトを探して登録する
+    /// </summary>
+    private void AutoRegisterTick()
+    {
+        if (!autoRegisterByTag) return;
+
+        _autoRegisterTimer -= Time.unscaledDeltaTime;
+        if (_autoRegisterTimer > 0f) return;
+        _autoRegisterTimer = Mathf.Max(0.1f, autoRegisterInterval);
+
+        AutoRegisterWithTag(autoRegisterPlayerTag);
+        AutoRegisterWithTag(autoRegisterEnemyTag);
+    }
+
+    private void AutoRegisterWithTag(string tagName)
+    {
+        if (string.IsNullOrEmpty(tagName)) return;
+
+        GameObject[] found;
+        try
+        {
+            found = GameObject.FindGameObjectsWithTag(tagName);
+        }
+        catch (UnityException)
+        {
+            // Tag Managerに存在しないタグ名を指定した場合に発生する
+            Debug.LogWarning("[FightingCameraController] タグ '" + tagName + "' が定義されていないため、自動登録をOFFにしました。");
+            autoRegisterByTag = false;
+            return;
+        }
+
+        foreach (var go in found)
+        {
+            if (go == null) continue;
+
+            Transform t = go.transform;
+            if (_autoRegisteredOnce.Contains(t)) continue; // 撃破後に再登録されるのを防ぐ
+
+            _autoRegisteredOnce.Add(t);
+            RegisterTarget(t);
         }
     }
 

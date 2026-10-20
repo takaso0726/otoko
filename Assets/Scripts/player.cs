@@ -160,6 +160,8 @@ public class Player : MonoBehaviour
     [SerializeField] bool enableAutoFacing = true;
     [Tooltip("相手とのZ軸の距離がこの値より小さい時は向きを変えない（真横で重なった時に左右へ向きがブレ続けるのを防ぐ）。")]
     [SerializeField] float autoFaceDeadZone = 0.05f;
+    [Tooltip("【CPU戦のみ有効】相手が反対側へ回り込んだ時、このZ距離以上離れて初めて向きを反転させる。密着中の押し合い・ノックバック等で左右が一瞬入れ替わっても反転しないようにするための値。")]
+    [SerializeField] float autoFaceFlipThreshold = 1.0f;
     [Tooltip("ONにすると、攻撃・投げ・必殺技の最中は向きを変えず、終わってから相手へ向き直す。OFF（既定）なら技の最中でも常に相手を向く。")]
     [SerializeField] bool lockFacingDuringAction = false;
 
@@ -717,6 +719,7 @@ public class Player : MonoBehaviour
     MoveDirection lastMoveDir = MoveDirection.None;
     int guardComboCount;             // 仁王立ちで連続して耐えた回数
     bool autoFaceSnapped;            // ★追加：最初に相手を認識した時に、補間なしで即座に向き合わせたか
+    float autoFaceSign = 1f;         // ★追加：現在向いている（向こうとしている）Z方向。密着中に判定が揺れても、確定するまで変えない
     bool hasMoveBackwardParam;       // ★追加：Animatorに"MoveBackward"(Bool)が存在するか（存在する時だけ値を送る）
     bool hasGuardParam;              // ★変更：Animatorに"Guard"(Trigger)が存在するか（存在する時だけトリガーを立てる）
     bool guardAnimApplied;           // ★変更：直前フレームでGuard状態だったか（Guardに入った瞬間だけトリガーを立てるための記録）
@@ -753,7 +756,7 @@ public class Player : MonoBehaviour
     [Header("復活後の停止（自分・相手ともに動けない）")]
     [Tooltip("復活に成功した瞬間から、自分・相手ともに動けなくなるフレーム数（60F=1秒）。\n" +
              "この間、カメラは復活したキャラの正面の引きの画を映す。")]
-    [SerializeField] int rebornStandUpFreezeFrames = 60; // ★変更：180F(3秒)→60F(1秒)。従来の1/3
+    [SerializeField] int rebornStandUpFreezeFrames = 180;
     [Tooltip("ONにすると、復活後の停止中は相手（P2／CPU）を非表示にする。復活演出のカメラに相手が映り込むのを防ぐ。\n" +
              "同時ダウン後の復活はカメラ演出をしないので、非表示にもしない。")]
     [SerializeField] bool hideOpponentDuringRebornFreeze = true;
@@ -1713,8 +1716,18 @@ public class Player : MonoBehaviour
         // ★リザルト画面モード：向きの自動変更・押しのけ・位置クランプを行わず、配置した位置のまま動かさない
         if (isResultMode) return;
 
-        AutoFaceOpponent(); // ★追加：常に相手の方向を向く
-        ResolvePlayerOverlap();
+        if (enemy != null)
+        {
+            // ★CPU戦：先に押しのけて位置を確定させてから、その位置を基準に相手の方向を向く
+            ResolvePlayerOverlap();
+            AutoFaceOpponent();
+        }
+        else
+        {
+            // 対人戦：従来どおりの順序
+            AutoFaceOpponent(); // ★追加：常に相手の方向を向く
+            ResolvePlayerOverlap();
+        }
         ClampPositionWithinBounds();
     }
 
@@ -1735,24 +1748,47 @@ public class Player : MonoBehaviour
     [Tooltip("1秒間に押しのけられる最大距離。大きいほど瞬時に離れ、小さいほどじわっと押し出される")]
     [SerializeField] float maxPushSpeed = 20f;
 
-    // P1・P2の胴体コライダー(Player_Collider)が重なっている時に、水平方向(XZ平面)へお互いを押し出す。
-    // 相手の真上に乗ってしまった場合でも、この水平方向の押し出しにより支え切れずに横へずれ落ち、
-    // 重力で自然に滑り落ちる（＝上に乗ったまま静止できなくなる）。
+    // 胴体コライダー同士が重なっている時に、水平方向(Z軸)へ押し出す。
+    //   ・対人戦(enemyPlayer)：P1・P2がお互いに半分ずつ押しのける。
+    //   ・★追加：CPU戦(enemy)：Enemyは押しのけ処理を持たないため、Player側だけが重なり分を全て押し戻す。
+    //     （以前はCPU戦が対象外で、プレイヤーがEnemyをすり抜けて左右が入れ替わり、自動向き合いで両者が反転していた）
+    // 相手の真上に乗ってしまった場合でも、この水平方向の押し出しにより横へずれ落ち、重力で自然に滑り落ちる。
     void ResolvePlayerOverlap()
     {
         if (!enablePlayerPush) return;
-        if (enemyPlayer == null) return; // 対人戦(P1/P2)専用。CPU戦(enemy)は対象外
-        if (Player_Collider == null || enemyPlayer.Player_Collider == null) return;
 
-        // ダウン中・死亡中のプレイヤーは押しのけ合いの対象から外す
-        if (Player_status == Status.Dead || enemyPlayer.Player_status == Status.Dead) return;
+        Transform otherTf;
+        CapsuleCollider otherCol;
+        bool otherPushesToo; // 相手側も同じ押しのけ処理をしているか（trueなら半分ずつ、falseなら自分が全部）
+
+        if (enemy != null)
+        {
+            // CPU戦：enemyを優先（GetOpponentTransformと同じ優先順位）
+            if (Player_status == Status.Dead) return;
+            otherTf = enemy.transform;
+            otherCol = enemy.GetComponent<CapsuleCollider>(); // Enemy側は自身の胴体CapsuleColliderをGetComponentで取得している（Enemy.csの変更不要）
+            otherPushesToo = false;
+        }
+        else if (enemyPlayer != null)
+        {
+            // ダウン中・死亡中のプレイヤーは押しのけ合いの対象から外す
+            if (Player_status == Status.Dead || enemyPlayer.Player_status == Status.Dead) return;
+            otherTf = enemyPlayer.transform;
+            otherCol = enemyPlayer.Player_Collider;
+            otherPushesToo = true;
+        }
+        else
+        {
+            return;
+        }
+
+        if (Player_Collider == null || otherCol == null) return;
 
         CapsuleCollider myCol = Player_Collider;
-        CapsuleCollider otherCol = enemyPlayer.Player_Collider;
 
         // 半径はワールドスケールを考慮する（通常は1のはずだが、念のためlossyScaleを反映）
         float myRadius = myCol.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z);
-        float otherRadius = otherCol.radius * Mathf.Max(enemyPlayer.transform.lossyScale.x, enemyPlayer.transform.lossyScale.z);
+        float otherRadius = otherCol.radius * Mathf.Max(otherTf.lossyScale.x, otherTf.lossyScale.z);
         float minDistance = myRadius + otherRadius + pushSkinWidth;
 
         // --- 垂直方向(Y)の重なりチェック ---
@@ -1760,22 +1796,23 @@ public class Player : MonoBehaviour
         // 実際には接触していないので押しのけを行わない。
         float myBottom = transform.position.y + myCol.center.y - myCol.height * 0.5f;
         float myTop = transform.position.y + myCol.center.y + myCol.height * 0.5f;
-        float otherBottom = enemyPlayer.transform.position.y + otherCol.center.y - otherCol.height * 0.5f;
-        float otherTop = enemyPlayer.transform.position.y + otherCol.center.y + otherCol.height * 0.5f;
+        float otherBottom = otherTf.position.y + otherCol.center.y - otherCol.height * 0.5f;
+        float otherTop = otherTf.position.y + otherCol.center.y + otherCol.height * 0.5f;
 
         bool verticalOverlap = myBottom < otherTop && otherBottom < myTop;
         if (!verticalOverlap) return;
 
-        // --- 水平方向(Z軸。P1/P2の間合いはZ軸のみで変化する仕様のため)の重なりチェック ---
-        float deltaZ = transform.position.z - enemyPlayer.transform.position.z;
+        // --- 水平方向(Z軸。間合いはZ軸のみで変化する仕様のため)の重なりチェック ---
+        float deltaZ = transform.position.z - otherTf.position.z;
         float distance = Mathf.Abs(deltaZ);
 
         if (distance >= minDistance) return; // 十分離れているので何もしない
 
         float overlap = minDistance - distance;
-        // 自分の分だけ半分押し出す（相手も同じ処理を自分自身に対して行うため、結果的に均等に離れる）
-        float halfPush = overlap * 0.5f;
-        float pushThisFrame = Mathf.Min(halfPush, maxPushSpeed * Time.deltaTime);
+        // 対人戦は半分だけ押し出す（相手も同じ処理を自分自身に対して行うため、結果的に均等に離れる）。
+        // CPU戦は相手が押し出さないので、重なり分を全て自分が押し戻す。
+        float share = otherPushesToo ? 0.5f : 1f;
+        float pushThisFrame = Mathf.Min(overlap * share, maxPushSpeed * Time.deltaTime);
 
         float pushDir;
         if (distance > 0.0001f)
@@ -1784,9 +1821,9 @@ public class Player : MonoBehaviour
         }
         else
         {
-            // 完全に同じZ座標で重なっている（例：真上に乗った瞬間）等、符号が決まらない場合は、
-            // InstanceIDで押す方向を固定し、お互い矛盾なく逆方向へ分かれるようにする
-            pushDir = GetInstanceID() < enemyPlayer.GetInstanceID() ? -1f : 1f;
+            // 完全に同じZ座標で重なっている等、符号が決まらない場合は、
+            // GameObjectのInstanceIDで押す方向を固定し、お互い矛盾なく逆方向へ分かれるようにする
+            pushDir = gameObject.GetInstanceID() < otherTf.gameObject.GetInstanceID() ? -1f : 1f;
         }
 
         transform.position += new Vector3(0f, 0f, pushDir * pushThisFrame);
@@ -2777,11 +2814,22 @@ public class Player : MonoBehaviour
     }
 
     // 対人戦(enemyPlayer)／対CPU戦(enemy)どちらの場合でも、相手のTransformを取得する
+    // ★変更：enemy(CPU)が設定されているならCPU戦とみなし、enemyを優先する。
+    //   以前はenemyPlayerを先に見ていたため、CPU戦でenemyPlayerに別のPlayer（古い参照やシーン内の別Player）が
+    //   入っていると、Enemyではなくそのオブジェクトを基準に向きが決まり、プレイヤーだけ反転することがあった。
+    Transform opponentLogged; // ★追加：どの相手を基準にしているかをログに出すための記録
     Transform GetOpponentTransform()
     {
-        if (enemyPlayer != null) return enemyPlayer.transform;
-        if (enemy != null) return enemy.transform;
-        return null;
+        Transform tf = null;
+        if (enemy != null) tf = enemy.transform;
+        else if (enemyPlayer != null) tf = enemyPlayer.transform;
+
+        if (tf != opponentLogged)
+        {
+            opponentLogged = tf;
+            if (tf != null) Debug.Log($"[{PlayerName}] 向き合いの基準にする相手: '{tf.gameObject.name}'", this);
+        }
+        return tf;
     }
 
     // ★追加：相手の方向へ自動で向きを変える（LateUpdateから毎フレーム呼ばれる）。
@@ -2823,16 +2871,29 @@ public class Player : MonoBehaviour
         float deltaZ = opponentTf.position.z - transform.position.z;
         if (Mathf.Abs(deltaZ) < autoFaceDeadZone) return; // ほぼ同じ位置：今の向きを維持
 
-        Vector3 faceDir = new Vector3(0f, 0f, Mathf.Sign(deltaZ));
+        float desiredSign = Mathf.Sign(deltaZ);
 
         if (!autoFaceSnapped)
         {
-            transform.rotation = Quaternion.LookRotation(faceDir, Vector3.up);
+            autoFaceSign = desiredSign;
+            transform.rotation = Quaternion.LookRotation(new Vector3(0f, 0f, autoFaceSign), Vector3.up);
             autoFaceSnapped = true;
             return;
         }
 
-        FaceDirection(faceDir);
+        // ★追加：向きの切り替えにヒステリシスを持たせる。
+        //   相手とほぼ密着している間はZの左右関係が不安定（押しのけ・ノックバック・攻撃の踏み込み等）なので、
+        //   相手が反対側へ autoFaceFlipThreshold 以上回り込んだ時だけ、向きを切り替える。
+        //   ★CPU戦(enemyが設定されている時)限定。対人戦は閾値0（＝従来どおり毎フレーム即座に相手の方向へ）。
+        bool isCpuBattle = enemy != null;
+        float flipThreshold = isCpuBattle ? autoFaceFlipThreshold : 0f;
+        if (desiredSign != autoFaceSign && Mathf.Abs(deltaZ) >= flipThreshold)
+        {
+            autoFaceSign = desiredSign;
+            if (isCpuBattle) Debug.Log($"[{PlayerName}] 向きを切り替え: {(autoFaceSign > 0f ? "+Z" : "-Z")}方向へ（相手とのZ差={deltaZ:F2}, 状態={currentState}）", this);
+        }
+
+        FaceDirection(new Vector3(0f, 0f, autoFaceSign));
     }
 
     // ★追加：指定した移動方向が「相手から離れる方向（後退）」かどうかを返す。
@@ -3452,6 +3513,7 @@ public class Player : MonoBehaviour
         flipped.y = 0f;
         if (flipped.sqrMagnitude < 0.0001f) return;
         transform.rotation = Quaternion.LookRotation(flipped.normalized, Vector3.up);
+        autoFaceSign = flipped.z >= 0f ? 1f : -1f; // ★追加：反転後の向きをAutoFaceの確定方向にも反映（直後に元の向きへ戻されないように）
     }
 
     // ★追加：掴みポーズで止めていたアニメーションを再開する。

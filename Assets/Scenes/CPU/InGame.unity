@@ -886,14 +886,12 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e97edcf51054b57469e09bda4b0ea584, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CameraController
-  targets:
-  - {fileID: 0}
-  - {fileID: 0}
+  m_EditorClassIdentifier: Assembly-CSharp::FightingCameraController
+  targets: []
   centerHeightRatio: 0
   characterHeightEstimate: 1.8
   followSmoothTime: 0.25
-  baseOffset: {x: 10, y: 3, z: 0}
+  baseOffset: {x: 0, y: 3, z: -8}
   minZoomDistance: 6
   maxZoomDistance: 16
   spreadToDistanceMultiplier: 1.5
@@ -915,12 +913,12 @@ MonoBehaviour:
   cameraBoundsEnabled: 0
   cameraBoundsMin: {x: -10, y: 1, z: -15}
   cameraBoundsMax: {x: 10, y: 8, z: -3}
-  focusZoomDistance: 2
+  focusZoomDistance: 4
   focusLookAtHeightOffset: 1.2
   guardImpactCameraMoveEnabled: 1
-  guardImpactDistance: 3
+  guardImpactDistance: 2.2
   guardImpactCamHeight: 0.4
-  guardImpactHorizontalAngle: -30
+  guardImpactHorizontalAngle: 35
   guardImpactCameraSide: 0
   guardImpactLookAtHeight: 1.9
   guardImpactLookAtSideOffset: 0.3
@@ -930,7 +928,7 @@ MonoBehaviour:
   guardImpactSlowTimeScale: 0.1
   guardImpactSlowDurationFrames: 9
   guardImpactSlowRecoverDuration: 0.2
-  guardImpactVolume: {fileID: 832575518}
+  guardImpactVolume: {fileID: 0}
   guardImpactVolumeWeight: 1
   volumeWeightSmoothSpeed: 8
   rebornCloseUpDistance: 0.8
@@ -2730,7 +2728,7 @@ MonoBehaviour:
   - {fileID: 1140915089}
   staticAudiences: []
   staticAudiencesFaceCamera: 1
-  cameraController: {fileID: 330585548}
+  cameraController: {fileID: 0}
   bigCheerComboThreshold: 3
   reactions:
   - situation: 0
@@ -4192,7 +4190,7 @@ MonoBehaviour:
   E_KankiGaugeBar2: {fileID: 77014343}
   PlayerTransform: {fileID: 0}
   EnemyTransform: {fileID: 0}
-  cameraController: {fileID: 330585548}
+  cameraController: {fileID: 0}
   BGM: {fileID: 8300000, guid: 78215c0163ae6f14e9dbae9023719665, type: 3}
   gameOverSceneName: GameOver
   gameClearSceneName: GameClear
@@ -5172,6 +5170,7 @@ SceneRoots:
   - {fileID: 330585546}
   - {fileID: 410087041}
   - {fileID: 832575519}
+  - {fileID: 1702718112}
   - {fileID: 1208181466}
   - {fileID: 685349370}
   - {fileID: 1846907281}
@@ -5179,7 +5178,6 @@ SceneRoots:
   - {fileID: 1226959111}
   - {fileID: 477244466}
   - {fileID: 1436067440}
-  - {fileID: 1702718112}
   - {fileID: 1329762183}
   - {fileID: 1206727502}
   - {fileID: 1261494522}
