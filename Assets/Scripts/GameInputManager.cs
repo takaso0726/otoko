@@ -240,6 +240,10 @@ public class GameInputManager : MonoBehaviour
         if (player1 != null) { player1.PlayerName = "P1"; player1.PLayerTagName = "P1"; }
         if (player2 != null) { player2.PlayerName = "P2"; player2.PLayerTagName = "P2"; }
 
+        // ★追加：プレイヤー番号に応じて、親と各部位のtag/layerを設定する
+        if (player1 != null) player1.ApplyPlayerTagAndLayer("P1");
+        if (player2 != null) player2.ApplyPlayerTagAndLayer("P2");
+
         var cam = cameraController != null ? cameraController : FindAnyObjectByType<FightingCameraController>();
         if (cam != null)
         {

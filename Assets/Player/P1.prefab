@@ -1772,7 +1772,7 @@ MonoBehaviour:
   hitStopFrames: 5
   guardHitStopFrames: 3
   freezeAnimatorDuringHitStop: 1
-  playHeadHitStateDirectly: 0
+  playHeadHitStateDirectly: 1
   punchAtk: 10
   punchMissFrames: 30
   punchHitFrames: 30

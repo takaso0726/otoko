@@ -1419,12 +1419,12 @@ MonoBehaviour:
   enableDebugLog: 1
   enableF2DebugKey: 1
   enableF3DebugKey: 1
-  enableF4DebugKey: 0
-  enableF5DebugKey: 0
-  enableF6DebugKey: 0
-  enableF7DebugKey: 0
-  enableF8DebugKey: 0
-  enableF10DebugKey: 0
+  enableF4DebugKey: 1
+  enableF5DebugKey: 1
+  enableF6DebugKey: 1
+  enableF7DebugKey: 1
+  enableF8DebugKey: 1
+  enableF10DebugKey: 1
   f10DebugFontSize: 18
   enableArrowKeyAnimation: 0
   enableDpadAnimation: 0
@@ -1440,32 +1440,32 @@ MonoBehaviour:
   downArrowAnimation:
     animationName: Anim-Down
     useTrigger: 1
-  PlayerName: 
+  PlayerName: P2
   PLayerTagName: 
   moveSpeed: 3
-  turnSpeed: 15
+  turnSpeed: 180
   enableAutoFacing: 1
   autoFaceDeadZone: 0.05
   lockFacingDuringAction: 0
   isResultMode: 0
   autoDetectResultScene: 1
   moveInputThreshold: 0.03
-  crouchInputThreshold: -0.43
+  crouchInputThreshold: -0.7
   upKickInputThreshold: 0.25
-  minMoveAnimSpeed: 0.4
+  minMoveAnimSpeed: 0.6
   maxMoveAnimSpeed: 1.4
   minMoveSpeedRatio: 0.4
-  minPosition: {x: -10, y: -10, z: -10}
-  maxPosition: {x: 10, y: 10, z: 10}
-  force: {x: 0, y: 0, z: 0}
+  minPosition: {x: -1, y: 0.2, z: -10}
+  maxPosition: {x: 1, y: 10, z: 10}
+  force: {x: 0, y: 500, z: 0}
   Jumpflag: 1
-  HP: 100
-  maxHP: 100
+  HP: 1000
+  maxHP: 1000
   atk: 10
   Player_status: 0
   guardFrames: 30
   throwFrames: 90
-  throwAtk: 5
+  throwAtk: 20
   throwStunFrames: 30
   escapeFramesAtZeroHp: 90
   escapeFramesAtFullHp: 24
@@ -1487,21 +1487,21 @@ MonoBehaviour:
   guardSuccessStunFrames: 30
   rebornTimeLimitFrames: 300
   rebornHpRatio: 0.3
-  mashThresholdBase: 11
+  mashThresholdBase: 10
   mashWithAnyButton: 1
-  mashThresholdStep: 3
-  standHeight: 2
+  mashThresholdStep: 7
+  standHeight: 1.93
   standCenter: {x: 0, y: 1, z: 0}
-  crouchHeight: 0.65
-  crouchCenter: {x: 0, y: 0.5, z: 0}
-  MenBlock_se: {fileID: 0}
-  Men_particle: {fileID: 0}
-  Hit_particle: {fileID: 0}
-  punchHitEffectData: {fileID: 0}
-  kickHitEffectData: {fileID: 0}
-  guardHitEffectData: {fileID: 0}
-  mashHitEffectData: {fileID: 0}
-  missHitEffectData: {fileID: 0}
+  crouchHeight: 1.15
+  crouchCenter: {x: 0, y: 0.47, z: 0}
+  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
+  Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
+  Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
+  punchHitEffectData: {fileID: 11400000, guid: 8772ce0eb28849c4abaede33a1153937, type: 2}
+  kickHitEffectData: {fileID: 11400000, guid: d4c9d40f25fe1244796e06fbb64cc7fc, type: 2}
+  guardHitEffectData: {fileID: 11400000, guid: 0efc11a881f5de141897cb73e3f94d51, type: 2}
+  mashHitEffectData: {fileID: 11400000, guid: de286e7f5553bf1418b0df8c98938742, type: 2}
+  missHitEffectData: {fileID: 11400000, guid: 182479a3e4175444d9090102939c91b9, type: 2}
   hitEffectFacingBasis: 0
   enableHitStop: 1
   hitStopFrames: 5
@@ -1516,7 +1516,7 @@ MonoBehaviour:
   punchKnockback:
     horizontalSpeed: 2.5
     upSpeed: 0
-  kickAtk: 10
+  kickAtk: 30
   kickMissFrames: 36
   kickHitFrames: 36
   kickStunFrames: 24
@@ -1524,7 +1524,7 @@ MonoBehaviour:
   kickKnockback:
     horizontalSpeed: 3.5
     upSpeed: 0
-  upKickAtk: 10
+  upKickAtk: 40
   upKickMissFrames: 42
   upKickHitFrames: 42
   upKickStunFrames: 30
@@ -1540,54 +1540,54 @@ MonoBehaviour:
   downKickKnockback:
     horizontalSpeed: 3
     upSpeed: 0
-  specialAtk: 20
+  specialAtk: 100
   specialHitStopFrames: 5
   specialKnockback:
-    horizontalSpeed: 0
-    upSpeed: 0
-  specialStunFrames: 30
+    horizontalSpeed: 2
+    upSpeed: 5
+  specialStunFrames: 10
   enableGuardSuccessEffect: 1
-  guardSuccessEffectPrefab: {fileID: 0}
-  guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
+  guardSuccessEffectPrefab: {fileID: 8365365947410503083, guid: 3e810419a41d2184da2046cdec7abe38, type: 3}
+  guardSuccessEffectOffset: {x: 0, y: 1.98, z: 0}
   guardSuccessEffectLifetime: 1
   enableGuardBuffEffect: 1
-  guardBuffEffectPrefab: {fileID: 0}
-  guardBuffEffectOffset: {x: 0, y: 1, z: 0}
+  guardBuffEffectPrefab: {fileID: 3568051733618127096, guid: 2e2455a33c696d74dbe4a1baff6ff255, type: 3}
+  guardBuffEffectOffset: {x: 0, y: 0.68, z: 0}
   kankiGaugePerBar: 100
   kankiGaugeBarCount: 2
-  gaugeGainOnHit: 15
-  gaugeGainOnGuard: 10
+  gaugeGainOnHit: 5
+  gaugeGainOnGuard: 25
   gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
   enableKankiChargeEffect: 1
-  kankiChargeEffectPrefab: {fileID: 6396199705279390725, guid: 3033e5beaf41edf45b102dad69361753, type: 3}
+  kankiChargeEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
   kankiChargeEffectOffset: {x: 0, y: 0, z: 0}
   kankiChargeEffectFollowLocal: 1
   enableKankiRevive: 1
   kankiReviveBarCost: 1
   reviveAtkMultiplier: 1.5
   reviveAtkBuffFrames: 600
-  kankiReviveEffectPrefab: {fileID: 0}
-  kankiReviveEffectOffset: {x: 0, y: 1, z: 0}
-  kankiReviveEffectLifetime: 2
-  reviveBuffEffectPrefab: {fileID: 0}
-  reviveBuffEffectOffset: {x: 0, y: 1, z: 0}
-  specialRequiredGauge: 200
-  specialGaugeCost: 200
+  kankiReviveEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
+  kankiReviveEffectOffset: {x: 0, y: 0, z: 0}
+  kankiReviveEffectLifetime: 3
+  reviveBuffEffectPrefab: {fileID: 4071785266033440036, guid: 3e8e5f6985c3f4c419ef9c6176185b7f, type: 3}
+  reviveBuffEffectOffset: {x: 0, y: 0, z: 0}
+  specialRequiredGauge: 100
+  specialGaugeCost: 100
   specialFrames: 180
   specialSe: {fileID: 0}
-  specialEffectPrefab: {fileID: 0}
+  specialEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
   specialEffectOffset: {x: 0, y: 1, z: 0}
   specialEffectLifetime: 1.5
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
-  fightingCamera: {fileID: 0}
+  fightingCamera: {fileID: 9096632630280813122, guid: 89c452da849cda84489bc37e8a782689, type: 3}
   downStartTrigger: Down-start
   downBoolParam: Down
   downReviveTrigger: Down-revive
   downFailTrigger: Down-fail
-  rebornStandUpFreezeFrames: 60
+  rebornStandUpFreezeFrames: 180
   hideOpponentDuringRebornFreeze: 1
   enableDualDownLayout: 1
   dualDownLeftXRatio: 0.25
@@ -1610,18 +1610,18 @@ MonoBehaviour:
   specialHitCooldownFrames: 6
   enablePlayerPush: 1
   pushSkinWidth: 0.02
-  maxPushSpeed: 20
+  maxPushSpeed: 1.29
   showMashPrompt: 1
   mashPromptText: "\u30DC\u30BF\u30F3\u3092\u9023\u6253\u3057\u308D\uFF01"
-  mashPromptFontSize: 64
+  mashPromptFontSize: 32
   mashPromptColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   showMashRemainingCount: 1
-  mashRemainingFontSize: 150
+  mashRemainingFontSize: 50
   mashRemainingColor: {r: 1, g: 1, b: 1, a: 1}
   mashRemainingYRatio: 0.42
   showMashButtonImage: 1
-  mashButtonNormalImage: {fileID: 0}
-  mashButtonPressedImage: {fileID: 0}
+  mashButtonNormalImage: {fileID: 2800000, guid: 252576c28c75a7f4f99964946c62997e, type: 3}
+  mashButtonPressedImage: {fileID: 2800000, guid: c3a4f25883c8d0549877dde7d3e52035, type: 3}
   mashButtonPressedFrames: 4
   mashButtonReleaseMinFrames: 3
   mashButtonSizeRatio: 0.22
@@ -1696,7 +1696,7 @@ Animator:
   m_GameObject: {fileID: 8961988206862004714}
   m_Enabled: 1
   m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: fd0682e02a0f2b74fb09f350dc131989, type: 2}
+  m_Controller: {fileID: 9100000, guid: 991f59df32c3cb54bbdfe8c0b0d1bdc8, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -1832,6 +1832,6 @@ MonoBehaviour:
   m_ActionEvents: []
   m_NeverAutoSwitchControlSchemes: 0
   m_DefaultControlScheme: 
-  m_DefaultActionMap: 
+  m_DefaultActionMap: Player
   m_SplitScreenIndex: -1
   m_Camera: {fileID: 0}

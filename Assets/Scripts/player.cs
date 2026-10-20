@@ -1228,6 +1228,67 @@ public class Player : MonoBehaviour
         return null;
     }
 
+    // 当たり判定の部位（ここに挙げた名前のオブジェクトが P[番号]Attack になる）
+    static readonly string[] AttackPartNames =
+    {
+        "P-LeftUpLeg", "P-LeftLeg", "P-LeftFoot",
+        "P-RightUpLeg", "P-RightLeg", "P-RightFoot",
+        "P-LeftArm", "P-LeftForeArm", "P-LeftHand",
+        "P-Head",
+        "P-RightArm", "P-RightForeArm", "P-RightHand",
+    };
+
+    // プレイヤー番号（"P1" / "P2"）に応じて、tagとlayerを設定する
+    //   一番上の親 ... tag = P[番号]       / layer = P[番号]
+    //   各部位     ... tag = P[番号]Attack / layer = P[番号]
+    // ※Start()より前（生成直後）に呼ばれても動くよう、キャッシュ済みのhitbox変数は使わず名前で探す
+    public void ApplyPlayerTagAndLayer(string playerLabel)
+    {
+        string bodyTag = playerLabel;              // 例: P1
+        string attackTag = playerLabel + "Attack"; // 例: P1Attack
+
+        int layer = LayerMask.NameToLayer(playerLabel);
+        if (layer < 0)
+        {
+            Debug.LogWarning($"[{gameObject.name}] Layer '{playerLabel}' が未登録です。" +
+                             "Project Settings > Tags and Layers で追加してください。layerは変更しません。", this);
+        }
+
+        // 一番上の親
+        GameObject root = transform.root.gameObject;
+        TrySetTag(root, bodyTag);
+        if (layer >= 0) root.layer = layer;
+
+        // 各部位（gameObject.layerは子へ伝播しないので、1つずつ設定する）
+        foreach (string partName in AttackPartNames)
+        {
+            Transform part = FindDeepChild(transform, partName);
+            if (part == null)
+            {
+                Debug.LogWarning($"[{gameObject.name}] 部位 '{partName}' が見つからず、tag/layerを設定できませんでした。", this);
+                continue;
+            }
+
+            TrySetTag(part.gameObject, attackTag);
+            if (layer >= 0) part.gameObject.layer = layer;
+        }
+
+        DLog($"[{PlayerName}] tag/layerを設定：親={bodyTag} / 部位={attackTag} / layer={playerLabel}({layer})");
+    }
+
+    // 未登録のtagを代入するとUnityExceptionになるため、握りつぶさず警告に変える
+    static void TrySetTag(GameObject go, string tagName)
+    {
+        try
+        {
+            go.tag = tagName;
+        }
+        catch (UnityException)
+        {
+            Debug.LogWarning($"Tag '{tagName}' が未登録です。Project Settings > Tags and Layers で追加してください。", go);
+        }
+    }
+
     //=====================================================
     // ★Input Actionsのコールバック（PlayerInputのBehavior=Send Messagesで自動的に呼ばれる）
     //   ここでは「ボタンが押された」という意図フラグを立てるだけにし、
