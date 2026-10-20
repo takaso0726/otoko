@@ -825,7 +825,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 8.21, y: 3.04, z: 0}
+  m_LocalPosition: {x: 18, y: 3.04, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -888,10 +888,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FightingCameraController
   targets: []
-  centerHeightRatio: 0
-  characterHeightEstimate: 1.8
+  autoRegisterByTag: 1
+  autoRegisterPlayerTag: P1
+  autoRegisterEnemyTag: Enemy
+  autoRegisterInterval: 0.1
+  centerHeightRatio: 1
+  characterHeightEstimate: 2
   followSmoothTime: 0.25
   baseOffset: {x: 0, y: 3, z: -8}
+  fixedZoomEnabled: 1
+  fixedZoomDistance: 10
   minZoomDistance: 6
   maxZoomDistance: 16
   spreadToDistanceMultiplier: 1.5
@@ -4175,6 +4181,11 @@ MonoBehaviour:
   e1: {fileID: 0}
   P_HPbar: {fileID: 1289788541}
   E_HPbar: {fileID: 939642776}
+  autoAssignHPBars: 1
+  hpBarNameKeyword: hp
+  autoSetHPBarMax: 1
+  autoAssignKankiGauges: 1
+  autoAssignEnemy: 1
   P1_KankiGaugeCircle1: {fileID: 0}
   P1_KankiGaugeCircle2: {fileID: 0}
   P2_KankiGaugeCircle1: {fileID: 0}
