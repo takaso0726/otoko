@@ -75,6 +75,10 @@ public class CharacterSelectController : MonoBehaviour
         public Vector3 portraitOffsetP1 = Vector3.zero;
         [Tooltip("このキャラのドアップ位置の微調整（2P側）。PlayerSelector.portraitOffset に【加算】される。0なら調整なし")]
         public Vector3 portraitOffsetP2 = Vector3.zero;
+        [Tooltip("このキャラのドアップ回転の微調整（1P側・オイラー角/度）。PlayerSelector.portraitRotation に【加算】される。0なら調整なし。UI(2D)ならZだけ触ればOK")]
+        public Vector3 portraitRotationP1 = Vector3.zero;
+        [Tooltip("このキャラのドアップ回転の微調整（2P側・オイラー角/度）。PlayerSelector.portraitRotation に【加算】される。0なら調整なし。UI(2D)ならZだけ触ればOK")]
+        public Vector3 portraitRotationP2 = Vector3.zero;
         [Tooltip("このキャラ専用の拡大率（1P・2P共通）。PlayerSelector.portraitScale とプレハブ自身のスケールに掛け算される。1=等倍")]
         public float portraitScaleMultiplier = 1f;
 
@@ -97,6 +101,8 @@ public class CharacterSelectController : MonoBehaviour
         public Vector3 portraitOffset = Vector3.zero;
         [Tooltip("ドアップの拡大率。プレハブ自身のスケールに掛け算される（1=等倍、1.5=1.5倍）")]
         public float portraitScale = 1f;
+        [Tooltip("ドアップの回転（オイラー角/度）。プレハブ自身の回転にさらに掛かる。0なら回転なし。UI(2D)ならZだけ触ればOK")]
+        public Vector3 portraitRotation = Vector3.zero;
         public Image nameImageObject;  // 選択中キャラの名前画像表示用（未設定なら何もしない）
         public int startIndex;         // このプレイヤーの初期カーソル位置（characters配列のインデックス）
 
@@ -435,7 +441,8 @@ public class CharacterSelectController : MonoBehaviour
     // ドアッププレハブを portraitRoot の中心に配置し、拡大率を反映する。
     // 位置 = プレイヤー共通の portraitOffset + キャラ別のオフセット（1P用/2P用）
     // 拡大率 = プレハブ自身のスケール × プレイヤー共通の portraitScale × キャラ別の portraitScaleMultiplier
-    // スケールはプレハブの元の値から毎回計算するので、何度呼んでも掛け算が積み重ならない。
+    // 回転 = プレハブ自身の回転 × Euler(プレイヤー共通の portraitRotation + キャラ別の回転（1P用/2P用）)
+    // スケール・回転はプレハブの元の値から毎回計算するので、何度呼んでも積み重ならない。
     void PlacePortrait(GameObject instance, GameObject prefab, PlayerSelector p, CharacterEntry entry, int playerNumber)
     {
         var t = instance.transform;
@@ -455,6 +462,9 @@ public class CharacterSelectController : MonoBehaviour
         float playerScale = p.portraitScale > 0f ? p.portraitScale : 1f;
         float characterScale = entry.portraitScaleMultiplier > 0f ? entry.portraitScaleMultiplier : 1f;
         t.localScale = prefab.transform.localScale * (playerScale * characterScale);
+
+        Vector3 characterRotation = playerNumber == 1 ? entry.portraitRotationP1 : entry.portraitRotationP2;
+        t.localRotation = prefab.transform.localRotation * Quaternion.Euler(p.portraitRotation + characterRotation);
     }
 
     // ---- ドアップ位置の調整補助 ----
@@ -514,6 +524,12 @@ public class CharacterSelectController : MonoBehaviour
         if (playerNumber == 1) entry.portraitOffsetP1 = diff;
         else entry.portraitOffsetP2 = diff;
 
+        // 回転も同様に、プレハブ自身の回転とプレイヤー共通分を除いた「キャラ別」の差分を書き戻す
+        Quaternion relative = Quaternion.Inverse(entry.portraitPrefab.transform.localRotation) * t.localRotation;
+        Vector3 rotDiff = NormalizeEuler(relative.eulerAngles) - p.portraitRotation;
+        if (playerNumber == 1) entry.portraitRotationP1 = rotDiff;
+        else entry.portraitRotationP2 = rotDiff;
+
         // 拡大率は1P・2P共通の値なので、2Pが同じキャラを表示中の場合は1Pの値を優先して上書きしない
         if (playerNumber == 2 && player1.currentIndex == player2.currentIndex) return;
 
@@ -523,6 +539,12 @@ public class CharacterSelectController : MonoBehaviour
         {
             entry.portraitScaleMultiplier = t.localScale.x / baseScale;
         }
+    }
+
+    // オイラー角を -180〜180 に収める（書き戻した値が 350 のような見づらい値にならないように）
+    static Vector3 NormalizeEuler(Vector3 e)
+    {
+        return new Vector3(Mathf.DeltaAngle(0f, e.x), Mathf.DeltaAngle(0f, e.y), Mathf.DeltaAngle(0f, e.z));
     }
 
     // AudioClipがInspectorで未設定の場合にPlayOneShot(null)警告が出るのを防ぐ

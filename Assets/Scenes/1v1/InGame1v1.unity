@@ -864,9 +864,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e97edcf51054b57469e09bda4b0ea584, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraController
-  targets:
-  - {fileID: 0}
-  - {fileID: 0}
+  targets: []
   autoRegisterByTag: 0
   autoRegisterPlayerTag: Player
   autoRegisterEnemyTag: Enemy
@@ -1728,6 +1726,8 @@ MonoBehaviour:
     prefab: {fileID: 5939530159737485577, guid: c5323318139c20442940e84b82dfc630, type: 3}
   - characterName: YANGKY
     prefab: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
+  - characterName: MACHO
+    prefab: {fileID: 6091258825155012558, guid: c1482187877744242bd7109919958ada, type: 3}
   player1SpawnPoint: {fileID: 1435874237}
   player2SpawnPoint: {fileID: 1195980007}
   fallbackPrefab: {fileID: 0}

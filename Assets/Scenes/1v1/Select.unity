@@ -256,6 +256,81 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!1 &232355150
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 232355151}
+  - component: {fileID: 232355153}
+  - component: {fileID: 232355152}
+  m_Layer: 5
+  m_Name: MACHO
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &232355151
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 232355150}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1.6, y: 1.4, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1488218539}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -300, y: -250}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &232355152
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 232355150}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: c598e03bbc5b7e443acf39d589b7cebd, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &232355153
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 232355150}
+  m_CullTransparentMesh: 1
 --- !u!1 &242202088
 GameObject:
   m_ObjectHideFlags: 0
@@ -550,7 +625,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -298, y: -249}
+  m_AnchoredPosition: {x: -109, y: -249}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &802211630
@@ -700,7 +775,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 479, y: -70.00002}
+  m_AnchoredPosition: {x: 421, y: -70.00002}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &991903145
@@ -826,8 +901,8 @@ Transform:
   m_GameObject: {fileID: 1029654956}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 1.5}
-  m_LocalScale: {x: 1.45, y: 1.65, z: 1}
+  m_LocalPosition: {x: 0, y: 1, z: 8}
+  m_LocalScale: {x: 2.208205, y: 2.2068748, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -1033,6 +1108,8 @@ MonoBehaviour:
     portraitPrefab: {fileID: 6758519040437653269, guid: 9b94bbaf73fe5aa45982a36823d7fd4a, type: 3}
     portraitOffsetP1: {x: 0, y: 0, z: 0}
     portraitOffsetP2: {x: 0, y: 0, z: 0}
+    portraitRotationP1: {x: 0, y: 0, z: 0}
+    portraitRotationP2: {x: 0, y: 0, z: 0}
     portraitScaleMultiplier: 1
     nameImage: {fileID: 21300000, guid: 6d94763c859627644bbdfd0c515465d1, type: 3}
   - characterName: Player2
@@ -1041,6 +1118,8 @@ MonoBehaviour:
     portraitPrefab: {fileID: 5939530159737485577, guid: f254ac76668bacc4aaea9cf843b98b83, type: 3}
     portraitOffsetP1: {x: 0, y: 0, z: 0}
     portraitOffsetP2: {x: 0, y: 0, z: 0}
+    portraitRotationP1: {x: 0, y: 0, z: 0}
+    portraitRotationP2: {x: 0, y: 0, z: 0}
     portraitScaleMultiplier: 1
     nameImage: {fileID: 21300000, guid: 6d94763c859627644bbdfd0c515465d1, type: 3}
   - characterName: YANGKY
@@ -1049,8 +1128,20 @@ MonoBehaviour:
     portraitPrefab: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
     portraitOffsetP1: {x: 0, y: 0, z: 0}
     portraitOffsetP2: {x: 0, y: 0, z: 0}
+    portraitRotationP1: {x: 0, y: 0, z: 0}
+    portraitRotationP2: {x: 0, y: 0, z: 0}
     portraitScaleMultiplier: 1
     nameImage: {fileID: 21300000, guid: 6c11f61f6fa31294b97445ad79a53490, type: 3}
+  - characterName: MACHO
+    anchor: {fileID: 232355151}
+    selectableBy: 0
+    portraitPrefab: {fileID: 6091258825155012558, guid: 7d5289afc3bb301478feba81684481dc, type: 3}
+    portraitOffsetP1: {x: 0, y: -2.8, z: 0}
+    portraitOffsetP2: {x: 0, y: -2.8, z: 0}
+    portraitRotationP1: {x: 0, y: 180, z: 0}
+    portraitRotationP2: {x: 0, y: 180, z: 0}
+    portraitScaleMultiplier: 1
+    nameImage: {fileID: 21300000, guid: 8e43d1fdcd29fd341a9e85b774cd56bb, type: 3}
   player1:
     playerName: Player1
     cursor: {fileID: 1317837554}
@@ -1059,6 +1150,7 @@ MonoBehaviour:
     portraitRoot: {fileID: 265861307}
     portraitOffset: {x: 0, y: 0, z: 0}
     portraitScale: 3
+    portraitRotation: {x: 0, y: 0, z: 0}
     nameImageObject: {fileID: 390385818}
     startIndex: 0
     currentIndex: 0
@@ -1071,6 +1163,7 @@ MonoBehaviour:
     portraitRoot: {fileID: 2098070419}
     portraitOffset: {x: 0, y: 0, z: 0}
     portraitScale: 3
+    portraitRotation: {x: 0, y: 0, z: 0}
     nameImageObject: {fileID: 991903145}
     startIndex: 0
     currentIndex: 0
@@ -1536,6 +1629,7 @@ RectTransform:
   - {fileID: 802211629}
   - {fileID: 1047786491}
   - {fileID: 1826866024}
+  - {fileID: 232355151}
   - {fileID: 712184761}
   - {fileID: 1084280243}
   - {fileID: 1317837554}
