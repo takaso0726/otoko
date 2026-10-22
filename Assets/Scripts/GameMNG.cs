@@ -309,6 +309,16 @@ public class GameMNG : MonoBehaviour
         E_HPbar.value = e1.HP;
     }
 
+    // ★追加：円形ゲージへ充填率を反映し、同じオブジェクトに炎アニメ(KankiGaugeFlameAnimator)が
+    //   付いていれば、そちらにも充填率を渡す（マックスになった瞬間に炎が点火する）。
+    //   KankiGaugeCircle側は変更不要。炎アニメ未設定のゲージでもそのまま動作する。
+    static void ApplyKankiRatio(KankiGaugeCircle circle, float ratio)
+    {
+        if (circle == null) return;
+        circle.SetRatio(ratio);
+        if (circle.TryGetComponent(out KankiGaugeFlameAnimator flame)) flame.SetRatio(ratio);
+    }
+
     // エネミー側の漢気ゲージ(2本分)を表示更新する
     // Enemy.csのAddKankiGauge/ReduceKankiGaugeが呼ばれた際に呼び出される想定
     public void Enemy_UpdateKankiGauge()
@@ -324,8 +334,8 @@ public class GameMNG : MonoBehaviour
             return;
         }
         // 1本目・2本目それぞれの充填率(0〜1)を円形ゲージへ反映
-        E_KankiGaugeCircle1.SetRatio(e1.GetGaugeFillRatio(0));
-        E_KankiGaugeCircle2.SetRatio(e1.GetGaugeFillRatio(1));
+        ApplyKankiRatio(E_KankiGaugeCircle1, e1.GetGaugeFillRatio(0));
+        ApplyKankiRatio(E_KankiGaugeCircle2, e1.GetGaugeFillRatio(1));
 
         // ★追加：Inspectorのスイッチ(enableLegacyKankiGaugeBar)がONの時だけ、
         //   旧バー式ゲージ(Slider)も同時に更新する。Sliderが未アサインでもエラーにはせずスキップする。
@@ -344,13 +354,13 @@ public class GameMNG : MonoBehaviour
     {
         if (p1 != null)
         {
-            if (P1_KankiGaugeCircle1 != null) P1_KankiGaugeCircle1.SetRatio(p1.GetGaugeFillRatio(0));
-            if (P1_KankiGaugeCircle2 != null) P1_KankiGaugeCircle2.SetRatio(p1.GetGaugeFillRatio(1));
+            ApplyKankiRatio(P1_KankiGaugeCircle1, p1.GetGaugeFillRatio(0));
+            ApplyKankiRatio(P1_KankiGaugeCircle2, p1.GetGaugeFillRatio(1));
         }
         if (p2 != null)
         {
-            if (P2_KankiGaugeCircle1 != null) P2_KankiGaugeCircle1.SetRatio(p2.GetGaugeFillRatio(0));
-            if (P2_KankiGaugeCircle2 != null) P2_KankiGaugeCircle2.SetRatio(p2.GetGaugeFillRatio(1));
+            ApplyKankiRatio(P2_KankiGaugeCircle1, p2.GetGaugeFillRatio(0));
+            ApplyKankiRatio(P2_KankiGaugeCircle2, p2.GetGaugeFillRatio(1));
         }
 
         // ★追加：Inspectorのスイッチ(enableLegacyKankiGaugeBar)がONの時だけ、
