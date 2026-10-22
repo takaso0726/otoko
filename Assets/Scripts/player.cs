@@ -4,205 +4,205 @@ using UnityEngine.Serialization;
 using UnityEngine.UIElements;
 
 //=====================================================
-// ★このスクリプトはPlayerInputコンポーネントとセットで使用します。
-//   PlayerInputの Behavior は「Send Messages」に設定してください。
-//   Actions には PlayerControls.inputactions（Playerマップ）を割り当ててください。
-//   誰の入力かはPlayerInputManagerがデバイス単位で自動的に振り分けます。
+// �����̃X�N���v�g��PlayerInput�R���|�[�l���g�ƃZ�b�g�Ŏg�p���܂��B
+//   PlayerInput�� Behavior �́uSend Messages�v�ɐݒ肵�Ă��������B
+//   Actions �ɂ� PlayerControls.inputactions�iPlayer�}�b�v�j�����蓖�ĂĂ��������B
+//   �N�̓��͂���PlayerInputManager���f�o�C�X�P�ʂŎ����I�ɐU�蕪���܂��B
 //=====================================================
-// プレイヤーキャラクターの移動・攻撃・被弾・復活などの一連の挙動を管理するメインスクリプト
+// �v���C���[�L�����N�^�[�̈ړ��E�U���E��e�E�����Ȃǂ̈�A�̋������Ǘ����郁�C���X�N���v�g
 [RequireComponent(typeof(PlayerInput))]
 public class Player : MonoBehaviour
 {
-    // GameMNGへの参照。毎回探すと負荷やタイミング次第でnullを返しやすいため、
-    // Startで一度だけ探してキャッシュし、以降はこれを使い回す。
+    // GameMNG�ւ̎Q�ƁB����T���ƕ��ׂ�^�C�~���O�����null��Ԃ��₷�����߁A
+    // Start�ň�x�����T���ăL���b�V�����A�ȍ~�͂�����g���񂷁B
     GameMNG gameMNG;
 
-    // 外部（GameMNG等）に見せるおおまかな状態。既存の呼び出し互換のため維持
+    // �O���iGameMNG���j�Ɍ����邨���܂��ȏ�ԁB�����̌Ăяo���݊��̂��߈ێ�
     public enum Status
     {
-        Neutral,    //待機(ニュートラル)
-        Attack,     //攻撃
-        Stand,      //仁王立ち
-        Throw,      //投げ(つかみ)
-        Live,       //生存
-        Reborn,     //復活
-        Dead,       //死亡
-        Win,        //勝利
+        Neutral,    //�ҋ@(�j���[�g����)
+        Attack,     //�U��
+        Stand,      //�m������
+        Throw,      //����(����)
+        Live,       //����
+        Reborn,     //����
+        Dead,       //���S
+        Win,        //����
     };
 
-    // 内部の行動制御用ステート。今どの行動をしているかをこれ1つで管理する
+    // �����̍s������p�X�e�[�g�B���ǂ̍s�������Ă��邩������1�ŊǗ�����
     private enum PlayerState
     {
-        Idle,       // 待機
-        Move,       // 前後移動
-        Crouch,     // しゃがみ
-        Punch,      // パンチ（空中では飛び蹴りになる）
-        Kick,       // 通常キック
-        UpKick,     // 上キック
-        DownKick,   // 下キック
-        Guard,      // 仁王立ち
-        Throw,      // 投げ：掴んでいる側（掴み始め～投げ飛ばすまでの一連の拘束）
-        Grabbed,    // ★追加：投げ：掴まれている側（脱出を試みている間の拘束）
-        Thrown,     // ★追加：投げ：投げ飛ばされて放物線上を飛んでいる間（着地するまで）
-        Special,    // 必殺技（漢気ゲージ消費技）
-        KnockedDown,// ダウン中（根性復活チャレンジ中）
-        Dead,       // 死亡（復活失敗）
-        Stunned,    // ★追加：やられ状態（被弾後、攻撃ごとに設定したフレーム数だけ行動不能）
+        Idle,       // �ҋ@
+        Move,       // �O��ړ�
+        Crouch,     // ���Ⴊ��
+        Punch,      // �p���`�i�󒆂ł͔�яR��ɂȂ�j
+        Kick,       // �ʏ�L�b�N
+        UpKick,     // ��L�b�N
+        DownKick,   // ���L�b�N
+        Guard,      // �m������
+        Throw,      // �����F�͂�ł��鑤�i�͂ݎn�߁`������΂��܂ł̈�A�̍S���j
+        Grabbed,    // ���ǉ��F�����F�͂܂�Ă��鑤�i�E�o�����݂Ă���Ԃ̍S���j
+        Thrown,     // ���ǉ��F�����F������΂���ĕ����������ł���ԁi���n����܂Łj
+        Special,    // �K�E�Z�i���C�Q�[�W����Z�j
+        KnockedDown,// �_�E�����i���������`�������W���j
+        Dead,       // ���S�i�������s�j
+        Stunned,    // ���ǉ��F�����ԁi��e��A�U�����Ƃɐݒ肵���t���[���������s���s�\�j
     }
 
     //=====================================================
-    // ★デバッグ
+    // ���f�o�b�O
     //=====================================================
-    [Header("デバッグ設定")]
-    [SerializeField] bool enableDebugLog = true; // trueの間だけ本スクリプト内のDebug.Logを出力する（Debug.LogErrorは不具合検知のため常時出力）
+    [Header("�f�o�b�O�ݒ�")]
+    [SerializeField] bool enableDebugLog = true; // true�̊Ԃ����{�X�N���v�g����Debug.Log���o�͂���iDebug.LogError�͕s����m�̂��ߏ펞�o�́j
 
-    // ★変更：F2/F4/F5/F6の各デバッグキーを、キャラクターごとにInspectorでON/OFF選択できるようにする。
-    //   以前はF4/F5がPlayerName=="P1"固定、F6は専用のisAlwaysGuardDebugTargetという別名の変数だったが、
-    //   命名を統一し、4つとも同じ仕組み（チェックボックスON＝そのキーの対象）で扱う。
-    [Header("デバッグキー 有効設定（キャラクターごとに選択可能）")]
-    [Tooltip("ONにすると、このキャラクターでF2キー（漢気ゲージデバッグログのON/OFF切替）が使えます。")]
+    // ���ύX�FF2/F4/F5/F6�̊e�f�o�b�O�L�[���A�L�����N�^�[���Ƃ�Inspector��ON/OFF�I���ł���悤�ɂ���B
+    //   �ȑO��F4/F5��PlayerName=="P1"�Œ�AF6�͐�p��isAlwaysGuardDebugTarget�Ƃ����ʖ��̕ϐ����������A
+    //   �����𓝈ꂵ�A4�Ƃ������d�g�݁i�`�F�b�N�{�b�N�XON�����̃L�[�̑Ώہj�ň����B
+    [Header("�f�o�b�O�L�[ �L���ݒ�i�L�����N�^�[���ƂɑI���\�j")]
+    [Tooltip("ON�ɂ���ƁA���̃L�����N�^�[��F2�L�[�i���C�Q�[�W�f�o�b�O���O��ON/OFF�ؑցj���g���܂��B")]
     [SerializeField] bool enableF2DebugKey = true;
-    [Tooltip("ONにすると、このキャラクターでF3キー（エフェクト発生ログのON/OFF切替）が使えます。")]
+    [Tooltip("ON�ɂ���ƁA���̃L�����N�^�[��F3�L�[�i�G�t�F�N�g�������O��ON/OFF�ؑցj���g���܂��B")]
     [SerializeField] bool enableF3DebugKey = true;
-    [Tooltip("ONにすると、このキャラクターでF4キー（ダウン中／Dead中からの強制復活）が使えます。")]
+    [Tooltip("ON�ɂ���ƁA���̃L�����N�^�[��F4�L�[�i�_�E�����^Dead������̋��������j���g���܂��B")]
     [SerializeField] bool enableF4DebugKey = false;
-    [Tooltip("ONにすると、このキャラクターでF5キー（HPを強制的に0にする）が使えます。")]
+    [Tooltip("ON�ɂ���ƁA���̃L�����N�^�[��F5�L�[�iHP�������I��0�ɂ���j���g���܂��B")]
     [SerializeField] bool enableF5DebugKey = false;
-    [Tooltip("ONにすると、このキャラクターでF6キー（常時仁王立ちデバッグモード）が使えます。")]
+    [Tooltip("ON�ɂ���ƁA���̃L�����N�^�[��F6�L�[�i�펞�m�������f�o�b�O���[�h�j���g���܂��B")]
     [SerializeField] bool enableF6DebugKey = false;
-    [Tooltip("ONにすると、このキャラクターでF7キー（漢気ゲージを満タンにする）が使えます。")]
+    [Tooltip("ON�ɂ���ƁA���̃L�����N�^�[��F7�L�[�i���C�Q�[�W�𖞃^���ɂ���j���g���܂��B")]
     [SerializeField] bool enableF7DebugKey = false;
-    [Tooltip("ONにすると、このキャラクターでF8キー（HPを最大値まで回復する）が使えます。")]
+    [Tooltip("ON�ɂ���ƁA���̃L�����N�^�[��F8�L�[�iHP���ő�l�܂ŉ񕜂���j���g���܂��B")]
     [SerializeField] bool enableF8DebugKey = false;
-    [Tooltip("ONにすると、このキャラクターでF10キー（やられ状態中に連続で攻撃が当たった回数の画面表示ON/OFF）が使えます。")]
+    [Tooltip("ON�ɂ���ƁA���̃L�����N�^�[��F10�L�[�i�����Ԓ��ɘA���ōU�������������񐔂̉�ʕ\��ON/OFF�j���g���܂��B")]
     [SerializeField] bool enableF10DebugKey = false;
-    [Tooltip("F10で表示するデバッグ文字（やられ状態／相手の技のクールタイム）のフォントサイズ。")]
+    [Tooltip("F10�ŕ\������f�o�b�O�����i�����ԁ^����̋Z�̃N�[���^�C���j�̃t�H���g�T�C�Y�B")]
     [SerializeField, Range(8, 48)] int f10DebugFontSize = 18;
 
     //=====================================================
-    // ★追加：矢印キー（↑←→↓）で任意のアニメーションを再生する設定
-    //   ・各キーを押した瞬間に、Inspectorで指定したアニメーションを1回再生する。
-    //   ・「Use Trigger」ON：AnimatorのTriggerパラメータ名を指定（例：Punch / Kick / UpKick / DownKick / waza）
-    //   ・「Use Trigger」OFF：Animatorのステート名を指定して直接再生（例：HeadHit）
-    //   ・currentState（状態機械）は変更しないので、あくまで見た目の再生・確認用。当たり判定やダメージは発生しない。
-    //   ・ダウン中／ヒットストップ中／掴まれ中／やられ中など、自由に動けない状態では再生しない。
+    // ���ǉ��F���L�[�i���������j�ŔC�ӂ̃A�j���[�V�������Đ�����ݒ�
+    //   �E�e�L�[���������u�ԂɁAInspector�Ŏw�肵���A�j���[�V������1��Đ�����B
+    //   �E�uUse Trigger�vON�FAnimator��Trigger�p�����[�^�����w��i��FPunch / Kick / UpKick / DownKick / waza�j
+    //   �E�uUse Trigger�vOFF�FAnimator�̃X�e�[�g�����w�肵�Ē��ڍĐ��i��FHeadHit�j
+    //   �EcurrentState�i��ԋ@�B�j�͕ύX���Ȃ��̂ŁA�����܂Ō����ڂ̍Đ��E�m�F�p�B�����蔻���_���[�W�͔������Ȃ��B
+    //   �E�_�E�����^�q�b�g�X�g�b�v���^�͂܂ꒆ�^���ꒆ�ȂǁA���R�ɓ����Ȃ���Ԃł͍Đ����Ȃ��B
     //=====================================================
     [System.Serializable]
     public class ArrowAnimationSetting
     {
-        [Tooltip("再生するアニメーション名。Use TriggerがONならTriggerパラメータ名、OFFならAnimatorのステート名。空なら何もしない。")]
+        [Tooltip("�Đ�����A�j���[�V�������BUse Trigger��ON�Ȃ�Trigger�p�����[�^���AOFF�Ȃ�Animator�̃X�e�[�g���B��Ȃ牽�����Ȃ��B")]
         public string animationName = "";
-        [Tooltip("ON：animationNameをTriggerとして発火する／OFF：animationNameのステートを頭から直接再生する")]
+        [Tooltip("ON�FanimationName��Trigger�Ƃ��Ĕ��΂���^OFF�FanimationName�̃X�e�[�g�𓪂��璼�ڍĐ�����")]
         public bool useTrigger = true;
     }
 
-    [Header("矢印キーでアニメーション再生")]
-    [Tooltip("ONにすると、このキャラクターで矢印キー（↑←→↓）によるアニメーション再生が使えます。\n" +
-             "※PlayerInputのキーボード操作で矢印キーを移動(Move)に割り当てている場合、移動も同時に入力される点に注意。")]
+    [Header("���L�[�ŃA�j���[�V�����Đ�")]
+    [Tooltip("ON�ɂ���ƁA���̃L�����N�^�[�Ŗ��L�[�i���������j�ɂ��A�j���[�V�����Đ����g���܂��B\n" +
+             "��PlayerInput�̃L�[�{�[�h����Ŗ��L�[���ړ�(Move)�Ɋ��蓖�ĂĂ���ꍇ�A�ړ��������ɓ��͂����_�ɒ��ӁB")]
     [SerializeField] bool enableArrowKeyAnimation = false;
-    [Tooltip("ONにすると、このキャラクターに割り当てられたゲームパッドの十字キー（上下左右）でも、下の同じ設定のアニメーションを再生できます。\n" +
-             "※PlayerInputで十字キーをMoveに割り当てている場合、移動も同時に入力される点に注意。")]
+    [Tooltip("ON�ɂ���ƁA���̃L�����N�^�[�Ɋ��蓖�Ă�ꂽ�Q�[���p�b�h�̏\���L�[�i�㉺���E�j�ł��A���̓����ݒ�̃A�j���[�V�������Đ��ł��܂��B\n" +
+             "��PlayerInput�ŏ\���L�[��Move�Ɋ��蓖�ĂĂ���ꍇ�A�ړ��������ɓ��͂����_�ɒ��ӁB")]
     [SerializeField] bool enableDpadAnimation = false;
-    [SerializeField] ArrowAnimationSetting upArrowAnimation = new ArrowAnimationSetting { animationName = "Anim-Up", useTrigger = true };       // ↑キー
-    [SerializeField] ArrowAnimationSetting leftArrowAnimation = new ArrowAnimationSetting { animationName = "Anim-Left", useTrigger = true };       // ←キー
-    [SerializeField] ArrowAnimationSetting rightArrowAnimation = new ArrowAnimationSetting { animationName = "Anim-Right", useTrigger = true };     // →キー
-    [SerializeField] ArrowAnimationSetting downArrowAnimation = new ArrowAnimationSetting { animationName = "Anim-Down", useTrigger = true };   // ↓キー
+    [SerializeField] ArrowAnimationSetting upArrowAnimation = new ArrowAnimationSetting { animationName = "Anim-Up", useTrigger = true };       // ���L�[
+    [SerializeField] ArrowAnimationSetting leftArrowAnimation = new ArrowAnimationSetting { animationName = "Anim-Left", useTrigger = true };       // ���L�[
+    [SerializeField] ArrowAnimationSetting rightArrowAnimation = new ArrowAnimationSetting { animationName = "Anim-Right", useTrigger = true };     // ���L�[
+    [SerializeField] ArrowAnimationSetting downArrowAnimation = new ArrowAnimationSetting { animationName = "Anim-Down", useTrigger = true };   // ���L�[
 
-    // 本スクリプト内のDebug.Log呼び出しはすべてこのメソッド経由にする。
-    // enableDebugLogをfalseにすればインスペクターから一括でログ出力を止められる。
+    // �{�X�N���v�g����Debug.Log�Ăяo���͂��ׂĂ��̃��\�b�h�o�R�ɂ���B
+    // enableDebugLog��false�ɂ���΃C���X�y�N�^�[����ꊇ�Ń��O�o�͂��~�߂���B
     void DLog(string message)
     {
         if (enableDebugLog) Debug.Log(message);
     }
 
-    // ★追加：漢気ゲージ専用のデバッグログ。F2キーでON/OFFをトグルする。
-    //   増減が多くログが流れやすいため、通常のenableDebugLogとは別に管理する。
+    // ���ǉ��F���C�Q�[�W��p�̃f�o�b�O���O�BF2�L�[��ON/OFF���g�O������B
+    //   �������������O������₷�����߁A�ʏ��enableDebugLog�Ƃ͕ʂɊǗ�����B
     private bool kankiGaugeDebugLogEnabled = false;
 
-    // 漢気ゲージ関連（増減・後退判定）のログはこのメソッド経由にする。
-    // F2でトグルした時だけ出力される（enableDebugLogの影響は受けない）。
+    // ���C�Q�[�W�֘A�i�����E��ޔ���j�̃��O�͂��̃��\�b�h�o�R�ɂ���B
+    // F2�Ńg�O�������������o�͂����ienableDebugLog�̉e���͎󂯂Ȃ��j�B
     void GaugeDLog(string message)
     {
         if (kankiGaugeDebugLogEnabled) Debug.Log(message);
     }
 
-    // ★追加：エフェクト発生専用のデバッグログ。F3キーでON/OFFをトグルする。
-    //   ヒット・ガード・必殺技・漢気ゲージ充填などのエフェクトが「生成された瞬間」にだけ出力される。
-    //   通常のenableDebugLogとは独立して管理する（F2の漢気ゲージログと同じ方式）。
+    // ���ǉ��F�G�t�F�N�g������p�̃f�o�b�O���O�BF3�L�[��ON/OFF���g�O������B
+    //   �q�b�g�E�K�[�h�E�K�E�Z�E���C�Q�[�W�[�U�Ȃǂ̃G�t�F�N�g���u�������ꂽ�u�ԁv�ɂ����o�͂����B
+    //   �ʏ��enableDebugLog�Ƃ͓Ɨ����ĊǗ�����iF2�̊��C�Q�[�W���O�Ɠ��������j�B
     private bool effectDebugLogEnabled = false;
 
-    // エフェクト発生ログはすべてこのメソッド経由にする。F3でトグルした時だけ出力される。
+    // �G�t�F�N�g�������O�͂��ׂĂ��̃��\�b�h�o�R�ɂ���BF3�Ńg�O�������������o�͂����B
     void EffectDLog(string message)
     {
         if (effectDebugLogEnabled) Debug.Log($"[EFFECT] {message}");
     }
 
     //=====================================================
-    // ★名前
+    // �����O
     //=====================================================
     public string PlayerName;
     public string PLayerTagName;
     //=====================================================
-    // ★移動・向き
+    // ���ړ��E����
     //=====================================================
-    [Header("移動設定")]
-    public float moveSpeed = 3f;             // 移動速度
-    public float turnSpeed = 15f;            // 向きを変える速さ
+    [Header("�ړ��ݒ�")]
+    public float moveSpeed = 3f;             // �ړ����x
+    public float turnSpeed = 15f;            // ������ς��鑬��
 
     //=====================================================
-    // ★追加：自動向き合い設定
-    //   相手（対人戦はenemyPlayer／対CPU戦はenemy）の方向へ、常に自動で向きを変える。
-    //   ONの間は「移動方向を向く」処理を行わないため、後退する時も相手の方を向いたまま下がる。
-    //   向きはZ軸（P1/P2の間合いが変化する軸）だけで判定する。
+    // ���ǉ��F�������������ݒ�
+    //   ����i�ΐl���enemyPlayer�^��CPU���enemy�j�̕����ցA��Ɏ����Ō�����ς���B
+    //   ON�̊Ԃ́u�ړ������������v�������s��Ȃ����߁A��ނ��鎞������̕����������܂܉�����B
+    //   ������Z���iP1/P2�̊ԍ������ω����鎲�j�����Ŕ��肷��B
     //=====================================================
-    [Header("自動向き合い設定")]
-    [Tooltip("ONにすると、常に相手の方向へ自動で向きを変える（移動方向は向かない）。OFFにすると従来どおり移動方向を向く。")]
+    [Header("�������������ݒ�")]
+    [Tooltip("ON�ɂ���ƁA��ɑ���̕����֎����Ō�����ς���i�ړ������͌����Ȃ��j�BOFF�ɂ���Ə]���ǂ���ړ������������B")]
     [SerializeField] bool enableAutoFacing = true;
-    [Tooltip("相手とのZ軸の距離がこの値より小さい時は向きを変えない（真横で重なった時に左右へ向きがブレ続けるのを防ぐ）。")]
+    [Tooltip("����Ƃ�Z���̋��������̒l��菬�������͌�����ς��Ȃ��i�^���ŏd�Ȃ������ɍ��E�֌������u��������̂�h���j�B")]
     [SerializeField] float autoFaceDeadZone = 0.05f;
-    [Tooltip("【CPU戦のみ有効】相手が反対側へ回り込んだ時、このZ距離以上離れて初めて向きを反転させる。密着中の押し合い・ノックバック等で左右が一瞬入れ替わっても反転しないようにするための値。")]
+    [Tooltip("�yCPU��̂ݗL���z���肪���Α��։�荞�񂾎��A����Z�����ȏ㗣��ď��߂Č����𔽓]������B�������̉��������E�m�b�N�o�b�N���ō��E����u����ւ���Ă����]���Ȃ��悤�ɂ��邽�߂̒l�B")]
     [SerializeField] float autoFaceFlipThreshold = 1.0f;
-    [Tooltip("ONにすると、攻撃・投げ・必殺技の最中は向きを変えず、終わってから相手へ向き直す。OFF（既定）なら技の最中でも常に相手を向く。")]
+    [Tooltip("ON�ɂ���ƁA�U���E�����E�K�E�Z�̍Œ��͌�����ς����A�I����Ă��瑊��֌��������BOFF�i����j�Ȃ�Z�̍Œ��ł���ɑ���������B")]
     [SerializeField] bool lockFacingDuringAction = false;
 
     //=====================================================
-    // ★追加：リザルト画面モード
-    //   ONの間は、攻撃ボタン（パンチ／キック）以外の操作を受け付けず、移動も制限する。
-    //   ・スティック入力は無視（左右移動・しゃがみ・上下キックの分岐もすべて無効）
-    //   ・ジャンプ／仁王立ち／投げ／必殺技／L1は無効
-    //   ・被弾・ダメージ判定は行わない（攻撃は見た目だけ）
-    //   ・向きの自動変更、押しのけ合い、移動範囲のクランプも行わない（配置した位置のまま動かない）
-    //   パンチ／キックが実際に出るたびに ResultAttackPressed イベントが発行される（ひび割れ演出などが購読する）。
-    //   攻撃のクールダウン（攻撃モーション中）に押したボタンは無視され、イベントも発行されない。
+    // ���ǉ��F���U���g��ʃ��[�h
+    //   ON�̊Ԃ́A�U���{�^���i�p���`�^�L�b�N�j�ȊO�̑�����󂯕t�����A�ړ�����������B
+    //   �E�X�e�B�b�N���͖͂����i���E�ړ��E���Ⴊ�݁E�㉺�L�b�N�̕�������ׂĖ����j
+    //   �E�W�����v�^�m�������^�����^�K�E�Z�^L1�͖���
+    //   �E��e�E�_���[�W����͍s��Ȃ��i�U���͌����ڂ����j
+    //   �E�����̎����ύX�A�����̂������A�ړ��͈͂̃N�����v���s��Ȃ��i�z�u�����ʒu�̂܂ܓ����Ȃ��j
+    //   �p���`�^�L�b�N�����ۂɏo�邽�т� ResultAttackPressed �C�x���g�����s�����i�Ђъ��ꉉ�o�Ȃǂ��w�ǂ���j�B
+    //   �U���̃N�[���_�E���i�U�����[�V�������j�ɉ������{�^���͖�������A�C�x���g�����s����Ȃ��B
     //=====================================================
-    [Header("リザルト画面モード")]
-    [Tooltip("ONにすると、攻撃ボタン（パンチ／キック）以外の操作と移動を無効にする。通常はOFF。\n" +
-             "下のAuto Detect Result SceneがONなら、InGame1V1ResultControllerのあるシーンでは自動的にONになる。")]
+    [Header("���U���g��ʃ��[�h")]
+    [Tooltip("ON�ɂ���ƁA�U���{�^���i�p���`�^�L�b�N�j�ȊO�̑���ƈړ��𖳌��ɂ���B�ʏ��OFF�B\n" +
+             "����Auto Detect Result Scene��ON�Ȃ�AInGame1V1ResultController�̂���V�[���ł͎����I��ON�ɂȂ�B")]
     [SerializeField] bool isResultMode = false;
-    [Tooltip("ONにすると、シーン内にInGame1V1ResultControllerがある時（＝リザルト画面）、自動でリザルト画面モードにする。")]
+    [Tooltip("ON�ɂ���ƁA�V�[������InGame1V1ResultController�����鎞�i�����U���g��ʁj�A�����Ń��U���g��ʃ��[�h�ɂ���B")]
     [SerializeField] bool autoDetectResultScene = true;
 
-    // リザルト画面モード中に、パンチ／キックが実際に出た瞬間（EnterPunch／EnterKick）に発行される。
-    // 攻撃のクールダウン中（攻撃モーション中）のボタン押下では発行されない＝発行間隔は攻撃のクールダウンに一致する。
+    // ���U���g��ʃ��[�h���ɁA�p���`�^�L�b�N�����ۂɏo���u�ԁiEnterPunch�^EnterKick�j�ɔ��s�����B
+    // �U���̃N�[���_�E�����i�U�����[�V�������j�̃{�^�������ł͔��s����Ȃ������s�Ԋu�͍U���̃N�[���_�E���Ɉ�v����B
     public static event System.Action<Player> ResultAttackPressed;
 
     public bool IsResultMode => isResultMode;
 
-    // ★追加：リザルト画面で、このPlayerの攻撃ボタン入力を受け付けるか。
-    //   InGame1V1ResultControllerが「勝者以外の操作は無効」にする時、勝者以外のPlayerをfalseにする。
+    // ���ǉ��F���U���g��ʂŁA����Player�̍U���{�^�����͂��󂯕t���邩�B
+    //   InGame1V1ResultController���u���҈ȊO�̑���͖����v�ɂ��鎞�A���҈ȊO��Player��false�ɂ���B
     bool resultInputEnabled = true;
     public void SetResultInputEnabled(bool enabled) { resultInputEnabled = enabled; }
 
-    // ★追加：このPlayerに紐づいているPlayerInput（1P=playerIndex 0／2P=1、使用デバイスの取得に使う）
+    // ���ǉ��F����Player�ɕR�Â��Ă���PlayerInput�i1P=playerIndex 0�^2P=1�A�g�p�f�o�C�X�̎擾�Ɏg���j
     public PlayerInput PlayerInputComponent => playerInput != null ? playerInput : GetComponent<PlayerInput>();
 
-    // リザルト画面モードのON/OFFを切り替える（InGame1V1ResultControllerからも呼ばれる）
+    // ���U���g��ʃ��[�h��ON/OFF��؂�ւ���iInGame1V1ResultController������Ă΂��j
     public void SetResultMode(bool enable)
     {
         isResultMode = enable;
         if (!enable) return;
 
-        // 入力の残りを消し、移動・しゃがみ状態からも抜けておく
+        // ���͂̎c��������A�ړ��E���Ⴊ�ݏ�Ԃ���������Ă���
         moveInput = Vector2.zero;
         ClearInputIntents();
         if (currentState == PlayerState.Move || currentState == PlayerState.Crouch)
@@ -211,148 +211,148 @@ public class Player : MonoBehaviour
             currentState = PlayerState.Idle;
         }
     }
-    [SerializeField] float moveInputThreshold = 0.03f;    // 左右移動と判定するスティックの入力量
-    [SerializeField] float crouchInputThreshold = -0.43f; // しゃがみ／下キックと判定するスティックの下入力量
-    [SerializeField] float upKickInputThreshold = 0.25f;  // 上キックと判定するスティックの上入力量
+    [SerializeField] float moveInputThreshold = 0.03f;    // ���E�ړ��Ɣ��肷��X�e�B�b�N�̓��͗�
+    [SerializeField] float crouchInputThreshold = -0.43f; // ���Ⴊ�݁^���L�b�N�Ɣ��肷��X�e�B�b�N�̉����͗�
+    [SerializeField] float upKickInputThreshold = 0.25f;  // ��L�b�N�Ɣ��肷��X�e�B�b�N�̏���͗�
 
-    // ★追加：前進／後退アニメーション（frontMove / BackMove）の再生速度を、
-    //   スティックの倒し具合（moveInput.xの絶対値）に応じて変化させるための範囲設定。
-    //   Animator側で"MoveSpeedMultiplier"という名前のFloatパラメータを作成し、
-    //   frontMove/BackMoveステートのSpeedにこのパラメータを乗算設定しておくこと（設定方法は後述）。
-    [Header("移動アニメーション速度設定")]
-    [SerializeField] float minMoveAnimSpeed = 0.4f;  // スティックを少しだけ倒した時の再生速度倍率
-    [SerializeField] float maxMoveAnimSpeed = 1.4f;  // スティックを最大まで倒した時の再生速度倍率
+    // ���ǉ��F�O�i�^��ރA�j���[�V�����ifrontMove / BackMove�j�̍Đ����x���A
+    //   �X�e�B�b�N�̓|����imoveInput.x�̐�Βl�j�ɉ����ĕω������邽�߂͈̔͐ݒ�B
+    //   Animator����"MoveSpeedMultiplier"�Ƃ������O��Float�p�����[�^���쐬���A
+    //   frontMove/BackMove�X�e�[�g��Speed�ɂ��̃p�����[�^����Z�ݒ肵�Ă������Ɓi�ݒ���@�͌�q�j�B
+    [Header("�ړ��A�j���[�V�������x�ݒ�")]
+    [SerializeField] float minMoveAnimSpeed = 0.4f;  // �X�e�B�b�N�����������|�������̍Đ����x�{��
+    [SerializeField] float maxMoveAnimSpeed = 1.4f;  // �X�e�B�b�N���ő�܂œ|�������̍Đ����x�{��
 
-    // ★追加：実際の移動速度（moveSpeed）もアナログ入力量に応じて可変にするための倍率設定。
-    //   スティックを軽く倒した時にmoveSpeedが0近くまで下がってしまうと「動いていないように見える」ため、
-    //   最低でもmoveSpeedのminMoveSpeedRatio倍は出るようにし、最大までいくとmoveSpeedそのまま(=1.0倍)にする。
-    [SerializeField] [Range(0f, 1f)] float minMoveSpeedRatio = 0.4f; // 入力が最小(閾値ギリギリ)の時のmoveSpeedに対する割合
+    // ���ǉ��F���ۂ̈ړ����x�imoveSpeed�j���A�i���O���͗ʂɉ����ĉςɂ��邽�߂̔{���ݒ�B
+    //   �X�e�B�b�N���y���|��������moveSpeed��0�߂��܂ŉ������Ă��܂��Ɓu�����Ă��Ȃ��悤�Ɍ�����v���߁A
+    //   �Œ�ł�moveSpeed��minMoveSpeedRatio�{�͏o��悤�ɂ��A�ő�܂ł�����moveSpeed���̂܂�(=1.0�{)�ɂ���B
+    [SerializeField] [Range(0f, 1f)] float minMoveSpeedRatio = 0.4f; // ���͂��ŏ�(臒l�M���M��)�̎���moveSpeed�ɑ΂��銄��
 
     //=====================================================
-    // ★移動範囲制限（ワールド座標）
-    //   ステージ外に出ないよう、X/Y/Z各軸ごとにワールド座標の移動可能範囲を制限する。
-    //   通常の移動(Move)だけでなく、ジャンプ等でRigidbodyが動かした結果もLateUpdateで一括して制限する。
+    // ���ړ��͈͐����i���[���h���W�j
+    //   �X�e�[�W�O�ɏo�Ȃ��悤�AX/Y/Z�e�����ƂɃ��[���h���W�̈ړ��\�͈͂𐧌�����B
+    //   �ʏ�̈ړ�(Move)�����łȂ��A�W�����v����Rigidbody�������������ʂ�LateUpdate�ňꊇ���Đ�������B
     //=====================================================
-    [Header("移動範囲制限設定（ワールド座標）")]
-    [Tooltip("ワールド座標の各軸の最小値（左端・下端・奥側の限界）")]
+    [Header("�ړ��͈͐����ݒ�i���[���h���W�j")]
+    [Tooltip("���[���h���W�̊e���̍ŏ��l�i���[�E���[�E�����̌��E�j")]
     [SerializeField] Vector3 minPosition = new Vector3(-10f, -10f, -10f);
-    [Tooltip("ワールド座標の各軸の最大値（右端・上端・手前側の限界）")]
+    [Tooltip("���[���h���W�̊e���̍ő�l�i�E�[�E��[�E��O���̌��E�j")]
     [SerializeField] Vector3 maxPosition = new Vector3(10f, 10f, 10f);
 
     //=====================================================
-    // ★ジャンプ
+    // ���W�����v
     //=====================================================
-    [Header("ジャンプ設定")]
-    public Vector3 force;                    // ジャンプ時にRigidbodyへ加える力
-    // true = 地上にいてジャンプ可能な状態／false = 空中にいる状態
-    // （名前は旧版から変えず互換性を保っているが、意味は「接地フラグ」に近い）
+    [Header("�W�����v�ݒ�")]
+    public Vector3 force;                    // �W�����v����Rigidbody�։������
+    // true = �n��ɂ��ăW�����v�\�ȏ�ԁ^false = �󒆂ɂ�����
+    // �i���O�͋��ł���ς����݊�����ۂ��Ă��邪�A�Ӗ��́u�ڒn�t���O�v�ɋ߂��j
     public bool Jumpflag = true;
 
     //=====================================================
-    // ★体力・攻撃力・状態
+    // ���̗́E�U���́E���
     //=====================================================
-    [Header("ステータス")]
-    public int HP = 100;                     // 体力（現在値）
-    public int maxHP = 100;                  // 体力の最大値（F8での全回復・復活時の回復割合の基準になる）
-    public int atk = 10;                     // 現在の攻撃力（直近に出した攻撃の種類・漢気ゲージ・ガード成功で自動計算される。Inspectorの値は初期表示用）
-    public Player.Status Player_status;        // 外部から参照される、プレイヤーの現在の大まかな状態
+    [Header("�X�e�[�^�X")]
+    public int HP = 100;                     // �̗́i���ݒl�j
+    public int maxHP = 100;                  // �̗͂̍ő�l�iF8�ł̑S�񕜁E�������̉񕜊����̊�ɂȂ�j
+    public int atk = 10;                     // ���݂̍U���́i���߂ɏo�����U���̎�ށE���C�Q�[�W�E�K�[�h�����Ŏ����v�Z�����BInspector�̒l�͏����\���p�j
+    public Player.Status Player_status;        // �O������Q�Ƃ����A�v���C���[�̌��݂̑�܂��ȏ��
 
     //=====================================================
-    // ★各アクションの持続時間（Inspectorで調整可能）
+    // ���e�A�N�V�����̎������ԁiInspector�Œ����\�j
     //=====================================================
-    [Header("アクション時間設定（フレーム：60フレーム=1秒）")]
-    // ※パンチ／キック／上キック／下キックの拘束時間は、下の「攻撃ごとの設定」（各技のヘッダー）へ移動した。
-    [SerializeField] int guardFrames = 30;    // 仁王立ちの拘束フレーム数
-    [SerializeField] int throwFrames = 90;    // 投げの拘束フレーム数
+    [Header("�A�N�V�������Ԑݒ�i�t���[���F60�t���[��=1�b�j")]
+    // ���p���`�^�L�b�N�^��L�b�N�^���L�b�N�̍S�����Ԃ́A���́u�U�����Ƃ̐ݒ�v�i�e�Z�̃w�b�_�[�j�ֈړ������B
+    [SerializeField] int guardFrames = 30;    // �m�������̍S���t���[����
+    [SerializeField] int throwFrames = 90;    // �����̍S���t���[����
 
     //=====================================================
-    // ★攻撃の種類ごとの攻撃力（Inspectorで個別に調整可能）
-    //   ここに新しい技を追加する場合は、対応するフィールドを増やし、
-    //   GetAttackPower() の switch にもケースを追加すること。
+    // ���U���̎�ނ��Ƃ̍U���́iInspector�Ōʂɒ����\�j
+    //   �����ɐV�����Z��ǉ�����ꍇ�́A�Ή�����t�B�[���h�𑝂₵�A
+    //   GetAttackPower() �� switch �ɂ��P�[�X��ǉ����邱�ƁB
     //=====================================================
-    // ※パンチ／キック／上キック／下キック／必殺技の攻撃力は、下の「攻撃ごとの設定」（各技のヘッダー）へ移動した。
-    [Header("投げの攻撃力")]
-    [SerializeField] int throwAtk = 5;     // 投げ（つかみ）成立時の固定ダメージ
-    [Tooltip("投げ成立で飛ばされた相手が、着地した後に【やられ状態（行動不能）】になるフレーム数（60F=1秒）。" +
-             "着地した瞬間から数え始める。0だとやられ状態にならない。\n" +
-             "※投げ不成立（掴みタイムアウト）で互いに吹き飛んだ場合は対象外。")]
+    // ���p���`�^�L�b�N�^��L�b�N�^���L�b�N�^�K�E�Z�̍U���͂́A���́u�U�����Ƃ̐ݒ�v�i�e�Z�̃w�b�_�[�j�ֈړ������B
+    [Header("�����̍U����")]
+    [SerializeField] int throwAtk = 5;     // �����i���݁j�������̌Œ�_���[�W
+    [Tooltip("���������Ŕ�΂��ꂽ���肪�A���n������Ɂy�����ԁi�s���s�\�j�z�ɂȂ�t���[�����i60F=1�b�j�B" +
+             "���n�����u�Ԃ��琔���n�߂�B0���Ƃ����ԂɂȂ�Ȃ��B\n" +
+             "�������s�����i�͂݃^�C���A�E�g�j�Ō݂��ɐ�����񂾏ꍇ�͑ΏۊO�B")]
     [SerializeField] int throwStunFrames = 30;
 
     //=====================================================
-    // ★追加：投げ（掴み）仕様変更に伴う詳細設定
-    //   掴み成立→(掴み状態中に脱出できなければ)→投げ飛ばし、という2段階の流れになる。
-    //   throwFramesは「掴んでから実際に投げ飛ばすまでの拘束時間」として引き続き使用する
-    //   （Animatorの"Throw-start"モーションの長さと合わせること）。
+    // ���ǉ��F�����i�͂݁j�d�l�ύX�ɔ����ڍאݒ�
+    //   �͂ݐ�����(�͂ݏ�Ԓ��ɒE�o�ł��Ȃ����)��������΂��A�Ƃ���2�i�K�̗���ɂȂ�B
+    //   throwFrames�́u�͂�ł�����ۂɓ�����΂��܂ł̍S�����ԁv�Ƃ��Ĉ��������g�p����
+    //   �iAnimator��"Throw-start"���[�V�����̒����ƍ��킹�邱�Ɓj�B
     //=====================================================
-    [Header("投げ（掴み）詳細設定")]
-    [Tooltip("HPが0の時に脱出（掴みを振りほどく）までに必要なフレーム数（60F=1秒）。値が大きいほど脱出しにくい＝投げられやすい。")]
+    [Header("�����i�͂݁j�ڍאݒ�")]
+    [Tooltip("HP��0�̎��ɒE�o�i�݂͂�U��قǂ��j�܂łɕK�v�ȃt���[�����i60F=1�b�j�B�l���傫���قǒE�o���ɂ������������₷���B")]
     [SerializeField] int escapeFramesAtZeroHp = 90;
-    [Tooltip("HPが満タンの時に脱出（掴みを振りほどく）までに必要なフレーム数（60F=1秒）。値が小さいほど脱出しやすい＝投げられにくい。")]
+    [Tooltip("HP�����^���̎��ɒE�o�i�݂͂�U��قǂ��j�܂łɕK�v�ȃt���[�����i60F=1�b�j�B�l���������قǒE�o���₷�����������ɂ����B")]
     [SerializeField] int escapeFramesAtFullHp = 24;
-    [Tooltip("掴まれている間、ボタンやスティックを入力する度に、脱出に必要な残り時間からさらに追加で短縮するフレーム数。")]
+    [Tooltip("�͂܂�Ă���ԁA�{�^����X�e�B�b�N����͂���x�ɁA�E�o�ɕK�v�Ȏc�莞�Ԃ��炳��ɒǉ��ŒZ�k����t���[�����B")]
     [SerializeField] int escapeReductionFramesPerInput = 9;
-    [Tooltip("投げが成立した瞬間、相手に加える水平方向の初速。攻撃側の移動スティックの倒し方向（前/後）で向きが決まる。")]
+    [Tooltip("���������������u�ԁA����ɉ����鐅�������̏����B�U�����̈ړ��X�e�B�b�N�̓|�������i�O/��j�Ō��������܂�B")]
     [SerializeField] float throwHorizontalSpeed = 6f;
-    [Tooltip("投げが成立した瞬間、相手に加える上方向の初速。大きいほど放物線の弧が高くなる。")]
+    [Tooltip("���������������u�ԁA����ɉ����������̏����B�傫���قǕ������̌ʂ������Ȃ�B")]
     [SerializeField] float throwUpSpeed = 5f;
-    [Tooltip("★変更：掴み拘束時間が終わった時点で、掴んでいる側が方向スティックを入力していなかった場合の「投げ不成立」時に、" +
-             "お互いを後方（相手から離れる方向）へ吹き飛ばす水平方向の初速。投げ成立時(throwHorizontalSpeed)より弱めが目安。")]
+    [Tooltip("���ύX�F�͂ݍS�����Ԃ��I��������_�ŁA�͂�ł��鑤�������X�e�B�b�N����͂��Ă��Ȃ������ꍇ�́u�����s�����v���ɁA" +
+             "���݂�������i���肩�痣�������j�֐�����΂����������̏����B����������(throwHorizontalSpeed)����߂��ڈ��B")]
     [SerializeField] float grabFailHorizontalSpeed = 3f;
-    [Tooltip("★追加：投げ不成立時に、お互いを後方へ吹き飛ばす上方向の初速。大きいほど放物線の弧が高くなる。")]
+    [Tooltip("���ǉ��F�����s�������ɁA���݂�������֐�����΂�������̏����B�傫���قǕ������̌ʂ������Ȃ�B")]
     [SerializeField] float grabFailUpSpeed = 3f;
-    [Tooltip("★追加：掴みが成立してから、掴みモーション(Throw-start)を再生し続ける時間。この時間が過ぎたらアニメーションを一時停止し、" +
-             "投げ成立(Throw-release)／投げ不成立(Throw-whiff)の瞬間まで掴んだポーズで止め続ける。" +
-             "※下のenableThrowStartPlayがONの時だけ使われる。OFFの時は、手が相手に接触した瞬間にアニメーションを即座に止める。")]
+    [Tooltip("���ǉ��F�݂͂��������Ă���A�͂݃��[�V����(Throw-start)���Đ��������鎞�ԁB���̎��Ԃ��߂�����A�j���[�V�������ꎞ��~���A" +
+             "��������(Throw-release)�^�����s����(Throw-whiff)�̏u�Ԃ܂Œ͂񂾃|�[�Y�Ŏ~�ߑ�����B" +
+             "������enableThrowStartPlay��ON�̎������g����BOFF�̎��́A�肪����ɐڐG�����u�ԂɃA�j���[�V�����𑦍��Ɏ~�߂�B")]
     [SerializeField] int throwStartPlayFrames = 12;
-    [Tooltip("★追加：ONにすると、手が相手に接触してから上のthrowStartPlayFramesフレームだけ掴みモーションを再生し続け、その後に止める。" +
-             "OFF（既定）の時は、手が相手に接触した瞬間にアニメーションを即座に止める。")]
+    [Tooltip("���ǉ��FON�ɂ���ƁA�肪����ɐڐG���Ă�����throwStartPlayFrames�t���[�������͂݃��[�V�������Đ��������A���̌�Ɏ~�߂�B" +
+             "OFF�i����j�̎��́A�肪����ɐڐG�����u�ԂɃA�j���[�V�����𑦍��Ɏ~�߂�B")]
     [SerializeField] bool enableThrowStartPlay = false;
-    [Tooltip("★追加：掴んでいる間に方向入力（前／後）をした時は、拘束時間の終了を待たずに即座に投げ飛ばす。\n" +
-             "投げ飛ばした後、掴んでいた側が次の行動に移れるようになるまでの硬直フレーム数（60F=1秒）。\n" +
-             "※拘束時間の残りがこれより短ければ、残り時間のほうが使われる。")]
+    [Tooltip("���ǉ��F�͂�ł���Ԃɕ������́i�O�^��j���������́A�S�����Ԃ̏I����҂����ɑ����ɓ�����΂��B\n" +
+             "������΂�����A�͂�ł����������̍s���Ɉڂ��悤�ɂȂ�܂ł̍d���t���[�����i60F=1�b�j�B\n" +
+             "���S�����Ԃ̎c�肪������Z����΁A�c�莞�Ԃ̂ق����g����B")]
     [SerializeField] int throwReleaseRecoveryFrames = 20;
-    [Tooltip("★追加：掴みが成立してから、方向入力による即時投げを受け付け始めるまでのフレーム数（60F=1秒）。\n" +
-             "この間は入力しても投げに移行せず、掴んだ状態を保つ。この間の入力は先行入力としては扱わず、\n" +
-             "経過後も入力し続けている（押しっぱなし）場合に投げが決まる。")]
+    [Tooltip("���ǉ��F�݂͂��������Ă���A�������͂ɂ�鑦���������󂯕t���n�߂�܂ł̃t���[�����i60F=1�b�j�B\n" +
+             "���̊Ԃ͓��͂��Ă������Ɉڍs�����A�͂񂾏�Ԃ�ۂB���̊Ԃ̓��͂͐�s���͂Ƃ��Ă͈��킸�A\n" +
+             "�o�ߌ�����͂������Ă���i�������ςȂ��j�ꍇ�ɓ��������܂�B")]
     [SerializeField] int throwInputStartDelayFrames = 10;
 
     //=====================================================
-    // ★ガード（仁王立ち）成功時の攻撃力上昇設定
-    //   ★変更：以前は「相手の攻撃力を自分の攻撃力に加算」していたが、
-    //   「次に与える技のダメージ倍率を上げる」方式に変更した。
+    // ���K�[�h�i�m�������j�������̍U���͏㏸�ݒ�
+    //   ���ύX�F�ȑO�́u����̍U���͂������̍U���͂ɉ��Z�v���Ă������A
+    //   �u���ɗ^����Z�̃_���[�W�{�����グ��v�����ɕύX�����B
     //=====================================================
-    [Header("ガード成功時の攻撃力上昇設定")]
-    [Tooltip("ガード成功時、次に自分が与える技のダメージ倍率。1.5なら次の技のダメージが1.5倍になる。\n" +
-             "（漢気ゲージによる攻撃力補正とは別に、さらに掛け算される）\n" +
-             "倍率は次の攻撃が相手に命中するまで持続する。1以下なら上昇なし。\n" +
-             "★技を出す（命中する）前に続けてガードに成功すると、成功するたびにこの倍率が掛け算で重なっていく（1.5なら 1.5 → 2.25 → 3.375…）。")]
+    [Header("�K�[�h�������̍U���͏㏸�ݒ�")]
+    [Tooltip("�K�[�h�������A���Ɏ������^����Z�̃_���[�W�{���B1.5�Ȃ玟�̋Z�̃_���[�W��1.5�{�ɂȂ�B\n" +
+             "�i���C�Q�[�W�ɂ��U���͕␳�Ƃ͕ʂɁA����Ɋ|���Z�����j\n" +
+             "�{���͎��̍U��������ɖ�������܂Ŏ�������B1�ȉ��Ȃ�㏸�Ȃ��B\n" +
+             "���Z���o���i��������j�O�ɑ����ăK�[�h�ɐ�������ƁA�������邽�тɂ��̔{�����|���Z�ŏd�Ȃ��Ă����i1.5�Ȃ� 1.5 �� 2.25 �� 3.375�c�j�B")]
     [SerializeField] float guardSuccessNextAttackMultiplier = 1.5f;
-    [Tooltip("ガード成功を重ねた時の、倍率の上限。0以下なら上限なし。")]
+    [Tooltip("�K�[�h�������d�˂����́A�{���̏���B0�ȉ��Ȃ����Ȃ��B")]
     [SerializeField] float guardSuccessMaxMultiplier = 0f;
 
     //=====================================================
-    // ★ガード（仁王立ち）失敗時のペナルティ設定
-    //   「失敗」＝相手の攻撃を一度も受け止めないまま、仁王立ちの拘束時間が終わった（空ガード）場合。
+    // ���K�[�h�i�m�������j���s���̃y�i���e�B�ݒ�
+    //   �u���s�v������̍U������x���󂯎~�߂Ȃ��܂܁A�m�������̍S�����Ԃ��I������i��K�[�h�j�ꍇ�B
     //=====================================================
-    [Header("ガード失敗時のペナルティ設定")]
-    [Tooltip("ガード失敗後、漢気ゲージの増加量にかかる倍率。0.5なら半減。1なら影響なし。")]
+    [Header("�K�[�h���s���̃y�i���e�B�ݒ�")]
+    [Tooltip("�K�[�h���s��A���C�Q�[�W�̑����ʂɂ�����{���B0.5�Ȃ甼���B1�Ȃ�e���Ȃ��B")]
     [Range(0f, 1f)]
     [SerializeField] float guardFailGaugeGainRate = 0.5f;
-    [Tooltip("ガード失敗後、漢気ゲージの増加率が下がる時間（フレーム数。60F=1秒）。0なら下がらない。")]
+    [Tooltip("�K�[�h���s��A���C�Q�[�W�̑������������鎞�ԁi�t���[�����B60F=1�b�j�B0�Ȃ牺����Ȃ��B")]
     [SerializeField] int guardFailGaugePenaltyFrames = 180;
-    [Tooltip("ガード失敗直後に受けるダメージにかかる倍率。1.5なら1.5倍。1なら影響なし。")]
+    [Tooltip("�K�[�h���s����Ɏ󂯂�_���[�W�ɂ�����{���B1.5�Ȃ�1.5�{�B1�Ȃ�e���Ȃ��B")]
     [SerializeField] float guardFailDamageMultiplier = 1.5f;
-    [Tooltip("ガード失敗直後、受けるダメージが増える時間（フレーム数。60F=1秒）。0なら増えない。")]
+    [Tooltip("�K�[�h���s����A�󂯂�_���[�W�������鎞�ԁi�t���[�����B60F=1�b�j�B0�Ȃ瑝���Ȃ��B")]
     [SerializeField] int guardFailDamagePenaltyFrames = 60;
 
-    private bool guardBlockedThisGuard = false; // 今の仁王立ちで、相手の攻撃を1回でも受け止めたか（失敗判定用）
-    private int guardFailGaugeTimer = 0;        // 漢気ゲージ増加率ダウンの残りフレーム数
-    private int guardFailDamageTimer = 0;       // 被ダメージ増加の残りフレーム数
+    private bool guardBlockedThisGuard = false; // ���̐m�������ŁA����̍U����1��ł��󂯎~�߂����i���s����p�j
+    private int guardFailGaugeTimer = 0;        // ���C�Q�[�W�������_�E���̎c��t���[����
+    private int guardFailDamageTimer = 0;       // ��_���[�W�����̎c��t���[����
 
-    // ★追加：F10デバッグ表示用。直前に受けたダメージの記録
-    private int lastDamageTaken = 0;            // 実際に減ったダメージ量（ガード半減・失敗ペナルティ反映後）
-    private int lastDamageBase = 0;             // ペナルティ倍率を掛ける前のダメージ量
-    private string lastDamageKind = "なし";     // 直前のダメージの種類（通常被弾／ガード(半減)／damege()）
+    // ���ǉ��FF10�f�o�b�O�\���p�B���O�Ɏ󂯂��_���[�W�̋L�^
+    private int lastDamageTaken = 0;            // ���ۂɌ������_���[�W�ʁi�K�[�h�����E���s�y�i���e�B���f��j
+    private int lastDamageBase = 0;             // �y�i���e�B�{�����|����O�̃_���[�W��
+    private string lastDamageKind = "�Ȃ�";     // ���O�̃_���[�W�̎�ށi�ʏ��e�^�K�[�h(����)�^damege()�j
 
     void RecordDamage(int damage, int baseDamage, string kind)
     {
@@ -361,450 +361,455 @@ public class Player : MonoBehaviour
         lastDamageKind = kind;
     }
 
-    // ガード失敗ペナルティの残りフレームを消化する（Updateの先頭から毎フレーム呼ぶ）
+    // �K�[�h���s�y�i���e�B�̎c��t���[������������iUpdate�̐擪���疈�t���[���Ăԁj
     void TickGuardFailPenalty()
     {
         if (guardFailGaugeTimer > 0) guardFailGaugeTimer = Mathf.Max(guardFailGaugeTimer - frameStep, 0);
         if (guardFailDamageTimer > 0) guardFailDamageTimer = Mathf.Max(guardFailDamageTimer - frameStep, 0);
     }
 
-    // 仁王立ちが空振り（1回も受け止めずに終了）した時に呼ぶ
+    // �m����������U��i1����󂯎~�߂��ɏI���j�������ɌĂ�
     void ApplyGuardFailPenalty()
     {
         guardFailGaugeTimer = Mathf.Max(guardFailGaugePenaltyFrames, 0);
         guardFailDamageTimer = Mathf.Max(guardFailDamagePenaltyFrames, 0);
-        DLog($"[{PlayerName}] ガード失敗：漢気ゲージ増加率×{guardFailGaugeGainRate}を{guardFailGaugeTimer}F／被ダメージ×{guardFailDamageMultiplier}を{guardFailDamageTimer}F");
+        DLog($"[{PlayerName}] �K�[�h���s�F���C�Q�[�W�������~{guardFailGaugeGainRate}��{guardFailGaugeTimer}F�^��_���[�W�~{guardFailDamageMultiplier}��{guardFailDamageTimer}F");
     }
 
     //=====================================================
-    // ★ガード（仁王立ち）成功時の、相手へのスタン設定
+    // ���K�[�h�i�m�������j�������́A����ւ̃X�^���ݒ�
     //=====================================================
-    [Header("ガード成功時の相手スタン設定")]
-    [Tooltip("仁王立ちでガードに成功した時、攻撃してきた相手を行動不能（スタン）にするフレーム数（60F=1秒）。" +
-             "この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。0だとスタンさせない。\n" +
-             "※相手が必殺技・投げ（掴み中）・ダウン中などの場合はスタンさせない。")]
+    [Header("�K�[�h�������̑���X�^���ݒ�")]
+    [Tooltip("�m�������ŃK�[�h�ɐ����������A�U�����Ă���������s���s�\�i�X�^���j�ɂ���t���[�����i60F=1�b�j�B" +
+             "���̊ԁA����͈ړ��E�U���E�K�[�h�E�����E�W�����v������؂ł��Ȃ��B0���ƃX�^�������Ȃ��B\n" +
+             "�����肪�K�E�Z�E�����i�͂ݒ��j�E�_�E�����Ȃǂ̏ꍇ�̓X�^�������Ȃ��B")]
     [SerializeField] int guardSuccessStunFrames = 30;
 
     //=====================================================
-    // ★根性復活（ダウン後の復活チャレンジ）設定
+    // �����������i�_�E����̕����`�������W�j�ݒ�
     //=====================================================
-    [Header("復活（根性）設定")]
-    [SerializeField] int rebornTimeLimitFrames = 300;  // 復活チャレンジの制限フレーム数（300F=5秒）
+    [Header("�����i�����j�ݒ�")]
+    [SerializeField] int rebornTimeLimitFrames = 300;  // �����`�������W�̐����t���[�����i300F=5�b�j
     [Range(0f, 1f)]
-    [SerializeField] float rebornHpRatio = 0.3f;    // 復活成功時に回復するHPの割合（maxHPに対する割合。0.3なら最大HPの3割まで回復）
-    [SerializeField] int mashThresholdBase = 11;    // 必要連打数の基準値
-    [Tooltip("ダウン中の連打に使えるボタンの切り替え。\n" +
-             "ON：どのボタン（ジャンプ・パンチ・キック・仁王立ち・投げ・L1）を押しても連打1回として数える。\n" +
-             "OFF：パンチボタン（Bボタン）だけを連打として数える（他のボタンは無視）。")]
-    [SerializeField] bool mashWithAnyButton = true;  // ★追加：ONならどのボタンでも連打OK／OFFならBボタン（パンチ）のみ
-    [SerializeField] int mashThresholdStep = 3;     // 復活回数が増えるごとに必要連打数が増える量
+    [SerializeField] float rebornHpRatio = 0.3f;    // �����������ɉ񕜂���HP�̊����imaxHP�ɑ΂��銄���B0.3�Ȃ�ő�HP��3���܂ŉ񕜁j
+    [SerializeField] int mashThresholdBase = 11;    // �K�v�A�Ő��̊�l
+    [Tooltip("�_�E�����̘A�łɎg����{�^���̐؂�ւ��B\n" +
+             "ON�F�ǂ̃{�^���i�W�����v�E�p���`�E�L�b�N�E�m�������E�����EL1�j�������Ă��A��1��Ƃ��Đ�����B\n" +
+             "OFF�F�p���`�{�^���iB�{�^���j������A�łƂ��Đ�����i���̃{�^���͖����j�B")]
+    [SerializeField] bool mashWithAnyButton = true;  // ���ǉ��FON�Ȃ�ǂ̃{�^���ł��A��OK�^OFF�Ȃ�B�{�^���i�p���`�j�̂�
+    [SerializeField] int mashThresholdStep = 3;     // �����񐔂������邲�ƂɕK�v�A�Ő����������
 
     //=====================================================
-    // ★しゃがみ時のコライダー変化量
+    // �����Ⴊ�ݎ��̃R���C�_�[�ω���
     //=====================================================
-    [Header("しゃがみ時のコライダー設定")]
+    [Header("���Ⴊ�ݎ��̃R���C�_�[�ݒ�")]
     [SerializeField] float standHeight = 2.0f;
     [SerializeField] Vector3 standCenter = new Vector3(0, 1.0f, 0);
     [SerializeField] float crouchHeight = 0.65f;
     [SerializeField] Vector3 crouchCenter = new Vector3(0, 0.5f, 0);
 
     //=====================================================
-    // ★エフェクト・効果音
+    // ���G�t�F�N�g�E���ʉ�
     //=====================================================
-    [Header("エフェクト・SE")]
-    public AudioClip MenBlock_se;            // 仁王立ちガード成功時の効果音
-    public ParticleSystem Men_particle;      // 仁王立ち用のパーティクル
-    public ParticleSystem Hit_particle;      // ヒット時用のパーティクル
+    [Header("�G�t�F�N�g�ESE")]
+    public AudioClip MenBlock_se;            // �m�������K�[�h�������̌��ʉ�
+    public ParticleSystem Men_particle;      // �m�������p�̃p�[�e�B�N��
+    public ParticleSystem Hit_particle;      // �q�b�g���p�̃p�[�e�B�N��
 
-    [Header("擬音演出（ドカン・ドドン等）")]
-    public HitEffectData punchHitEffectData;   // パンチ（空中攻撃含む）被弾時に出す擬音の設定
-    public HitEffectData kickHitEffectData;    // キック（通常/上/下すべて共通）被弾時に出す擬音の設定
-    public HitEffectData guardHitEffectData;   // 仁王立ちガード成功時に出す擬音の設定（未設定なら出さない）
-    public HitEffectData mashHitEffectData;    // 根性復活の連打1回ごとに出す擬音の設定（未設定なら出さない）
-    public HitEffectData missHitEffectData;    // 攻撃が空振りした時に出す擬音の設定（未設定なら出さない）
+    [Header("�[�����o�i�h�J���E�h�h�����j")]
+    public HitEffectData punchHitEffectData;   // �p���`�i�󒆍U���܂ށj��e���ɏo���[���̐ݒ�
+    public HitEffectData kickHitEffectData;    // �L�b�N�i�ʏ�/��/�����ׂċ��ʁj��e���ɏo���[���̐ݒ�
+    public HitEffectData guardHitEffectData;   // �m�������K�[�h�������ɏo���[���̐ݒ�i���ݒ�Ȃ�o���Ȃ��j
+    public HitEffectData mashHitEffectData;    // ���������̘A��1�񂲂Ƃɏo���[���̐ݒ�i���ݒ�Ȃ�o���Ȃ��j
+    public HitEffectData missHitEffectData;    // �U������U�肵�����ɏo���[���̐ݒ�i���ݒ�Ȃ�o���Ȃ��j
 
-    // ★追加：被弾擬音を「どのキャラの向き」の反対側に出すか
+    // ���ǉ��F��e�[�����u�ǂ̃L�����̌����v�̔��Α��ɏo����
     public enum HitEffectFacingBasis
     {
-        Attacker, // 攻撃したキャラの向き（左を向いて攻撃したら右へ／右を向いて攻撃したら左へ）
-        Victim,   // 被弾したキャラの向き（左を向いている側が殴られたら右へ／右なら左へ）
+        Attacker, // �U�������L�����̌����i���������čU��������E�ց^�E�������čU�������獶�ցj
+        Victim,   // ��e�����L�����̌����i���������Ă��鑤������ꂽ��E�ց^�E�Ȃ獶�ցj
     }
-    [Tooltip("被弾した時の擬音を、攻撃したキャラ／被弾したキャラのどちらの向きの反対側に出すか。")]
+    [Tooltip("��e�������̋[�����A�U�������L�����^��e�����L�����̂ǂ���̌����̔��Α��ɏo�����B")]
     [SerializeField] HitEffectFacingBasis hitEffectFacingBasis = HitEffectFacingBasis.Attacker;
 
     //=====================================================
-    // ★ヒットストップ設定
+    // ���q�b�g�X�g�b�v�ݒ�
     //=====================================================
-    [Header("ヒットストップ設定")]
-    [SerializeField] bool enableHitStop = true;             // ヒットストップ機能を使うかどうか
-    [Tooltip("CPU(Enemy)の攻撃を受けた時など、攻撃側に個別設定が無い場合に使う、通常被弾時のヒットストップのフレーム数（60F=1秒）。\n" +
-             "対人戦でPlayerの攻撃を受けた時は、攻撃者側の「攻撃ごとの設定」のヒットストップ時間が使われる。")]
-    [SerializeField] int hitStopFrames = 5;         // 通常被弾時（CPU等の攻撃側設定が無い場合）に少しだけ動けなくなるフレーム数
-    [SerializeField] int guardHitStopFrames = 3;    // 仁王立ちガード成功時に少しだけ動けなくなるフレーム数
-    [SerializeField] bool freezeAnimatorDuringHitStop = true; // ヒットストップ中はアニメーションも一瞬止めるか
+    [Header("�q�b�g�X�g�b�v�ݒ�")]
+    [SerializeField] bool enableHitStop = true;             // �q�b�g�X�g�b�v�@�\���g�����ǂ���
+    [Tooltip("CPU(Enemy)�̍U�����󂯂����ȂǁA�U�����Ɍʐݒ肪�����ꍇ�Ɏg���A�ʏ��e���̃q�b�g�X�g�b�v�̃t���[�����i60F=1�b�j�B\n" +
+             "�ΐl���Player�̍U�����󂯂����́A�U���ґ��́u�U�����Ƃ̐ݒ�v�̃q�b�g�X�g�b�v���Ԃ��g����B")]
+    [SerializeField] int hitStopFrames = 5;         // �ʏ��e���iCPU���̍U�����ݒ肪�����ꍇ�j�ɏ������������Ȃ��Ȃ�t���[����
+    [SerializeField] int guardHitStopFrames = 3;    // �m�������K�[�h�������ɏ������������Ȃ��Ȃ�t���[����
+    [SerializeField] bool freezeAnimatorDuringHitStop = true; // �q�b�g�X�g�b�v���̓A�j���[�V��������u�~�߂邩
 
-    private int hitStopTimer = 0;   // 残りヒットストップフレーム数。0より大きい間は入力処理をすべてスキップする
-    private bool pendingHeadHitAnimation = false; // ヒットストップ終了時に被弾アニメーションを再生するか（ガード成功時はfalse）
+    private int hitStopTimer = 0;   // �c��q�b�g�X�g�b�v�t���[�����B0���傫���Ԃ͓��͏��������ׂăX�L�b�v����
+    private bool pendingHeadHitAnimation = false; // �q�b�g�X�g�b�v�I�����ɔ�e�A�j���[�V�������Đ����邩�i�K�[�h��������false�j
 
-    // ★追加：被弾アニメーションの二重再生を防ぐための設定。
-    //   以前は、被弾した瞬間にTrigger（Hit／Hit-front／Hit-back）で再生を始めたうえで、
-    //   ヒットストップ終了時にHeadHitステートを頭から再生し直していたため、被弾アニメーションが2回再生されていた。
-    //   今は、被弾アニメーションを1つだけ選んで「ヒットストップが終わった瞬間に1回だけ」再生する。
-    // ★変更：既定をON（トリガーOFF）にした。被弾時にHit／Hit-front／Hit-backのTriggerは一切立てず、
-    //   HeadHitステートを「ヒットストップ終了時（ヒットストップ無しならその場）に1回だけ」直接再生する。
-    //   ※Inspectorでこの項目のチェックを外していた場合は、シリアライズ済みの値(OFF)が優先されるので、チェックを入れ直すこと。
-    [Tooltip("ON（既定）：被弾Trigger（Hit／Hit-front／Hit-back）は立てず、HeadHitステートを1回だけ直接再生する。\n" +
-             "OFF：被弾アニメーションをTrigger（Hit／Hit-front／Hit-back）で、ヒットストップ終了時に1回だけ再生する。")]
+    // ���ǉ��F��e�A�j���[�V�����̓�d�Đ���h�����߂̐ݒ�B
+    //   �ȑO�́A��e�����u�Ԃ�Trigger�iHit�^Hit-front�^Hit-back�j�ōĐ����n�߂������ŁA
+    //   �q�b�g�X�g�b�v�I������HeadHit�X�e�[�g�𓪂���Đ��������Ă������߁A��e�A�j���[�V������2��Đ�����Ă����B
+    //   ���́A��e�A�j���[�V������1�����I��Łu�q�b�g�X�g�b�v���I������u�Ԃ�1�񂾂��v�Đ�����B
+    // ���ύX�F�����ON�i�g���K�[OFF�j�ɂ����B��e����Hit�^Hit-front�^Hit-back��Trigger�͈�ؗ��Ă��A
+    //   HeadHit�X�e�[�g���u�q�b�g�X�g�b�v�I�����i�q�b�g�X�g�b�v�����Ȃ炻�̏�j��1�񂾂��v���ڍĐ�����B
+    //   ��Inspector�ł��̍��ڂ̃`�F�b�N���O���Ă����ꍇ�́A�V���A���C�Y�ς݂̒l(OFF)���D�悳���̂ŁA�`�F�b�N����꒼�����ƁB
+    [Tooltip("ON�i����j�F��eTrigger�iHit�^Hit-front�^Hit-back�j�͗��Ă��AHeadHit�X�e�[�g��1�񂾂����ڍĐ�����B\n" +
+             "OFF�F��e�A�j���[�V������Trigger�iHit�^Hit-front�^Hit-back�j�ŁA�q�b�g�X�g�b�v�I������1�񂾂��Đ�����B")]
     [SerializeField] bool playHeadHitStateDirectly = true;
-    private bool pendingHitTrigger = false;       // 予約中の被弾Triggerがあるか
-    private bool pendingHitHasDirection = false;  // 攻撃者の方向が分かっているか（Hit-front／Hit-backを立てるか）
-    private bool pendingHitFromFront = false;     // 攻撃者が自分の前方にいたか
-    private bool hasPendingKnockback = false;    // ヒットストップ終了時にノックバックを与えるか
-    private Vector3 pendingKnockbackVelocity;    // 与えるノックバックの初速（水平＋上方向）
+    private bool pendingHitTrigger = false;       // �\�񒆂̔�eTrigger�����邩
+    private bool pendingHitHasDirection = false;  // �U���҂̕������������Ă��邩�iHit-front�^Hit-back�𗧂Ă邩�j
+    private bool pendingHitFromFront = false;     // �U���҂������̑O���ɂ�����
+    private bool hasPendingKnockback = false;    // �q�b�g�X�g�b�v�I�����Ƀm�b�N�o�b�N��^���邩
+    private Vector3 pendingKnockbackVelocity;    // �^����m�b�N�o�b�N�̏����i�����{������j
 
     //=====================================================
-    // ★攻撃ごとの設定（攻撃の種類ごと）
-    //   各技のヘッダーの下に、次の順で並べている：
-    //     ① 攻撃力 … この技が当たった時に相手へ与えるダメージ（漢気ゲージ補正の前の素の値）
-    //     ② 攻撃後のクールダウン（拘束時間）… 攻撃を出した後、次の行動ができるまでの時間
-//        ★空振り時(〇〇MissFrames)と命中時(〇〇HitFrames)を別々に設定できる。
-//        どちらも「攻撃を出した瞬間からの合計時間」。命中した瞬間に、残り時間が命中時の値へ切り替わる。
-    //     ③ ヒットストップ … この技を当てられた相手が止まる時間
-    //     ④ ノックバック … この技を当てられた相手が飛ぶ量（攻撃者から離れる方向＋上方向）
-    //     ⑤ やられ状態の時間 … この技を当てられた相手が行動不能になるフレーム数（60F=1秒）。0ならやられ状態にならない。
-    //   ③④⑤は「攻撃する側」のInspectorで調整する。
-    //   ※仁王立ちガードで防がれた時は、ヒットストップはguardHitStopFrames、ノックバックは無し。
-    //   ※新しい技を追加する場合は、対応するフィールドを増やし、GetAttackPower() /
-    //     GetCurrentHitStopFrames() / GetCurrentKnockbackSetting() / GetMultiHitSetting() の
-    //     switchにもケースを追加すること。
+    // ���U�����Ƃ̐ݒ�i�U���̎�ނ��Ɓj
+    //   �e�Z�̃w�b�_�[�̉��ɁA���̏��ŕ��ׂĂ���F
+    //     �@ �U���� �c ���̋Z�������������ɑ���֗^����_���[�W�i���C�Q�[�W�␳�̑O�̑f�̒l�j
+    //     �A �U����̃N�[���_�E���i�S�����ԁj�c �U�����o������A���̍s�����ł���܂ł̎���
+//        ����U�莞(�Z�ZMissFrames)�Ɩ�����(�Z�ZHitFrames)��ʁX�ɐݒ�ł���B
+//        �ǂ�����u�U�����o�����u�Ԃ���̍��v���ԁv�B���������u�ԂɁA�c�莞�Ԃ��������̒l�֐؂�ւ��B
+    //     �B �q�b�g�X�g�b�v �c ���̋Z�𓖂Ă�ꂽ���肪�~�܂鎞��
+    //     �C �m�b�N�o�b�N �c ���̋Z�𓖂Ă�ꂽ���肪��ԗʁi�U���҂��痣�������{������j
+    //     �D �����Ԃ̎��� �c ���̋Z�𓖂Ă�ꂽ���肪�s���s�\�ɂȂ�t���[�����i60F=1�b�j�B0�Ȃ�����ԂɂȂ�Ȃ��B
+    //   �B�C�D�́u�U�����鑤�v��Inspector�Œ�������B
+    //   ���m�������K�[�h�Ŗh���ꂽ���́A�q�b�g�X�g�b�v��guardHitStopFrames�A�m�b�N�o�b�N�͖����B
+    //   ���V�����Z��ǉ�����ꍇ�́A�Ή�����t�B�[���h�𑝂₵�AGetAttackPower() /
+    //     GetCurrentHitStopFrames() / GetCurrentKnockbackSetting() / GetMultiHitSetting() ��
+    //     switch�ɂ��P�[�X��ǉ����邱�ƁB
     //=====================================================
     [System.Serializable]
     public class KnockbackSetting
     {
-        [Tooltip("相手を後方（攻撃者から離れる方向）へ飛ばす水平方向の初速。大きいほど遠くまで飛ぶ。0で水平方向には飛ばない。")]
+        [Tooltip("���������i�U���҂��痣�������j�֔�΂����������̏����B�傫���قǉ����܂Ŕ�ԁB0�Ő��������ɂ͔�΂Ȃ��B")]
         public float horizontalSpeed = 3f;
-        [Tooltip("相手を上方向へ飛ばす初速。大きいほど高く浮く。0で浮かない。" +
-                 "1未満だと実際にはほとんど浮かないので、浮かせたい時は1以上を目安に。")]
+        [Tooltip("�����������֔�΂������B�傫���قǍ��������B0�ŕ����Ȃ��B" +
+                 "1�������Ǝ��ۂɂ͂قƂ�Ǖ����Ȃ��̂ŁA��������������1�ȏ��ڈ��ɁB")]
         public float upSpeed = 0f;
     }
 
-    [Header("パンチ（空中攻撃含む）")]
-    [Tooltip("① パンチの攻撃力（ダメージ量）")]
+    [Header("�p���`�i�󒆍U���܂ށj")]
+    [Tooltip("�@ �p���`�̍U���́i�_���[�W�ʁj")]
     [SerializeField] int punchAtk = 10;
-    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束フレーム数。60F=1秒）。パンチを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [Tooltip("�A �U����̃N�[���_�E���y��U�莞�z�i�S���t���[�����B60F=1�b�j�B�p���`���o���Ă���A����ɓ�����Ȃ������ꍇ�Ɏ��̍s�����ł���܂ł̎��ԁB")]
     [SerializeField] int punchMissFrames = 30;
-    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束フレーム数。60F=1秒）。パンチを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
+    [Tooltip("�A �U����̃N�[���_�E���y�������z�i�S���t���[�����B60F=1�b�j�B�p���`���o���Ă���A����ɓ��������ꍇ�Ɏ��̍s�����ł���܂ł̎��ԁi�U���J�n����̍��v�j�B�����������_�Ŋ��Ɍo�߂��Ă��鎞�Ԃ�����𒴂��Ă���΁A�����ɍs���\�ɂȂ�B")]
     [SerializeField] int punchHitFrames = 30;
-    [Tooltip("⑤ パンチを当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [Tooltip("�D �p���`�𓖂Ă����́A����́y�����ԁi�s���s�\�j�z�̃t���[�����i60F=1�b�j�B���̊ԁA����͈ړ��E�U���E�K�[�h�E�����E�W�����v������؂ł��Ȃ��B���ꒆ�ɂ���ɍU�������������ꍇ�́A�c�莞�ԂƂ��̒l�̒������ɉ��������B0���Ƃ����ԂɂȂ�Ȃ��B")]
     [SerializeField] int punchStunFrames = 18;
-    [Tooltip("③ パンチを当てた時の、相手のヒットストップのフレーム数（60F=1秒）。0だと止まらない。")]
+    [Tooltip("�B �p���`�𓖂Ă����́A����̃q�b�g�X�g�b�v�̃t���[�����i60F=1�b�j�B0���Ǝ~�܂�Ȃ��B")]
     [SerializeField] int punchHitStopFrames = 5;
-    [Tooltip("④ パンチを当てた時の、相手のノックバック量")]
+    [Tooltip("�C �p���`�𓖂Ă����́A����̃m�b�N�o�b�N��")]
     [SerializeField] KnockbackSetting punchKnockback = new KnockbackSetting { horizontalSpeed = 2.5f, upSpeed = 0f };
 
 
-    [Header("通常キック")]
-    [Tooltip("① 通常キックの攻撃力（ダメージ量）")]
+    [Header("�ʏ�L�b�N")]
+    [Tooltip("�@ �ʏ�L�b�N�̍U���́i�_���[�W�ʁj")]
     [SerializeField] int kickAtk = 10;
-    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束フレーム数。60F=1秒）。キックを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [Tooltip("�A �U����̃N�[���_�E���y��U�莞�z�i�S���t���[�����B60F=1�b�j�B�L�b�N���o���Ă���A����ɓ�����Ȃ������ꍇ�Ɏ��̍s�����ł���܂ł̎��ԁB")]
     [SerializeField] int kickMissFrames = 36;
-    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束フレーム数。60F=1秒）。キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
+    [Tooltip("�A �U����̃N�[���_�E���y�������z�i�S���t���[�����B60F=1�b�j�B�L�b�N���o���Ă���A����ɓ��������ꍇ�Ɏ��̍s�����ł���܂ł̎��ԁi�U���J�n����̍��v�j�B�����������_�Ŋ��Ɍo�߂��Ă��鎞�Ԃ�����𒴂��Ă���΁A�����ɍs���\�ɂȂ�B")]
     [SerializeField] int kickHitFrames = 36;
-    [Tooltip("⑤ 通常キックを当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [Tooltip("�D �ʏ�L�b�N�𓖂Ă����́A����́y�����ԁi�s���s�\�j�z�̃t���[�����i60F=1�b�j�B���̊ԁA����͈ړ��E�U���E�K�[�h�E�����E�W�����v������؂ł��Ȃ��B���ꒆ�ɂ���ɍU�������������ꍇ�́A�c�莞�ԂƂ��̒l�̒������ɉ��������B0���Ƃ����ԂɂȂ�Ȃ��B")]
     [SerializeField] int kickStunFrames = 24;
-    [Tooltip("③ 通常キックを当てた時の、相手のヒットストップのフレーム数（60F=1秒）。0だと止まらない。")]
+    [Tooltip("�B �ʏ�L�b�N�𓖂Ă����́A����̃q�b�g�X�g�b�v�̃t���[�����i60F=1�b�j�B0���Ǝ~�܂�Ȃ��B")]
     [SerializeField] int kickHitStopFrames = 5;
-    [Tooltip("④ 通常キックを当てた時の、相手のノックバック量")]
+    [Tooltip("�C �ʏ�L�b�N�𓖂Ă����́A����̃m�b�N�o�b�N��")]
     [SerializeField] KnockbackSetting kickKnockback = new KnockbackSetting { horizontalSpeed = 3.5f, upSpeed = 0f };
 
-    [Header("上キック")]
-    [Tooltip("① 上キックの攻撃力（ダメージ量）")]
+    [Header("��L�b�N")]
+    [Tooltip("�@ ��L�b�N�̍U���́i�_���[�W�ʁj")]
     [SerializeField] int upKickAtk = 10;
-    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束フレーム数。60F=1秒）。上キックを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [Tooltip("�A �U����̃N�[���_�E���y��U�莞�z�i�S���t���[�����B60F=1�b�j�B��L�b�N���o���Ă���A����ɓ�����Ȃ������ꍇ�Ɏ��̍s�����ł���܂ł̎��ԁB")]
     [SerializeField] int upKickMissFrames = 42;
-    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束フレーム数。60F=1秒）。上キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
+    [Tooltip("�A �U����̃N�[���_�E���y�������z�i�S���t���[�����B60F=1�b�j�B��L�b�N���o���Ă���A����ɓ��������ꍇ�Ɏ��̍s�����ł���܂ł̎��ԁi�U���J�n����̍��v�j�B�����������_�Ŋ��Ɍo�߂��Ă��鎞�Ԃ�����𒴂��Ă���΁A�����ɍs���\�ɂȂ�B")]
     [SerializeField] int upKickHitFrames = 42;
-    [Tooltip("⑤ 上キックを当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [Tooltip("�D ��L�b�N�𓖂Ă����́A����́y�����ԁi�s���s�\�j�z�̃t���[�����i60F=1�b�j�B���̊ԁA����͈ړ��E�U���E�K�[�h�E�����E�W�����v������؂ł��Ȃ��B���ꒆ�ɂ���ɍU�������������ꍇ�́A�c�莞�ԂƂ��̒l�̒������ɉ��������B0���Ƃ����ԂɂȂ�Ȃ��B")]
     [SerializeField] int upKickStunFrames = 30;
-    [Tooltip("③ 上キックを当てた時の、相手のヒットストップのフレーム数（60F=1秒）。0だと止まらない。")]
+    [Tooltip("�B ��L�b�N�𓖂Ă����́A����̃q�b�g�X�g�b�v�̃t���[�����i60F=1�b�j�B0���Ǝ~�܂�Ȃ��B")]
     [SerializeField] int upKickHitStopFrames = 5;
-    [Tooltip("④ 上キックを当てた時の、相手のノックバック量")]
+    [Tooltip("�C ��L�b�N�𓖂Ă����́A����̃m�b�N�o�b�N��")]
     [SerializeField] KnockbackSetting upKickKnockback = new KnockbackSetting { horizontalSpeed = 2f, upSpeed = 5f };
 
-    [Header("下キック")]
-    [Tooltip("① 下キックの攻撃力（ダメージ量）")]
+    [Header("���L�b�N")]
+    [Tooltip("�@ ���L�b�N�̍U���́i�_���[�W�ʁj")]
     [SerializeField] int downKickAtk = 10;
-    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束フレーム数。60F=1秒）。下キックを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [Tooltip("�A �U����̃N�[���_�E���y��U�莞�z�i�S���t���[�����B60F=1�b�j�B���L�b�N���o���Ă���A����ɓ�����Ȃ������ꍇ�Ɏ��̍s�����ł���܂ł̎��ԁB")]
     [SerializeField] int downKickMissFrames = 30;
-    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束フレーム数。60F=1秒）。下キックを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。命中した時点で既に経過している時間がこれを超えていれば、即座に行動可能になる。")]
+    [Tooltip("�A �U����̃N�[���_�E���y�������z�i�S���t���[�����B60F=1�b�j�B���L�b�N���o���Ă���A����ɓ��������ꍇ�Ɏ��̍s�����ł���܂ł̎��ԁi�U���J�n����̍��v�j�B�����������_�Ŋ��Ɍo�߂��Ă��鎞�Ԃ�����𒴂��Ă���΁A�����ɍs���\�ɂȂ�B")]
     [SerializeField] int downKickHitFrames = 30;
-    [Tooltip("⑤ 下キックを当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [Tooltip("�D ���L�b�N�𓖂Ă����́A����́y�����ԁi�s���s�\�j�z�̃t���[�����i60F=1�b�j�B���̊ԁA����͈ړ��E�U���E�K�[�h�E�����E�W�����v������؂ł��Ȃ��B���ꒆ�ɂ���ɍU�������������ꍇ�́A�c�莞�ԂƂ��̒l�̒������ɉ��������B0���Ƃ����ԂɂȂ�Ȃ��B")]
     [SerializeField] int downKickStunFrames = 24;
-    [Tooltip("③ 下キックを当てた時の、相手のヒットストップのフレーム数（60F=1秒）。0だと止まらない。")]
+    [Tooltip("�B ���L�b�N�𓖂Ă����́A����̃q�b�g�X�g�b�v�̃t���[�����i60F=1�b�j�B0���Ǝ~�܂�Ȃ��B")]
     [SerializeField] int downKickHitStopFrames = 5;
-    [Tooltip("④ 下キックを当てた時の、相手のノックバック量")]
+    [Tooltip("�C ���L�b�N�𓖂Ă����́A����̃m�b�N�o�b�N��")]
     [SerializeField] KnockbackSetting downKickKnockback = new KnockbackSetting { horizontalSpeed = 3f, upSpeed = 0f };
 
 
-    [Header("必殺技（waza）")]
-    [Tooltip("① 必殺技（左足の攻撃判定）が相手に命中した時のダメージ量。パンチ・キック等と同じ仕組みで、" +
-             "漢気ゲージによる攻撃力補正（atkPowerPerBar）もこの値を基準に上乗せされる。")]
+    [Header("�K�E�Z�iwaza�j")]
+    [Tooltip("�@ �K�E�Z�i�����̍U������j������ɖ����������̃_���[�W�ʁB�p���`�E�L�b�N���Ɠ����d�g�݂ŁA" +
+             "���C�Q�[�W�ɂ��U���͕␳�iatkPowerPerBar�j�����̒l����ɏ�悹�����B")]
     [SerializeField] int specialAtk = 20;
-    [Tooltip("③ 必殺技を当てた時の、相手のヒットストップのフレーム数（60F=1秒）。多段ヒットごとに毎回かかる点に注意。0だと止まらない。\n" +
-             "※② 必殺技のクールダウン（拘束時間）は、下の「必殺技設定」のspecialFramesで調整する（waza アニメーションの長さと合わせる必要があるため）。")]
+    [Tooltip("�B �K�E�Z�𓖂Ă����́A����̃q�b�g�X�g�b�v�̃t���[�����i60F=1�b�j�B���i�q�b�g���Ƃɖ��񂩂���_�ɒ��ӁB0���Ǝ~�܂�Ȃ��B\n" +
+             "���A �K�E�Z�̃N�[���_�E���i�S�����ԁj�́A���́u�K�E�Z�ݒ�v��specialFrames�Œ�������iwaza �A�j���[�V�����̒����ƍ��킹��K�v�����邽�߁j�B")]
     [SerializeField] int specialHitStopFrames = 5;
-    [Tooltip("④ 必殺技を当てた時の、相手のノックバック量。多段ヒットするため、既定は0（飛ばさない）。")]
+    [Tooltip("�C �K�E�Z�𓖂Ă����́A����̃m�b�N�o�b�N�ʁB���i�q�b�g���邽�߁A�����0�i��΂��Ȃ��j�B")]
     [SerializeField] KnockbackSetting specialKnockback = new KnockbackSetting { horizontalSpeed = 0f, upSpeed = 0f };
-    [Tooltip("⑤ 必殺技を当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
+    [Tooltip("�D �K�E�Z�𓖂Ă����́A����́y�����ԁi�s���s�\�j�z�̃t���[�����i60F=1�b�j�B���̊ԁA����͈ړ��E�U���E�K�[�h�E�����E�W�����v������؂ł��Ȃ��B���ꒆ�ɂ���ɍU�������������ꍇ�́A�c�莞�ԂƂ��̒l�̒������ɉ��������B0���Ƃ����ԂɂȂ�Ȃ��B")]
     [SerializeField] int specialStunFrames = 30;
 
     //=====================================================
-    // ★仁王立ち（ガード）成功エフェクト設定
+    // ���m�������i�K�[�h�j�����G�t�F�N�g�ݒ�
     //=====================================================
-    [Header("仁王立ち成功エフェクト設定")]
-    [SerializeField] bool enableGuardSuccessEffect = true;   // ガード成功時にエフェクトを出すかどうか
-    [SerializeField] ParticleSystem guardSuccessEffectPrefab; // ガード成功時に生成するパーティクル（未設定なら出さない）
-    [SerializeField] Vector3 guardSuccessEffectOffset = new Vector3(0f, 1.0f, 0f); // 生成位置のオフセット（プレイヤー基準）
-    [SerializeField] float guardSuccessEffectLifetime = 1.0f; // 生成したエフェクトを破棄するまでの時間（秒）
+    [Header("�m�����������G�t�F�N�g�ݒ�")]
+    [SerializeField] bool enableGuardSuccessEffect = true;   // �K�[�h�������ɃG�t�F�N�g���o�����ǂ���
+    [SerializeField] ParticleSystem guardSuccessEffectPrefab; // �K�[�h�������ɐ�������p�[�e�B�N���i���ݒ�Ȃ�o���Ȃ��j
+    [SerializeField] Vector3 guardSuccessEffectOffset = new Vector3(0f, 1.0f, 0f); // �����ʒu�̃I�t�Z�b�g�i�v���C���[��j
+    [SerializeField] float guardSuccessEffectLifetime = 1.0f; // ���������G�t�F�N�g��j������܂ł̎��ԁi�b�j
 
     //=====================================================
-    // ★ガード成功による攻撃力上昇中の持続エフェクト設定
-    //   ガード成功で攻撃力が上昇している間（＝次の自分の攻撃が当たるまで）、
-    //   プレイヤーに追従してループ再生し続けるエフェクト。
+    // ���K�[�h�����ɂ��U���͏㏸���̎����G�t�F�N�g�ݒ�
+    //   �K�[�h�����ōU���͂��㏸���Ă���ԁi�����̎����̍U����������܂Łj�A
+    //   �v���C���[�ɒǏ]���ă��[�v�Đ���������G�t�F�N�g�B
     //=====================================================
-    [Header("攻撃力上昇中エフェクト設定")]
-    [SerializeField] bool enableGuardBuffEffect = true;        // 攻撃力上昇中のエフェクトを出すかどうか
-    [SerializeField] ParticleSystem guardBuffEffectPrefab;     // 上昇中に出し続けるパーティクル（Loopオン推奨・未設定なら出さない）
-    [SerializeField] Vector3 guardBuffEffectOffset = new Vector3(0f, 1.0f, 0f); // 生成位置のオフセット（プレイヤー基準）
+    [Header("�U���͏㏸���G�t�F�N�g�ݒ�")]
+    [SerializeField] bool enableGuardBuffEffect = true;        // �U���͏㏸���̃G�t�F�N�g���o�����ǂ���
+    [SerializeField] ParticleSystem guardBuffEffectPrefab;     // �㏸���ɏo��������p�[�e�B�N���iLoop�I�������E���ݒ�Ȃ�o���Ȃ��j
+    [SerializeField] Vector3 guardBuffEffectOffset = new Vector3(0f, 1.0f, 0f); // �����ʒu�̃I�t�Z�b�g�i�v���C���[��j
 
-    private bool isGuardBuffed = false;               // 現在ガード成功による攻撃力上昇中かどうか
-    private float guardBuffMultiplier = 1f;            // 現在のガード成功による累積ダメージ倍率（ガード成功のたびに掛け算で増える）
-    private ParticleSystem activeGuardBuffEffect;      // 生成中の攻撃力上昇エフェクトの参照（多重生成防止・停止処理用）
+    private bool isGuardBuffed = false;               // ���݃K�[�h�����ɂ��U���͏㏸�����ǂ���
+    private float guardBuffMultiplier = 1f;            // ���݂̃K�[�h�����ɂ��ݐσ_���[�W�{���i�K�[�h�����̂��тɊ|���Z�ő�����j
+    private ParticleSystem activeGuardBuffEffect;      // �������̍U���͏㏸�G�t�F�N�g�̎Q�Ɓi���d�����h�~�E��~�����p�j
     //=====================================================
-    // ---- 漢気ゲージ(必殺技ゲージ) ----
+    // ---- ���C�Q�[�W(�K�E�Z�Q�[�W) ----
     //=====================================================
-    [Header("漢気ゲージ設定")]
-    [Tooltip("ゲージ1本分の最大値")]
+    [Header("���C�Q�[�W�ݒ�")]
+    [Tooltip("�Q�[�W1�{���̍ő�l")]
     public float kankiGaugePerBar = 100f;
-    [Tooltip("ゲージの本数(2本分)")]
+    [Tooltip("�Q�[�W�̖{��(2�{��)")]
     public int kankiGaugeBarCount = 2;
-    [Tooltip("相手に攻撃を当てた（ダメージを与えた）時に増える量")]
+    [Tooltip("����ɍU���𓖂Ă��i�_���[�W��^�����j���ɑ������")]
     public float gaugeGainOnHit = 15f;
-    [Tooltip("仁王立ちでガードに成功した時に増える量")]
+    [Tooltip("�m�������ŃK�[�h�ɐ����������ɑ������")]
     public float gaugeGainOnGuard = 10f;
-    [Tooltip("後退（相手から離れる方向へ移動）している間、1秒あたりに減る量")]
+    [Tooltip("��ށi���肩�痣�������ֈړ��j���Ă���ԁA1�b������Ɍ����")]
     public float gaugeLossOnRetreat = 5f;
-    [Tooltip("ゲージ1本(満タン)につき上昇する基礎攻撃力倍率。0.25なら1本で+25%（実際のダメージ＝基礎攻撃力倍率×技の攻撃力）")]
+    [Tooltip("�Q�[�W1�{(���^��)�ɂ��㏸�����b�U���͔{���B0.25�Ȃ�1�{��+25%�i���ۂ̃_���[�W����b�U���͔{���~�Z�̍U���́j")]
     public float atkPowerPerBar = 0.25f;
 
-    // 現在の合計ゲージ量(0 〜 kankiGaugePerBar * kankiGaugeBarCount)
+    // ���݂̍��v�Q�[�W��(0 ? kankiGaugePerBar * kankiGaugeBarCount)
     private float kankiGauge = 0f;
 
-    // ゲージによる補正がかかる前の、素の攻撃力
+    // �Q�[�W�ɂ��␳��������O�́A�f�̍U����
     private int baseAtk;
 
     //=====================================================
-    // ★追加：漢気ゲージが1本以上たまっている間、自身の中心に出し続けるエフェクト設定
-    //   ゲージ1本分(kankiGaugePerBar)以上 → 表示開始／1本分未満になった → 停止（自然にフェードアウト）
+    // ���ǉ��F���C�Q�[�W��1�{�ȏソ�܂��Ă���ԁA���g�̒��S�ɏo��������G�t�F�N�g�ݒ�
+    //   �Q�[�W1�{��(kankiGaugePerBar)�ȏ� �� �\���J�n�^1�{�������ɂȂ��� �� ��~�i���R�Ƀt�F�[�h�A�E�g�j
     //=====================================================
-    [Header("漢気ゲージ充填中エフェクト設定")]
-    [SerializeField] bool enableKankiChargeEffect = true;          // ゲージ充填中エフェクトを出すかどうか
-    [Tooltip("ゲージが1本以上たまっている間、出し続けるパーティクル（Loopオン推奨・未設定なら出さない）")]
-    [SerializeField] ParticleSystem kankiChargeEffectPrefab;
-    [Tooltip("プレイヤー基準の生成位置。キャラクターの体の中心あたりになるよう調整してください。")]
+    [Header("���C�Q�[�W�[�U���G�t�F�N�g�ݒ�")]
+    [SerializeField] bool enableKankiChargeEffect = true;          // �Q�[�W�[�U���G�t�F�N�g���o�����ǂ���
+    [Tooltip("�Q�[�W��1�{�ȏソ�܂��Ă���ԁA�o��������p�[�e�B�N���iLoop�I�������E���ݒ�Ȃ�o���Ȃ��j")]
+    [SerializeField] ParticleSystem kankiChargeEffectPrefab;       //�Q�[�W�����܂��Ă��鎞�̃G�t�F�N�g(�㕔��)
+    [SerializeField] ParticleSystem kankiChargeEffectPrefab_Ground;//�Q�[�W�����܂��Ă��鎞�̃G�t�F�N�g(������)
+    [Tooltip("�v���C���[��̐����ʒu�B�L�����N�^�[�̑̂̒��S������ɂȂ�悤�������Ă��������B")]
     [SerializeField] Vector3 kankiChargeEffectOffset = new Vector3(0f, 0.0f, 0f);
 
-    [Tooltip("ONにすると、パーティクルの発生位置がプレイヤーと一緒に動く（Local）。OFFだと発生済みの粒は移動時にその場へ置き去りになる（World）。")]
+    [Tooltip("ON�ɂ���ƁA�p�[�e�B�N���̔����ʒu���v���C���[�ƈꏏ�ɓ����iLocal�j�BOFF���Ɣ����ς݂̗��͈ړ����ɂ��̏�֒u������ɂȂ�iWorld�j�B")]
     [SerializeField] bool kankiChargeEffectFollowLocal = true;
-
-    private ParticleSystem activeKankiChargeEffect; // 生成中のエフェクト参照（多重生成防止・停止処理用）
+    private ParticleSystem activeKankiChargeEffect; // �������̃G�t�F�N�g�Q�Ɓi���d�����h�~�E��~�����p�j
+    private ParticleSystem activeKankiChargeEffect_Ground; // �������̃G�t�F�N�g�Q�Ɓi���d�����h�~�E��~�����p�j
 
     //=====================================================
-    // ★追加：漢気復活（ダウン中に漢気ゲージを消費して、連打せずに即座に復活する）設定
-    //   ダウン中（復活チャレンジの制限時間内）にL1ボタンを押すと、漢気ゲージを消費してその場で復活する。
-    //   復活後は一定時間（reviveAtkBuffFrames）、攻撃力が上昇し、その間は専用エフェクトを出し続ける。
+    // ���ǉ��F���C�����i�_�E�����Ɋ��C�Q�[�W������āA�A�ł����ɑ����ɕ�������j�ݒ�
+    //   �_�E�����i�����`�������W�̐������ԓ��j��L1�{�^���������ƁA���C�Q�[�W������Ă��̏�ŕ�������B
+    //   ������͈�莞�ԁireviveAtkBuffFrames�j�A�U���͂��㏸���A���̊Ԃ͐�p�G�t�F�N�g���o��������B
     //=====================================================
-    [Header("漢気復活設定（ゲージ消費の即時復活）")]
-    [Tooltip("ONにすると、ダウン中にL1ボタンで漢気ゲージを消費して即座に復活できる。")]
+    [Header("���C�����ݒ�i�Q�[�W����̑��������j")]
+    [Tooltip("ON�ɂ���ƁA�_�E������L1�{�^���Ŋ��C�Q�[�W������đ����ɕ����ł���B")]
     [SerializeField] bool enableKankiRevive = true;
-    [Tooltip("漢気復活で消費する漢気ゲージの本数。1ならゲージ1本分(kankiGaugePerBar)を消費する。消費分のゲージがたまっていない時は復活できない。")]
+    [Tooltip("���C�����ŏ���銿�C�Q�[�W�̖{���B1�Ȃ�Q�[�W1�{��(kankiGaugePerBar)�������B����̃Q�[�W�����܂��Ă��Ȃ����͕����ł��Ȃ��B")]
     [SerializeField] int kankiReviveBarCost = 1;
-    [Tooltip("復活後の攻撃力の倍率。1.5なら攻撃力が1.5倍（+50%）、2なら2倍。1以下にすると上昇しない。漢気ゲージ本数による補正と掛け合わせて計算される。")]
+    [Tooltip("������̍U���͂̔{���B1.5�Ȃ�U���͂�1.5�{�i+50%�j�A2�Ȃ�2�{�B1�ȉ��ɂ���Ə㏸���Ȃ��B���C�Q�[�W�{���ɂ��␳�Ɗ|�����킹�Čv�Z�����B")]
     [SerializeField] float reviveAtkMultiplier = 1.5f;
-    [Tooltip("復活後に攻撃力上昇が続くフレーム数（60F=1秒。600F=10秒）。この間は攻撃力上昇エフェクトも出続ける。")]
+    [Tooltip("������ɍU���͏㏸�������t���[�����i60F=1�b�B600F=10�b�j�B���̊Ԃ͍U���͏㏸�G�t�F�N�g���o������B")]
     [SerializeField] int reviveAtkBuffFrames = 600;
 
-    [Header("漢気復活エフェクト設定")]
-    [Tooltip("復活した瞬間に1回だけ出すパーティクル（未設定なら出さない）")]
+    [Header("���C�����G�t�F�N�g�ݒ�")]
+    [Tooltip("���������u�Ԃ�1�񂾂��o���p�[�e�B�N���i���ݒ�Ȃ�o���Ȃ��j")]
     [SerializeField] ParticleSystem kankiReviveEffectPrefab;
-    [Tooltip("プレイヤー基準の生成位置")]
+    [SerializeField] ParticleSystem kankiReviveEffectPrefab_Ground;
+    [Tooltip("�v���C���[��̐����ʒu")]
     [SerializeField] Vector3 kankiReviveEffectOffset = new Vector3(0f, 1.0f, 0f);
-    [Tooltip("生成した復活エフェクトを破棄するまでの時間（秒）")]
+    [Tooltip("�������������G�t�F�N�g��j������܂ł̎��ԁi�b�j")]
     [SerializeField] float kankiReviveEffectLifetime = 2.0f;
-    [Tooltip("攻撃力上昇中に出し続けるパーティクル（未設定なら出さない）。Loopの設定に関わらず上昇中は自動でループさせ、上昇が終わると止まる。")]
+    [Tooltip("�U���͏㏸���ɏo��������p�[�e�B�N���i���ݒ�Ȃ�o���Ȃ��j�BLoop�̐ݒ�Ɋւ�炸�㏸���͎����Ń��[�v�����A�㏸���I���Ǝ~�܂�B")]
     [SerializeField] ParticleSystem reviveBuffEffectPrefab;
-    [Tooltip("プレイヤー基準の生成位置")]
+    [SerializeField] ParticleSystem reviveBuffEffectPrefab_Ground;
+    [Tooltip("�v���C���[��̐����ʒu")]
     [SerializeField] Vector3 reviveBuffEffectOffset = new Vector3(0f, 1.0f, 0f);
 
-    private bool wantKankiRevive = false;           // ダウン中にL1が押された（漢気復活の要求）
-    private bool isReviveBuffed = false;            // 漢気復活による攻撃力上昇中かどうか
-    private int reviveBuffTimer = 0;             // 攻撃力上昇の残りフレーム数
-    private ParticleSystem activeReviveBuffEffect;  // 生成中の攻撃力上昇エフェクトの参照（多重生成防止・停止処理用）
+    private bool wantKankiRevive = false;           // �_�E������L1�������ꂽ�i���C�����̗v���j
+    private bool isReviveBuffed = false;            // ���C�����ɂ��U���͏㏸�����ǂ���
+    private int reviveBuffTimer = 0;             // �U���͏㏸�̎c��t���[����
+    private ParticleSystem activeReviveBuffEffect;  // �������̍U���͏㏸�G�t�F�N�g�̎Q�Ɓi���d�����h�~�E��~�����p�j
+    private ParticleSystem activeReviveBuffEffect_Ground;  // �������̍U���͏㏸�G�t�F�N�g�̎Q�Ɓi���d�����h�~�E��~�����p�j
 
     //=====================================================
-    // ---- 必殺技（漢気ゲージ消費） ----
+    // ---- �K�E�Z�i���C�Q�[�W����j ----
     //=====================================================
-    [Header("必殺技設定")]
-    [Tooltip("必殺技を発動するために必要な漢気ゲージ量。デフォルトはゲージ満タン(2本分)。")]
+    [Header("�K�E�Z�ݒ�")]
+    [Tooltip("�K�E�Z�𔭓����邽�߂ɕK�v�Ȋ��C�Q�[�W�ʁB�f�t�H���g�̓Q�[�W���^��(2�{��)�B")]
     public float specialRequiredGauge = 200f;
 
-    [Tooltip("必殺技発動で消費する漢気ゲージ量。")]
+    [Tooltip("�K�E�Z�����ŏ���銿�C�Q�[�W�ʁB")]
     public float specialGaugeCost = 200f;
 
-    // ※必殺技の攻撃力(specialAtk)は、「攻撃ごとの設定」の「必殺技（waza）」ヘッダーへ移動した。
+    // ���K�E�Z�̍U����(specialAtk)�́A�u�U�����Ƃ̐ݒ�v�́u�K�E�Z�iwaza�j�v�w�b�_�[�ֈړ������B
 
-    [Tooltip("必殺技発動中の拘束フレーム数(60F=1秒)。既定値は180フレーム（3秒）。\n" +
-             "この間は攻撃・ガード・投げ・ジャンプ・必殺技の再発動は一切できず、移動のみ可能。\n" +
-             "また、この間は相手からの攻撃を一切受け付けない（無敵）。\n" +
-             "「waza」トリガーで再生される必殺技アニメーションの長さと同じフレーム数に合わせること。")]
+    [Tooltip("�K�E�Z�������̍S���t���[����(60F=1�b)�B����l��180�t���[���i3�b�j�B\n" +
+             "���̊Ԃ͍U���E�K�[�h�E�����E�W�����v�E�K�E�Z�̍Ĕ����͈�؂ł����A�ړ��̂݉\�B\n" +
+             "�܂��A���̊Ԃ͑��肩��̍U������؎󂯕t���Ȃ��i���G�j�B\n" +
+             "�uwaza�v�g���K�[�ōĐ������K�E�Z�A�j���[�V�����̒����Ɠ����t���[�����ɍ��킹�邱�ƁB")]
     [SerializeField] int specialFrames = 180;
 
-    [Header("必殺技演出（任意設定）")]
-    [Tooltip("必殺技発動時に鳴らす効果音（未設定なら鳴らさない）")]
+    [Header("�K�E�Z���o�i�C�Ӑݒ�j")]
+    [Tooltip("�K�E�Z�������ɖ炷���ʉ��i���ݒ�Ȃ�炳�Ȃ��j")]
     [SerializeField] AudioClip specialSe;
-    [Tooltip("必殺技発動時に生成するパーティクル（未設定なら出さない）")]
+    [Tooltip("�K�E�Z�������ɐ�������p�[�e�B�N���i���ݒ�Ȃ�o���Ȃ��j")]
     [SerializeField] ParticleSystem specialEffectPrefab;
+
     [SerializeField] Vector3 specialEffectOffset = new Vector3(0f, 1.0f, 0f);
     [SerializeField] float specialEffectLifetime = 1.5f;
 
     //=====================================================
-    // ★外部参照
+    // ���O���Q��
     //=====================================================
-    [Header("参照")]
-    public Enemy enemy;                              // 対戦相手（敵）
+    [Header("�Q��")]
+    public Enemy enemy;                              // �ΐ푊��i�G�j
     public Player enemyPlayer;
-    public Animator animator;                         // プレイヤーのAnimator
-    public FightingCameraController fightingCamera;   // 演出用カメラ
+    public Animator animator;                         // �v���C���[��Animator
+    public FightingCameraController fightingCamera;   // ���o�p�J����
 
     //=====================================================
-    // ★内部状態
+    // ���������
     //=====================================================
-    Animator currentanimator;                               //現在のアニメーションを管理する変数
-    private PlayerState currentState = PlayerState.Idle;   // 現在の行動状態
-    private int stateTimer;                               // 現在の行動が終わるまでの残りフレーム数
-    private int currentAttackMissFrames;                // ★追加：今出している通常攻撃の「空振り時」拘束時間（命中時に経過時間を求めるために保持）
+    Animator currentanimator;                               //���݂̃A�j���[�V�������Ǘ�����ϐ�
+    private PlayerState currentState = PlayerState.Idle;   // ���݂̍s�����
+    private int stateTimer;                               // ���݂̍s�����I���܂ł̎c��t���[����
+    private int currentAttackMissFrames;                // ���ǉ��F���o���Ă���ʏ�U���́u��U�莞�v�S�����ԁi�������Ɍo�ߎ��Ԃ����߂邽�߂ɕێ��j
 
     Rigidbody rb;
     AudioSource se;
     PlayerInput playerInput;
-    Vector2 moveInput;                        // 左スティックの現在値（OnMoveで更新され続ける）
+    Vector2 moveInput;                        // ���X�e�B�b�N�̌��ݒl�iOnMove�ōX�V���ꑱ����j
 
-    // ボタン入力の「意図」フラグ。OnXコールバックで立てて、Update内で1回だけ消費してクリアする
+    // �{�^�����͂́u�Ӑ}�v�t���O�BOnX�R�[���o�b�N�ŗ��ĂāAUpdate����1�񂾂�����ăN���A����
     bool wantJump;
     bool wantPunch;
     bool wantKick;
     bool wantGuard;
     bool wantThrow;
-    bool wantSpecial;   // L1（必殺技ボタン）
+    bool wantSpecial;   // L1�i�K�E�Z�{�^���j
 
-    bool isGuarding;                 // 仁王立ち中かどうか（被弾処理の分岐に使う）
+    bool isGuarding;                 // �m�����������ǂ����i��e�����̕���Ɏg���j
 
-    // ★追加：しゃがみの見た目（コライダー・アニメーター）をスティック下入力に直結させて追跡するフラグ。
-    //   currentState（状態機械）とは独立して管理する。詳細はSyncCrouchVisual()のコメントを参照。
+    // ���ǉ��F���Ⴊ�݂̌����ځi�R���C�_�[�E�A�j���[�^�[�j���X�e�B�b�N�����͂ɒ��������ĒǐՂ���t���O�B
+    //   currentState�i��ԋ@�B�j�Ƃ͓Ɨ����ĊǗ�����B�ڍׂ�SyncCrouchVisual()�̃R�����g���Q�ƁB
     bool isCrouchVisual;
 
-    // ★追加：frontMove/BackMoveのTriggerを「移動を開始した瞬間・方向が切り替わった瞬間」だけ
-    //   発火させるための直近の移動方向記録。毎フレームSetTriggerすると同じアニメが再生し直され続けてしまう。
+    // ���ǉ��FfrontMove/BackMove��Trigger���u�ړ����J�n�����u�ԁE�������؂�ւ�����u�ԁv����
+    //   ���΂����邽�߂̒��߂̈ړ������L�^�B���t���[��SetTrigger����Ɠ����A�j�����Đ��������ꑱ���Ă��܂��B
     enum MoveDirection { None, Forward, Backward }
     MoveDirection lastMoveDir = MoveDirection.None;
-    int guardComboCount;             // 仁王立ちで連続して耐えた回数
-    bool autoFaceSnapped;            // ★追加：最初に相手を認識した時に、補間なしで即座に向き合わせたか
-    float autoFaceSign = 1f;         // ★追加：現在向いている（向こうとしている）Z方向。密着中に判定が揺れても、確定するまで変えない
-    bool hasMoveBackwardParam;       // ★追加：Animatorに"MoveBackward"(Bool)が存在するか（存在する時だけ値を送る）
-    bool hasGuardParam;              // ★変更：Animatorに"Guard"(Trigger)が存在するか（存在する時だけトリガーを立てる）
-    bool guardAnimApplied;           // ★変更：直前フレームでGuard状態だったか（Guardに入った瞬間だけトリガーを立てるための記録）
-    const string GuardParam = "Guard"; // ★仁王立ちアニメーション用のAnimatorパラメータ名（Trigger）
-    bool hasGuardSuccessParam;       // ★追加：Animatorに"Guard-success"(Trigger)が存在するか（存在する時だけ立てる）
-    const string GuardSuccessParam = "Guard-success"; // ★仁王立ち成功（ガード成功）アニメーション用のAnimatorパラメータ名（Trigger）
-    // ★追加：F6キーでON/OFFする、常時仁王立ちデバッグモードの現在の状態
+    int guardComboCount;             // �m�������ŘA�����đς�����
+    bool autoFaceSnapped;            // ���ǉ��F�ŏ��ɑ����F���������ɁA��ԂȂ��ő����Ɍ������킹����
+    float autoFaceSign = 1f;         // ���ǉ��F���݌����Ă���i�������Ƃ��Ă���jZ�����B�������ɔ��肪�h��Ă��A�m�肷��܂ŕς��Ȃ�
+    bool hasMoveBackwardParam;       // ���ǉ��FAnimator��"MoveBackward"(Bool)�����݂��邩�i���݂��鎞�����l�𑗂�j
+    bool hasGuardParam;              // ���ύX�FAnimator��"Guard"(Trigger)�����݂��邩�i���݂��鎞�����g���K�[�𗧂Ă�j
+    bool guardAnimApplied;           // ���ύX�F���O�t���[����Guard��Ԃ��������iGuard�ɓ������u�Ԃ����g���K�[�𗧂Ă邽�߂̋L�^�j
+    const string GuardParam = "Guard"; // ���m�������A�j���[�V�����p��Animator�p�����[�^���iTrigger�j
+    bool hasGuardSuccessParam;       // ���ǉ��FAnimator��"Guard-success"(Trigger)�����݂��邩�i���݂��鎞�������Ă�j
+    const string GuardSuccessParam = "Guard-success"; // ���m�����������i�K�[�h�����j�A�j���[�V�����p��Animator�p�����[�^���iTrigger�j
+    // ���ǉ��FF6�L�[��ON/OFF����A�펞�m�������f�o�b�O���[�h�̌��݂̏��
     private bool debugAlwaysGuard = false;
-    bool rebornCamStarted;           // 根性復活のクローズアップカメラを開始済みか
+    bool rebornCamStarted;           // ���������̃N���[�Y�A�b�v�J�������J�n�ς݂�
 
     //=====================================================
-    // ★追加：ダウン関連のアニメーション（開始／ダウン中／復活／復活失敗）
-    //   ・ダウン開始：Trigger。ダウンした瞬間に1回だけ立てる
-    //   ・ダウン中　：Bool。ダウンしている間ずっとtrue、復活／死亡で必ずfalseに戻す
-    //   ・復活　　　：Trigger。復活成功（連打・漢気復活・F4デバッグ復活）の瞬間に立てる
-    //   ・復活失敗　：Trigger。制限時間内に復活できず力尽きた（Dead）瞬間に立てる
-    //   パラメータ名はInspectorで変更できる。空にするとその演出は何もしない。
-    //   Animatorに存在しない名前を指定した場合も警告を出さずに無視する。
+    // ���ǉ��F�_�E���֘A�̃A�j���[�V�����i�J�n�^�_�E�����^�����^�������s�j
+    //   �E�_�E���J�n�FTrigger�B�_�E�������u�Ԃ�1�񂾂����Ă�
+    //   �E�_�E�����@�FBool�B�_�E�����Ă���Ԃ�����true�A�����^���S�ŕK��false�ɖ߂�
+    //   �E�����@�@�@�FTrigger�B���������i�A�ŁE���C�����EF4�f�o�b�O�����j�̏u�Ԃɗ��Ă�
+    //   �E�������s�@�FTrigger�B�������ԓ��ɕ����ł����͐s�����iDead�j�u�Ԃɗ��Ă�
+    //   �p�����[�^����Inspector�ŕύX�ł���B��ɂ���Ƃ��̉��o�͉������Ȃ��B
+    //   Animator�ɑ��݂��Ȃ����O���w�肵���ꍇ���x�����o�����ɖ�������B
     //=====================================================
-    [Header("ダウン時のアニメーション（Animatorのパラメータ名）")]
-    [Tooltip("ダウンした瞬間に1回だけ立てるTrigger名。")]
+    [Header("�_�E�����̃A�j���[�V�����iAnimator�̃p�����[�^���j")]
+    [Tooltip("�_�E�������u�Ԃ�1�񂾂����Ă�Trigger���B")]
     [SerializeField] string downStartTrigger = "Down-start";
-    [Tooltip("ダウンしている間ずっとtrueにするBool名（復活／死亡でfalseに戻る）。")]
+    [Tooltip("�_�E�����Ă���Ԃ�����true�ɂ���Bool���i�����^���S��false�ɖ߂�j�B")]
     [SerializeField] string downBoolParam = "Down";
-    [Tooltip("根性復活・漢気復活に成功した瞬間に立てるTrigger名。")]
+    [Tooltip("���������E���C�����ɐ��������u�Ԃɗ��Ă�Trigger���B")]
     [SerializeField] string downReviveTrigger = "Down-revive";
-    [Tooltip("制限時間内に復活できず力尽きた（Dead）瞬間に立てるTrigger名。")]
+    [Tooltip("�������ԓ��ɕ����ł����͐s�����iDead�j�u�Ԃɗ��Ă�Trigger���B")]
     [SerializeField] string downFailTrigger = "Down-fail";
-    bool downAnimPlayed;             // ダウン中で、ダウン開始アニメーションを開始済みか（復活／死亡でfalseに戻る）
+    bool downAnimPlayed;             // �_�E�����ŁA�_�E���J�n�A�j���[�V�������J�n�ς݂��i�����^���S��false�ɖ߂�j
 
     //=====================================================
-    // ★追加：復活後の停止／同時ダウン時のUI
+    // ���ǉ��F������̒�~�^�����_�E������UI
     //=====================================================
-    [Header("復活後の停止（自分・相手ともに動けない）")]
-    [Tooltip("復活に成功した瞬間から、自分・相手ともに動けなくなるフレーム数（60F=1秒）。\n" +
-             "この間、カメラは復活したキャラの正面の引きの画を映す。")]
+    [Header("������̒�~�i�����E����Ƃ��ɓ����Ȃ��j")]
+    [Tooltip("�����ɐ��������u�Ԃ���A�����E����Ƃ��ɓ����Ȃ��Ȃ�t���[�����i60F=1�b�j�B\n" +
+             "���̊ԁA�J�����͕��������L�����̐��ʂ̈����̉���f���B")]
     [SerializeField] int rebornStandUpFreezeFrames = 180;
-    [Tooltip("ONにすると、復活後の停止中は相手（P2／CPU）を非表示にする。復活演出のカメラに相手が映り込むのを防ぐ。\n" +
-             "同時ダウン後の復活はカメラ演出をしないので、非表示にもしない。")]
+    [Tooltip("ON�ɂ���ƁA������̒�~���͑���iP2�^CPU�j���\���ɂ���B�������o�̃J�����ɑ��肪�f�荞�ނ̂�h���B\n" +
+             "�����_�E����̕����̓J�������o�����Ȃ��̂ŁA��\���ɂ����Ȃ��B")]
     [SerializeField] bool hideOpponentDuringRebornFreeze = true;
 
-    bool downWasDual;                                                                   // 今回のダウン中に、一度でも同時ダウン（両者HP0）になったか
+    bool downWasDual;                                                                   // ����̃_�E�����ɁA��x�ł������_�E���i����HP0�j�ɂȂ�����
     readonly System.Collections.Generic.List<UnityEngine.Renderer> hiddenOpponentRenderers
-        = new System.Collections.Generic.List<UnityEngine.Renderer>();                  // 復活停止中に非表示にしている相手のRenderer
+        = new System.Collections.Generic.List<UnityEngine.Renderer>();                  // ������~���ɔ�\���ɂ��Ă��鑊���Renderer
 
-    [Header("同時ダウン時のUI（P1・P2の両方がダウンした時）")]
-    [Tooltip("同時ダウン中は、カメラの引き（クローズアップ）をせず通常カメラのままにし、\n" +
-             "制限時間・ボタン画像・残り連打数をP1は画面左、P2は画面右に表示する。")]
+    [Header("�����_�E������UI�iP1�EP2�̗������_�E���������j")]
+    [Tooltip("�����_�E�����́A�J�����̈����i�N���[�Y�A�b�v�j�������ʏ�J�����̂܂܂ɂ��A\n" +
+             "�������ԁE�{�^���摜�E�c��A�Ő���P1�͉�ʍ��AP2�͉�ʉE�ɕ\������B")]
     [SerializeField] bool enableDualDownLayout = true;
-    [Tooltip("同時ダウン時、P1のUIを表示する横位置（画面幅に対する割合。0.25＝左半分の中央）")]
+    [Tooltip("�����_�E�����AP1��UI��\�����鉡�ʒu�i��ʕ��ɑ΂��銄���B0.25���������̒����j")]
     [SerializeField, Range(0f, 1f)] float dualDownLeftXRatio = 0.25f;
-    [Tooltip("同時ダウン時、P2のUIを表示する横位置（画面幅に対する割合。0.75＝右半分の中央）")]
+    [Tooltip("�����_�E�����AP2��UI��\�����鉡�ʒu�i��ʕ��ɑ΂��銄���B0.75���E�����̒����j")]
     [SerializeField, Range(0f, 1f)] float dualDownRightXRatio = 0.75f;
-    bool canThrow = true;            // 投げの多重発生を防ぐフラグ
-    bool throwReaching;              // ★追加：投げ動作中で、まだ掴みが成立しておらず手の当たり判定の接触を待っている間（接触した瞬間にfalseになる）
+    bool canThrow = true;            // �����̑��d������h���t���O
+    bool throwReaching;              // ���ǉ��F�������쒆�ŁA�܂��݂͂��������Ă��炸��̓����蔻��̐ڐG��҂��Ă���ԁi�ڐG�����u�Ԃ�false�ɂȂ�j
 
-    // ★追加：投げ（掴み）仕様変更用の相互参照・タイマー
-    Player grabbedTarget;            // 自分が今掴んでいる相手（掴む側の時だけ使用。掴んでいなければnull）
-    Player grabbingPlayer;           // 自分を今掴んでいる相手（掴まれる側の時だけ使用。掴まれていなければnull）
-    int grabHoldTimer;             // 掴み成立後、掴みモーションを再生し続ける残りフレーム数（0になったら一時停止）
-    bool grabHoldFrozen;             // 掴みモーションを一時停止中か（trueの間animator.speed=0）
-    bool grabStickWasActive;         // 掴まれ中、前フレームでスティックが倒れていたか（押しっぱなしを連打扱いにしないための判定用）
-    int escapeTimer;               // 掴まれている間の、脱出に必要な残りフレーム数（0になったら脱出成功）
+    // ���ǉ��F�����i�͂݁j�d�l�ύX�p�̑��ݎQ�ƁE�^�C�}�[
+    Player grabbedTarget;            // ���������͂�ł��鑊��i�͂ޑ��̎������g�p�B�͂�ł��Ȃ����null�j
+    Player grabbingPlayer;           // ���������͂�ł��鑊��i�͂܂�鑤�̎������g�p�B�͂܂�Ă��Ȃ����null�j
+    int grabHoldTimer;             // �͂ݐ�����A�͂݃��[�V�������Đ���������c��t���[�����i0�ɂȂ�����ꎞ��~�j
+    bool grabHoldFrozen;             // �͂݃��[�V�������ꎞ��~�����itrue�̊�animator.speed=0�j
+    bool grabStickWasActive;         // �͂܂ꒆ�A�O�t���[���ŃX�e�B�b�N���|��Ă������i�������ςȂ���A�ň����ɂ��Ȃ����߂̔���p�j
+    int escapeTimer;               // �͂܂�Ă���Ԃ́A�E�o�ɕK�v�Ȏc��t���[�����i0�ɂȂ�����E�o�����j
 
-    int rebornCount = 1;             // 復活回数のカウント
-    int rebornTimer;               // 復活チャレンジの経過フレーム数
-    int mashCount;                   // 復活チャレンジ中のボタン連打回数
+    int rebornCount = 1;             // �����񐔂̃J�E���g
+    int rebornTimer;               // �����`�������W�̌o�߃t���[����
+    int mashCount;                   // �����`�������W���̃{�^���A�ŉ�
 
-    //当たり判定の子オブジェクト
+    //�����蔻��̎q�I�u�W�F�N�g
     CapsuleCollider Head;
     CapsuleCollider RightArm, RightForeArm, RightHand, RightFoot, RightUpLeg, RightLeg;
     CapsuleCollider LeftArm, LeftForeArm, LeftHand, LeftFoot, LeftUpLeg, LeftLeg;
-    CapsuleCollider Player_Collider;          // 本体（胴体）のコライダー。しゃがみ時にサイズ変更する
-    CapsuleCollider[] allHitboxes;            // 全ての攻撃用当たり判定をまとめて操作するための配列
+    CapsuleCollider Player_Collider;          // �{�́i���́j�̃R���C�_�[�B���Ⴊ�ݎ��ɃT�C�Y�ύX����
+    CapsuleCollider[] allHitboxes;            // �S�Ă̍U���p�����蔻����܂Ƃ߂đ��삷�邽�߂̔z��
 
-    // ★追加：他プレイヤーから「このコライダーは自分の攻撃用ヒットボックスか？」を
-    //   問い合わせるための公開プロパティ。OnTriggerEnterでの攻撃/被弾の区別に使う。
+    // ���ǉ��F���v���C���[����u���̃R���C�_�[�͎����̍U���p�q�b�g�{�b�N�X���H�v��
+    //   �₢���킹�邽�߂̌��J�v���p�e�B�BOnTriggerEnter�ł̍U��/��e�̋�ʂɎg���B
     public CapsuleCollider[] AttackHitboxes => allHitboxes;
-    // ★追加：本体（胴体）コライダーの公開プロパティ。同様にOnTriggerEnterで使う。
+    // ���ǉ��F�{�́i���́j�R���C�_�[�̌��J�v���p�e�B�B���l��OnTriggerEnter�Ŏg���B
     public CapsuleCollider BodyCollider => Player_Collider;
 
-    // ★追加：擬音演出（パンチ/キックで表示を分ける）用に、
-    //   自分が今どの攻撃をしているかを外部（被弾した相手）から問い合わせるためのプロパティ。
-    //   currentStateはprivateなので、これ経由でしか攻撃種別が見えないようにしている。
-    //   AttackType自体はPlayer/Enemy共通の独立ファイル(AttackType.cs)で定義している。
+    // ���ǉ��F�[�����o�i�p���`/�L�b�N�ŕ\���𕪂���j�p�ɁA
+    //   ���������ǂ̍U�������Ă��邩���O���i��e��������j����₢���킹�邽�߂̃v���p�e�B�B
+    //   currentState��private�Ȃ̂ŁA����o�R�ł����U����ʂ������Ȃ��悤�ɂ��Ă���B
+    //   AttackType���̂�Player/Enemy���ʂ̓Ɨ��t�@�C��(AttackType.cs)�Œ�`���Ă���B
     public AttackType CurrentAttackType
     {
         get
@@ -820,9 +825,9 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★追加：攻撃種別に応じた「基準攻撃力」を返す。
-    //   漢気ゲージやガード上昇分は含まない、Inspectorで設定した素の値。
-    //   新しい技を追加したときはここにもケースを追加すること。
+    // ���ǉ��F�U����ʂɉ������u��U���́v��Ԃ��B
+    //   ���C�Q�[�W��K�[�h�㏸���͊܂܂Ȃ��AInspector�Őݒ肵���f�̒l�B
+    //   �V�����Z��ǉ������Ƃ��͂����ɂ��P�[�X��ǉ����邱�ƁB
     int GetAttackPower(AttackType type)
     {
         switch (type)
@@ -831,12 +836,12 @@ public class Player : MonoBehaviour
             case AttackType.Kick: return kickAtk;
             case AttackType.UpKick: return upKickAtk;
             case AttackType.DownKick: return downKickAtk;
-            default: return punchAtk; // 想定外の場合のフォールバック
+            default: return punchAtk; // �z��O�̏ꍇ�̃t�H�[���o�b�N
         }
     }
 
-    // ★追加：攻撃種別に応じて、自分が持っているHitEffectDataのどれを使うかを返す。
-    //   被弾した相手側から「あなたの攻撃はどの擬音を使う？」と問い合わせられるためのメソッド。
+    // ���ǉ��F�U����ʂɉ����āA�����������Ă���HitEffectData�̂ǂ���g������Ԃ��B
+    //   ��e�������葤����u���Ȃ��̍U���͂ǂ̋[�����g���H�v�Ɩ₢���킹���邽�߂̃��\�b�h�B
     public HitEffectData GetHitEffectDataFor(AttackType type)
     {
         switch (type)
@@ -852,58 +857,58 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★追加：空振り演出用。攻撃を出した瞬間にfalseにし、相手にヒットした瞬間trueにする。
-    //   攻撃モーション終了時にまだfalseなら「空振り」とみなす。
+    // ���ǉ��F��U�艉�o�p�B�U�����o�����u�Ԃ�false�ɂ��A����Ƀq�b�g�����u��true�ɂ���B
+    //   �U�����[�V�����I�����ɂ܂�false�Ȃ�u��U��v�Ƃ݂Ȃ��B
     private bool attackLandedThisAttack = false;
 
     //=====================================================
-    // ★多段ヒット設定（攻撃の種類ごと）
-    //   1回の攻撃（パンチ・通常キック・上キック・下キック）で、相手に何回まで
-    //   ダメージを与えられるかを、技ごとに個別にInspectorから設定できるようにする。
-    //   ・allowMultiHit = false（既定）：1回の攻撃につき1ヒットのみ（多段ヒット防止）
-    //   ・allowMultiHit = true：maxHitCountで指定した回数までヒットを許可
+    // �����i�q�b�g�ݒ�i�U���̎�ނ��Ɓj
+    //   1��̍U���i�p���`�E�ʏ�L�b�N�E��L�b�N�E���L�b�N�j�ŁA����ɉ���܂�
+    //   �_���[�W��^�����邩���A�Z���ƂɌʂ�Inspector����ݒ�ł���悤�ɂ���B
+    //   �EallowMultiHit = false�i����j�F1��̍U���ɂ�1�q�b�g�̂݁i���i�q�b�g�h�~�j
+    //   �EallowMultiHit = true�FmaxHitCount�Ŏw�肵���񐔂܂Ńq�b�g������
     //=====================================================
     [System.Serializable]
     public class MultiHitSetting
     {
-        [Tooltip("OFF（既定）：この技は1回の攻撃で相手に当たるのは1回だけになります（多段ヒット防止）。\n" +
-                 "ON：この技は1回の攻撃で複数回ヒットを許可します（多段ヒット可能）。回数は下のmaxHitCountで設定します。")]
+        [Tooltip("OFF�i����j�F���̋Z��1��̍U���ő���ɓ�����̂�1�񂾂��ɂȂ�܂��i���i�q�b�g�h�~�j�B\n" +
+                 "ON�F���̋Z��1��̍U���ŕ�����q�b�g�������܂��i���i�q�b�g�\�j�B�񐔂͉���maxHitCount�Őݒ肵�܂��B")]
         public bool allowMultiHit = false;
-        [Tooltip("多段ヒットを許可する場合、1回の攻撃で最大何回までヒット判定を有効にするか。\n" +
-                 "allowMultiHitがOFFの間はこの値に関わらず常に1回として扱われます。")]
+        [Tooltip("���i�q�b�g��������ꍇ�A1��̍U���ōő剽��܂Ńq�b�g�����L���ɂ��邩�B\n" +
+                 "allowMultiHit��OFF�̊Ԃ͂��̒l�Ɋւ�炸���1��Ƃ��Ĉ����܂��B")]
         [Min(1)] public int maxHitCount = 1;
     }
 
-    [Header("多段ヒット設定（攻撃の種類ごと）")]
-    [Tooltip("パンチ（空中攻撃含む）の多段ヒット設定")]
+    [Header("���i�q�b�g�ݒ�i�U���̎�ނ��Ɓj")]
+    [Tooltip("�p���`�i�󒆍U���܂ށj�̑��i�q�b�g�ݒ�")]
     [SerializeField] MultiHitSetting punchMultiHit = new MultiHitSetting();
-    [Tooltip("通常キックの多段ヒット設定")]
+    [Tooltip("�ʏ�L�b�N�̑��i�q�b�g�ݒ�")]
     [SerializeField] MultiHitSetting kickMultiHit = new MultiHitSetting();
-    [Tooltip("上キックの多段ヒット設定")]
+    [Tooltip("��L�b�N�̑��i�q�b�g�ݒ�")]
     [SerializeField] MultiHitSetting upKickMultiHit = new MultiHitSetting();
-    [Tooltip("下キックの多段ヒット設定")]
+    [Tooltip("���L�b�N�̑��i�q�b�g�ݒ�")]
     [SerializeField] MultiHitSetting downKickMultiHit = new MultiHitSetting();
-    [Tooltip("必殺技（waza／左足攻撃）の多段ヒット設定。既定でON（180フレーム＝3秒間で最大5回まで命中可能）。")]
+    [Tooltip("�K�E�Z�iwaza�^�����U���j�̑��i�q�b�g�ݒ�B�����ON�i180�t���[����3�b�Ԃōő�5��܂Ŗ����\�j�B")]
     [SerializeField] MultiHitSetting specialMultiHit = new MultiHitSetting { allowMultiHit = true, maxHitCount = 5 };
-    [Tooltip("必殺技が命中してから、次のヒットが有効になるまでのクールタイム（フレーム）。多段ヒットの連続ヒット間隔を制御する。")]
+    [Tooltip("�K�E�Z���������Ă���A���̃q�b�g���L���ɂȂ�܂ł̃N�[���^�C���i�t���[���j�B���i�q�b�g�̘A���q�b�g�Ԋu�𐧌䂷��B")]
     [SerializeField] int specialHitCooldownFrames = 6;
 
-    // 現在の攻撃で、既に何回ヒットが確定したか。EnterPunch/EnterKick等、新しい攻撃の開始時に0へリセットする。
+    // ���݂̍U���ŁA���ɉ���q�b�g���m�肵�����BEnterPunch/EnterKick���A�V�����U���̊J�n����0�փ��Z�b�g����B
     private int hitCountThisAttack = 0;
 
-    // 必殺技が最後にヒットを確定したフレーム（CurrentFrame）。specialHitCooldownFramesの間隔判定に使用する。
-    // 新しい攻撃の開始時（ResetMultiHitCount）に十分過去の値へリセットし、前回の攻撃のクールタイムを引きずらないようにする。
+    // �K�E�Z���Ō�Ƀq�b�g���m�肵���t���[���iCurrentFrame�j�BspecialHitCooldownFrames�̊Ԋu����Ɏg�p����B
+    // �V�����U���̊J�n���iResetMultiHitCount�j�ɏ\���ߋ��̒l�փ��Z�b�g���A�O��̍U���̃N�[���^�C������������Ȃ��悤�ɂ���B
     private int lastSpecialHitFrame = -999999;
 
-    // 攻撃の開始時（EnterPunch/EnterKick等）に呼び出し、多段ヒットのカウントをリセットする。
+    // �U���̊J�n���iEnterPunch/EnterKick���j�ɌĂяo���A���i�q�b�g�̃J�E���g�����Z�b�g����B
     void ResetMultiHitCount()
     {
         hitCountThisAttack = 0;
         lastSpecialHitFrame = -999999;
     }
 
-    // 攻撃の種類（AttackType）に応じた多段ヒット設定を返す。
-    // 新しい技を追加した場合は、対応するMultiHitSettingフィールドを増やし、ここにもケースを追加すること。
+    // �U���̎�ށiAttackType�j�ɉ��������i�q�b�g�ݒ��Ԃ��B
+    // �V�����Z��ǉ������ꍇ�́A�Ή�����MultiHitSetting�t�B�[���h�𑝂₵�A�����ɂ��P�[�X��ǉ����邱�ƁB
     MultiHitSetting GetMultiHitSetting(AttackType type)
     {
         switch (type)
@@ -912,14 +917,14 @@ public class Player : MonoBehaviour
             case AttackType.Kick: return kickMultiHit;
             case AttackType.UpKick: return upKickMultiHit;
             case AttackType.DownKick: return downKickMultiHit;
-            default: return punchMultiHit; // 想定外の場合のフォールバック
+            default: return punchMultiHit; // �z��O�̏ꍇ�̃t�H�[���o�b�N
         }
     }
 
-    // ★追加：被弾した相手側（OnTriggerEnter）から、「今出している技のノックバック量」を問い合わせるための公開メソッド。
-    //   必殺技中はspecialKnockback、それ以外はCurrentAttackTypeに応じた設定を返す。
-    //   攻撃中でない場合（想定外）はnullを返す＝ノックバックなし。
-    //   新しい技を追加した場合は、対応するKnockbackSettingフィールドを増やし、ここにもケースを追加すること。
+    // ���ǉ��F��e�������葤�iOnTriggerEnter�j����A�u���o���Ă���Z�̃m�b�N�o�b�N�ʁv��₢���킹�邽�߂̌��J���\�b�h�B
+    //   �K�E�Z����specialKnockback�A����ȊO��CurrentAttackType�ɉ������ݒ��Ԃ��B
+    //   �U�����łȂ��ꍇ�i�z��O�j��null��Ԃ����m�b�N�o�b�N�Ȃ��B
+    //   �V�����Z��ǉ������ꍇ�́A�Ή�����KnockbackSetting�t�B�[���h�𑝂₵�A�����ɂ��P�[�X��ǉ����邱�ƁB
     public KnockbackSetting GetCurrentKnockbackSetting()
     {
         if (currentState == PlayerState.Special) return specialKnockback;
@@ -934,10 +939,10 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★追加：被弾した相手側（OnTriggerEnter）から、「今出している技のヒットストップのフレーム数（60F=1秒）」を問い合わせるための公開メソッド。
-    //   必殺技中はspecialHitStopFrames、それ以外はCurrentAttackTypeに応じた値を返す。
-    //   攻撃中でない場合（想定外）は、呼び出し側のフォールバックで扱えるよう負の値(-1)を返す。
-    //   新しい技を追加した場合は、対応するフィールドを増やし、ここにもケースを追加すること。
+    // ���ǉ��F��e�������葤�iOnTriggerEnter�j����A�u���o���Ă���Z�̃q�b�g�X�g�b�v�̃t���[�����i60F=1�b�j�v��₢���킹�邽�߂̌��J���\�b�h�B
+    //   �K�E�Z����specialHitStopFrames�A����ȊO��CurrentAttackType�ɉ������l��Ԃ��B
+    //   �U�����łȂ��ꍇ�i�z��O�j�́A�Ăяo�����̃t�H�[���o�b�N�ň�����悤���̒l(-1)��Ԃ��B
+    //   �V�����Z��ǉ������ꍇ�́A�Ή�����t�B�[���h�𑝂₵�A�����ɂ��P�[�X��ǉ����邱�ƁB
     public int GetCurrentHitStopFrames()
     {
         if (currentState == PlayerState.Special) return specialHitStopFrames;
@@ -952,9 +957,9 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★追加：被弾した相手側（OnTriggerEnter）から、「今出している技のやられ状態のフレーム数」を問い合わせるための公開メソッド。
-    //   必殺技中はspecialStunFrames、それ以外はCurrentAttackTypeに応じた値を返す。攻撃中でない場合は0（やられ状態にしない）。
-    //   新しい技を追加した場合は、対応するフィールドを増やし、ここにもケースを追加すること。
+    // ���ǉ��F��e�������葤�iOnTriggerEnter�j����A�u���o���Ă���Z�̂����Ԃ̃t���[�����v��₢���킹�邽�߂̌��J���\�b�h�B
+    //   �K�E�Z����specialStunFrames�A����ȊO��CurrentAttackType�ɉ������l��Ԃ��B�U�����łȂ��ꍇ��0�i�����Ԃɂ��Ȃ��j�B
+    //   �V�����Z��ǉ������ꍇ�́A�Ή�����t�B�[���h�𑝂₵�A�����ɂ��P�[�X��ǉ����邱�ƁB
     public int GetCurrentStunFrames()
     {
         if (currentState == PlayerState.Special) return specialStunFrames;
@@ -969,14 +974,14 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★追加：被弾した相手側（OnTriggerEnter）から、「今回の接触を有効なヒットとして扱ってよいか」を
-    //   攻撃側（自分＝このPlayerインスタンス）に問い合わせるための公開メソッド。
-    //   現在出している技ごとのMultiHitSettingを参照して判定する。
-    //   ・必殺技(Special)中はspecialMultiHitを参照する（CurrentAttackTypeには含まれないため専用に分岐）。
-    //   ・それ以外はCurrentAttackType（パンチ/キック等）に応じたMultiHitSettingを参照する。
-    //   ・多段ヒット無効時：1回目の呼び出しのみtrueを返し、以降は同じ攻撃の間ずっとfalseを返す。
-    //   ・多段ヒット有効時：maxHitCountで設定した回数までtrueを返す。
-    //   trueを返した場合のみ、呼び出し側（被弾した相手）はダメージ処理を実行すること。
+    // ���ǉ��F��e�������葤�iOnTriggerEnter�j����A�u����̐ڐG��L���ȃq�b�g�Ƃ��Ĉ����Ă悢���v��
+    //   �U�����i����������Player�C���X�^���X�j�ɖ₢���킹�邽�߂̌��J���\�b�h�B
+    //   ���ݏo���Ă���Z���Ƃ�MultiHitSetting���Q�Ƃ��Ĕ��肷��B
+    //   �E�K�E�Z(Special)����specialMultiHit���Q�Ƃ���iCurrentAttackType�ɂ͊܂܂�Ȃ����ߐ�p�ɕ���j�B
+    //   �E����ȊO��CurrentAttackType�i�p���`/�L�b�N���j�ɉ�����MultiHitSetting���Q�Ƃ���B
+    //   �E���i�q�b�g�������F1��ڂ̌Ăяo���̂�true��Ԃ��A�ȍ~�͓����U���̊Ԃ�����false��Ԃ��B
+    //   �E���i�q�b�g�L�����FmaxHitCount�Őݒ肵���񐔂܂�true��Ԃ��B
+    //   true��Ԃ����ꍇ�̂݁A�Ăяo�����i��e��������j�̓_���[�W���������s���邱�ƁB
     public bool TryRegisterHit()
     {
         bool isSpecial = currentState == PlayerState.Special;
@@ -985,15 +990,15 @@ public class Player : MonoBehaviour
 
         if (hitCountThisAttack >= limit)
         {
-            GaugeDLog($"[{PlayerName}] 多段ヒット制限により今回の接触は無効（技={(isSpecial ? "Special" : CurrentAttackType.ToString())} / 既に{hitCountThisAttack}回ヒット済み / 上限{limit}回）");
+            GaugeDLog($"[{PlayerName}] ���i�q�b�g�����ɂ�荡��̐ڐG�͖����i�Z={(isSpecial ? "Special" : CurrentAttackType.ToString())} / ����{hitCountThisAttack}��q�b�g�ς� / ���{limit}��j");
             return false;
         }
 
-        // ★追加：必殺技は、命中してから次のヒットが有効になるまでspecialHitCooldownFramesフレームのクールタイムを設ける。
-        //   多段ヒット許可中でも、同一フレーム／連続フレームでの連続ヒットを防ぐための時間的な間引き。
+        // ���ǉ��F�K�E�Z�́A�������Ă��玟�̃q�b�g���L���ɂȂ�܂�specialHitCooldownFrames�t���[���̃N�[���^�C����݂���B
+        //   ���i�q�b�g�����ł��A����t���[���^�A���t���[���ł̘A���q�b�g��h�����߂̎��ԓI�ȊԈ����B
         if (isSpecial && CurrentFrame - lastSpecialHitFrame < specialHitCooldownFrames)
         {
-            GaugeDLog($"[{PlayerName}] 必殺技クールタイム中により今回の接触は無効（前回ヒットから{CurrentFrame - lastSpecialHitFrame}フレーム / クールタイム{specialHitCooldownFrames}フレーム）");
+            GaugeDLog($"[{PlayerName}] �K�E�Z�N�[���^�C�����ɂ�荡��̐ڐG�͖����i�O��q�b�g����{CurrentFrame - lastSpecialHitFrame}�t���[�� / �N�[���^�C��{specialHitCooldownFrames}�t���[���j");
             return false;
         }
 
@@ -1002,8 +1007,8 @@ public class Player : MonoBehaviour
         return true;
     }
 
-    // ★追加：攻撃種別ごとの「命中時」クールダウン（攻撃開始からの合計フレーム数）を返す。
-    //   新しい技を追加したときはここにもケースを追加すること。
+    // ���ǉ��F�U����ʂ��Ƃ́u�������v�N�[���_�E���i�U���J�n����̍��v�t���[�����j��Ԃ��B
+    //   �V�����Z��ǉ������Ƃ��͂����ɂ��P�[�X��ǉ����邱�ƁB
     int GetHitFrames(AttackType type)
     {
         switch (type)
@@ -1016,53 +1021,53 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★追加：被弾した相手側から「あなたの攻撃、当たりましたよ」と通知してもらうための公開メソッド。
+    // ���ǉ��F��e�������葤����u���Ȃ��̍U���A������܂�����v�ƒʒm���Ă��炤���߂̌��J���\�b�h�B
     public void NotifyAttackLanded()
     {
-        // ★追加：この攻撃で最初の命中だった場合、クールダウンを「空振り時」から「命中時」の長さへ切り替える。
-        //   （必殺技や投げなど、CurrentAttackTypeがNoneの状態では対象外）
+        // ���ǉ��F���̍U���ōŏ��̖����������ꍇ�A�N�[���_�E�����u��U�莞�v����u�������v�̒����֐؂�ւ���B
+        //   �i�K�E�Z�Ⓤ���ȂǁACurrentAttackType��None�̏�Ԃł͑ΏۊO�j
         if (!attackLandedThisAttack && CurrentAttackType != AttackType.None)
         {
-            int elapsed = currentAttackMissFrames - stateTimer; // 攻撃開始からの経過フレーム数
+            int elapsed = currentAttackMissFrames - stateTimer; // �U���J�n����̌o�߃t���[����
             int newTimer = Mathf.Max(GetHitFrames(CurrentAttackType) - elapsed, 0);
-            DLog($"[{PlayerName}] 命中によりクールダウン切替：残り{stateTimer}F → {newTimer}F（命中時={GetHitFrames(CurrentAttackType)}F / 経過={elapsed}F）");
+            DLog($"[{PlayerName}] �����ɂ��N�[���_�E���ؑցF�c��{stateTimer}F �� {newTimer}F�i������={GetHitFrames(CurrentAttackType)}F / �o��={elapsed}F�j");
             stateTimer = newTimer;
         }
 
         attackLandedThisAttack = true;
 
-        // 相手にダメージを与えた（攻撃を命中させた）ので、漢気ゲージを増やす
+        // ����Ƀ_���[�W��^�����i�U���𖽒��������j�̂ŁA���C�Q�[�W�𑝂₷
         AddKankiGauge(gaugeGainOnHit);
 
-        // ガード成功で上昇していた攻撃力は「次の攻撃が当たるまで」の効果なので、
-        // 自分の攻撃が実際に相手へ命中したこのタイミングでバフとエフェクトを終了する。
+        // �K�[�h�����ŏ㏸���Ă����U���͂́u���̍U����������܂Łv�̌��ʂȂ̂ŁA
+        // �����̍U�������ۂɑ���֖����������̃^�C�~���O�Ńo�t�ƃG�t�F�N�g���I������B
         if (isGuardBuffed)
         {
             isGuardBuffed = false;
-            guardBuffMultiplier = 1f; // 技が当たったので累積倍率をリセット
+            guardBuffMultiplier = 1f; // �Z�����������̂ŗݐϔ{�������Z�b�g
             StopGuardBuffEffect();
         }
     }
 
-    // ★追加：相手（enemyPlayer / enemy）の参照が切れている時に、シーン内から自動で探し直す。
-    //   プレハブはシーン上のオブジェクトへの参照を保持できないため、プレハブ化して置き直したり、
-    //   相手側を置き直したりすると、Inspectorで設定していたenemyPlayer/enemyが空(None/Missing)になり、
-    //   OnTriggerEnterの「相手の攻撃か？」判定が常にfalseになって当たり判定が消えたように見える。
-    //   ・enemyPlayerもenemyも未設定（または破棄済み）の時だけ、0.5秒おきに探す（設定済みなら何もしない）。
-    //   ・まず自分以外のPlayerを探し、いなければCPUのEnemyを探す。
-    //   ・Inspectorで設定されていればそちらが常に優先される。
+    // ���ǉ��F����ienemyPlayer / enemy�j�̎Q�Ƃ��؂�Ă��鎞�ɁA�V�[�������玩���ŒT�������B
+    //   �v���n�u�̓V�[����̃I�u�W�F�N�g�ւ̎Q�Ƃ�ێ��ł��Ȃ����߁A�v���n�u�����Ēu����������A
+    //   ���葤��u���������肷��ƁAInspector�Őݒ肵�Ă���enemyPlayer/enemy����(None/Missing)�ɂȂ�A
+    //   OnTriggerEnter�́u����̍U�����H�v���肪���false�ɂȂ��ē����蔻�肪�������悤�Ɍ�����B
+    //   �EenemyPlayer��enemy�����ݒ�i�܂��͔j���ς݁j�̎������A0.5�b�����ɒT���i�ݒ�ς݂Ȃ牽�����Ȃ��j�B
+    //   �E�܂������ȊO��Player��T���A���Ȃ����CPU��Enemy��T���B
+    //   �EInspector�Őݒ肳��Ă���΂����炪��ɗD�悳���B
     private float opponentResolveTimer = 0f;
 
     void ResolveOpponentIfMissing()
     {
-        // UnityのObjectの==は、破棄済み(Missing)の参照もnull扱いにする
+        // Unity��Object��==�́A�j���ς�(Missing)�̎Q�Ƃ�null�����ɂ���
         if (enemyPlayer != null || enemy != null) return;
 
         opponentResolveTimer -= Time.unscaledDeltaTime;
         if (opponentResolveTimer > 0f) return;
         opponentResolveTimer = 0.5f;
 
-        // 自分以外のPlayer（対人戦の相手）を探す。PLayerTagNameが自分と違うものを優先する
+        // �����ȊO��Player�i�ΐl��̑���j��T���BPLayerTagName�������ƈႤ���̂�D�悷��
         Player found = null;
         foreach (Player candidate in FindObjectsByType<Player>(FindObjectsSortMode.None))
         {
@@ -1076,52 +1081,52 @@ public class Player : MonoBehaviour
         if (found != null)
         {
             enemyPlayer = found;
-            Debug.LogWarning($"[{PlayerName}] enemyPlayerが未設定だったため、シーン内の'{found.gameObject.name}'を自動で設定しました。" +
-                             "プレハブはシーン上のオブジェクトを参照できないため、Inspectorで設定し直すことをおすすめします。", this);
+            Debug.LogWarning($"[{PlayerName}] enemyPlayer�����ݒ肾�������߁A�V�[������'{found.gameObject.name}'�������Őݒ肵�܂����B" +
+                             "�v���n�u�̓V�[����̃I�u�W�F�N�g���Q�Ƃł��Ȃ����߁AInspector�Őݒ肵�������Ƃ��������߂��܂��B", this);
             return;
         }
 
-        // 対人戦の相手がいなければ、CPU(Enemy)を探す
+        // �ΐl��̑��肪���Ȃ���΁ACPU(Enemy)��T��
         Enemy foundEnemy = FindAnyObjectByType<Enemy>();
         if (foundEnemy != null)
         {
             enemy = foundEnemy;
-            Debug.LogWarning($"[{PlayerName}] enemyが未設定だったため、シーン内の'{foundEnemy.gameObject.name}'を自動で設定しました。" +
-                             "Inspectorで設定し直すことをおすすめします。", this);
+            Debug.LogWarning($"[{PlayerName}] enemy�����ݒ肾�������߁A�V�[������'{foundEnemy.gameObject.name}'�������Őݒ肵�܂����B" +
+                             "Inspector�Őݒ肵�������Ƃ��������߂��܂��B", this);
         }
     }
 
-    // ★追加：リザルト画面（InGame1V1ResultControllerがあるシーン）なら、自動でリザルト画面モードにする
+    // ���ǉ��F���U���g��ʁiInGame1V1ResultController������V�[���j�Ȃ�A�����Ń��U���g��ʃ��[�h�ɂ���
     void Awake()
     {
         if (autoDetectResultScene && !isResultMode
             && FindAnyObjectByType<InGame1V1ResultController>(FindObjectsInactive.Include) != null)
         {
             isResultMode = true;
-            DLog($"[{PlayerName}] リザルト画面を検知したため、リザルト画面モードで起動します");
+            DLog($"[{PlayerName}] ���U���g��ʂ����m�������߁A���U���g��ʃ��[�h�ŋN�����܂�");
         }
     }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    // 各種コンポーネント・子オブジェクトの当たり判定の取得と初期化を行う
+    // �e��R���|�[�l���g�E�q�I�u�W�F�N�g�̓����蔻��̎擾�Ə��������s��
     void Start()
     {
-        //男気ゲージに使用する、補正前の素の攻撃力。
-        //攻撃の種類ごとに変わるため、実際の値は各攻撃発生時（EnterPunch/EnterKick）に設定し直す。
-        //ここでは戦闘開始直後の表示用にパンチの攻撃力で初期化しておく。
+        //�j�C�Q�[�W�Ɏg�p����A�␳�O�̑f�̍U���́B
+        //�U���̎�ނ��Ƃɕς�邽�߁A���ۂ̒l�͊e�U���������iEnterPunch/EnterKick�j�ɐݒ肵�����B
+        //�����ł͐퓬�J�n����̕\���p�Ƀp���`�̍U���͂ŏ��������Ă����B
         baseAtk = GetAttackPower(AttackType.Punch);
         UpdateAtkByGauge();
-        // 自分にアタッチされているPlayerInputコンポーネントを取得
+        // �����ɃA�^�b�`����Ă���PlayerInput�R���|�[�l���g���擾
         playerInput = GetComponent<PlayerInput>();
-        // どのプレイヤー番号・どのデバイスが紐づいているかログ出力（デバッグ用）
-        DLog($"{gameObject.name} : PlayerIndex={playerInput.playerIndex} / Device={(playerInput.devices.Count > 0 ? playerInput.devices[0].displayName : "なし")}");
+        // �ǂ̃v���C���[�ԍ��E�ǂ̃f�o�C�X���R�Â��Ă��邩���O�o�́i�f�o�b�O�p�j
+        DLog($"{gameObject.name} : PlayerIndex={playerInput.playerIndex} / Device={(playerInput.devices.Count > 0 ? playerInput.devices[0].displayName : "�Ȃ�")}");
 
-        rb = GetComponent<Rigidbody>();		//PlayerのRigidbodyを取得
+        rb = GetComponent<Rigidbody>();		//Player��Rigidbody���擾
         animator = GetComponent<Animator>();
         se = GetComponent<AudioSource>();
 
-        // ★追加：後退用アニメーションの切り替えに使う"MoveBackward"(Bool)がAnimatorにあるか調べておく。
-        //   無い場合はSetBoolを呼ばない（毎フレーム警告が出るのを防ぐ）。
+        // ���ǉ��F��ޗp�A�j���[�V�����̐؂�ւ��Ɏg��"MoveBackward"(Bool)��Animator�ɂ��邩���ׂĂ����B
+        //   �����ꍇ��SetBool���Ă΂Ȃ��i���t���[���x�����o��̂�h���j�B
         if (animator != null)
         {
             foreach (var param in animator.parameters)
@@ -1133,8 +1138,8 @@ public class Player : MonoBehaviour
                 }
             }
 
-            // ★変更：仁王立ち用の"Guard"(Trigger)・ガード成功用の"Guard-success"(Trigger)がAnimatorにあるか調べる。
-            //   無ければ警告を1回だけ出し、そのアニメーションの再生は行わない。
+            // ���ύX�F�m�������p��"Guard"(Trigger)�E�K�[�h�����p��"Guard-success"(Trigger)��Animator�ɂ��邩���ׂ�B
+            //   ������Όx����1�񂾂��o���A���̃A�j���[�V�����̍Đ��͍s��Ȃ��B
             foreach (var param in animator.parameters)
             {
                 if (param.name == GuardParam && param.type == AnimatorControllerParameterType.Trigger)
@@ -1148,25 +1153,25 @@ public class Player : MonoBehaviour
             }
             if (!hasGuardParam)
             {
-                Debug.LogWarning($"[{PlayerName}] Animatorに'{GuardParam}'(Trigger)パラメータがありません。仁王立ちのアニメーションは再生されません。", this);
+                Debug.LogWarning($"[{PlayerName}] Animator��'{GuardParam}'(Trigger)�p�����[�^������܂���B�m�������̃A�j���[�V�����͍Đ�����܂���B", this);
             }
             if (!hasGuardSuccessParam)
             {
-                Debug.LogWarning($"[{PlayerName}] Animatorに'{GuardSuccessParam}'(Trigger)パラメータがありません。仁王立ち成功のアニメーションは再生されません。", this);
+                Debug.LogWarning($"[{PlayerName}] Animator��'{GuardSuccessParam}'(Trigger)�p�����[�^������܂���B�m�����������̃A�j���[�V�����͍Đ�����܂���B", this);
             }
         }
 
-        // GameMNGを名前に依存しない方法で探してキャッシュしておく。
-        // （オブジェクト名が"ManagerObject"や"GameMNG"でなくても正しく取得できるようにする）
-        // 見つからない場合はここでハッキリ警告を出し、以降のNullReferenceExceptionを防ぐ。
+        // GameMNG�𖼑O�Ɉˑ����Ȃ����@�ŒT���ăL���b�V�����Ă����B
+        // �i�I�u�W�F�N�g����"ManagerObject"��"GameMNG"�łȂ��Ă��������擾�ł���悤�ɂ���j
+        // ������Ȃ��ꍇ�͂����Ńn�b�L���x�����o���A�ȍ~��NullReferenceException��h���B
         gameMNG = FindAnyObjectByType<GameMNG>();
-        if (gameMNG == null && !isResultMode) // リザルト画面にはGameMNGが無いのが普通なのでエラーにしない
+        if (gameMNG == null && !isResultMode) // ���U���g��ʂɂ�GameMNG�������̂����ʂȂ̂ŃG���[�ɂ��Ȃ�
         {
-            Debug.LogError("シーン内にGameMNGコンポーネントを持つGameObjectが見つかりません。" +
-                "配置し忘れ／非アクティブ状態になっていないか確認してください。");
+            Debug.LogError("�V�[������GameMNG�R���|�[�l���g������GameObject��������܂���B" +
+                "�z�u���Y��^��A�N�e�B�u��ԂɂȂ��Ă��Ȃ����m�F���Ă��������B");
         }
 
-        //<当たり判定の子オブジェクトの取得>
+        //<�����蔻��̎q�I�u�W�F�N�g�̎擾>
         Head = FindHitbox("P-Head");
         RightArm = FindHitbox("P-RightArm");
         RightForeArm = FindHitbox("P-RightForeArm");
@@ -1182,41 +1187,41 @@ public class Player : MonoBehaviour
         LeftLeg = FindHitbox("P-LeftLeg");
         Player_Collider = GetComponent<CapsuleCollider>();
 
-        // 一括ON/OFF操作用の配列にまとめておく
+        // �ꊇON/OFF����p�̔z��ɂ܂Ƃ߂Ă���
         allHitboxes = new[]
         {
             Head, RightArm, RightForeArm, RightHand, RightFoot, RightUpLeg, RightLeg,
             LeftArm, LeftForeArm, LeftHand, LeftFoot, LeftUpLeg, LeftLeg,
         };
 
-        // 全身の攻撃用当たり判定コライダーを一括でOFFにする
+        // �S�g�̍U���p�����蔻��R���C�_�[���ꊇ��OFF�ɂ���
         DisableAllHitboxes();
 
-        //ステータスを初期化する
+        //�X�e�[�^�X������������
         currentState = PlayerState.Idle;
         Player_status = Status.Live;
 
-        // ★デバッグ用：自分のヒットボックスが正しく取得できているか確認
+        // ���f�o�b�O�p�F�����̃q�b�g�{�b�N�X���������擾�ł��Ă��邩�m�F
         foreach (var hb in allHitboxes)
         {
-            DLog($"[{gameObject.name}] hitbox取得: {(hb != null ? hb.name + " / owner=" + hb.transform.root.name : "null!")}");
+            DLog($"[{gameObject.name}] hitbox�擾: {(hb != null ? hb.name + " / owner=" + hb.transform.root.name : "null!")}");
         }
         
     }
 
-    // 指定した名前の子オブジェクトからCapsuleColliderを取得するヘルパー
+    // �w�肵�����O�̎q�I�u�W�F�N�g����CapsuleCollider���擾����w���p�[
     CapsuleCollider FindHitbox(string objectName)
     {
         Transform t = FindDeepChild(transform, objectName);
         if (t == null)
         {
-            Debug.LogError($"[{gameObject.name}] ヒットボックス '{objectName}' が自分の階層内に見つかりません");
+            Debug.LogError($"[{gameObject.name}] �q�b�g�{�b�N�X '{objectName}' �������̊K�w���Ɍ�����܂���");
             return null;
         }
         return t.GetComponent<CapsuleCollider>();
     }
 
-    // transformの子孫を再帰的に探索し、名前が一致するTransformを返す
+    // transform�̎q�����ċA�I�ɒT�����A���O����v����Transform��Ԃ�
     Transform FindDeepChild(Transform parent, string name)
     {
         foreach (Transform child in parent)
@@ -1228,7 +1233,7 @@ public class Player : MonoBehaviour
         return null;
     }
 
-    // 当たり判定の部位（ここに挙げた名前のオブジェクトが P[番号]Attack になる）
+    // �����蔻��̕��ʁi�����ɋ��������O�̃I�u�W�F�N�g�� P[�ԍ�]Attack �ɂȂ�j
     static readonly string[] AttackPartNames =
     {
         "P-LeftUpLeg", "P-LeftLeg", "P-LeftFoot",
@@ -1238,34 +1243,34 @@ public class Player : MonoBehaviour
         "P-RightArm", "P-RightForeArm", "P-RightHand",
     };
 
-    // プレイヤー番号（"P1" / "P2"）に応じて、tagとlayerを設定する
-    //   一番上の親 ... tag = P[番号]       / layer = P[番号]
-    //   各部位     ... tag = P[番号]Attack / layer = P[番号]
-    // ※Start()より前（生成直後）に呼ばれても動くよう、キャッシュ済みのhitbox変数は使わず名前で探す
+    // �v���C���[�ԍ��i"P1" / "P2"�j�ɉ����āAtag��layer��ݒ肷��
+    //   ��ԏ�̐e ... tag = P[�ԍ�]       / layer = P[�ԍ�]
+    //   �e����     ... tag = P[�ԍ�]Attack / layer = P[�ԍ�]
+    // ��Start()���O�i��������j�ɌĂ΂�Ă������悤�A�L���b�V���ς݂�hitbox�ϐ��͎g�킸���O�ŒT��
     public void ApplyPlayerTagAndLayer(string playerLabel)
     {
-        string bodyTag = playerLabel;              // 例: P1
-        string attackTag = playerLabel + "Attack"; // 例: P1Attack
+        string bodyTag = playerLabel;              // ��: P1
+        string attackTag = playerLabel + "Attack"; // ��: P1Attack
 
         int layer = LayerMask.NameToLayer(playerLabel);
         if (layer < 0)
         {
-            Debug.LogWarning($"[{gameObject.name}] Layer '{playerLabel}' が未登録です。" +
-                             "Project Settings > Tags and Layers で追加してください。layerは変更しません。", this);
+            Debug.LogWarning($"[{gameObject.name}] Layer '{playerLabel}' �����o�^�ł��B" +
+                             "Project Settings > Tags and Layers �Œǉ����Ă��������Blayer�͕ύX���܂���B", this);
         }
 
-        // 一番上の親
+        // ��ԏ�̐e
         GameObject root = transform.root.gameObject;
         TrySetTag(root, bodyTag);
         if (layer >= 0) root.layer = layer;
 
-        // 各部位（gameObject.layerは子へ伝播しないので、1つずつ設定する）
+        // �e���ʁigameObject.layer�͎q�֓`�d���Ȃ��̂ŁA1���ݒ肷��j
         foreach (string partName in AttackPartNames)
         {
             Transform part = FindDeepChild(transform, partName);
             if (part == null)
             {
-                Debug.LogWarning($"[{gameObject.name}] 部位 '{partName}' が見つからず、tag/layerを設定できませんでした。", this);
+                Debug.LogWarning($"[{gameObject.name}] ���� '{partName}' �������炸�Atag/layer��ݒ�ł��܂���ł����B", this);
                 continue;
             }
 
@@ -1273,10 +1278,10 @@ public class Player : MonoBehaviour
             if (layer >= 0) part.gameObject.layer = layer;
         }
 
-        DLog($"[{PlayerName}] tag/layerを設定：親={bodyTag} / 部位={attackTag} / layer={playerLabel}({layer})");
+        DLog($"[{PlayerName}] tag/layer��ݒ�F�e={bodyTag} / ����={attackTag} / layer={playerLabel}({layer})");
     }
 
-    // 未登録のtagを代入するとUnityExceptionになるため、握りつぶさず警告に変える
+    // ���o�^��tag���������UnityException�ɂȂ邽�߁A����Ԃ����x���ɕς���
     static void TrySetTag(GameObject go, string tagName)
     {
         try
@@ -1285,151 +1290,151 @@ public class Player : MonoBehaviour
         }
         catch (UnityException)
         {
-            Debug.LogWarning($"Tag '{tagName}' が未登録です。Project Settings > Tags and Layers で追加してください。", go);
+            Debug.LogWarning($"Tag '{tagName}' �����o�^�ł��BProject Settings > Tags and Layers �Œǉ����Ă��������B", go);
         }
     }
 
     //=====================================================
-    // ★Input Actionsのコールバック（PlayerInputのBehavior=Send Messagesで自動的に呼ばれる）
-    //   ここでは「ボタンが押された」という意図フラグを立てるだけにし、
-    //   実際にどう行動へ反映するかはUpdate側で判断する。
+    // ��Input Actions�̃R�[���o�b�N�iPlayerInput��Behavior=Send Messages�Ŏ����I�ɌĂ΂��j
+    //   �����ł́u�{�^���������ꂽ�v�Ƃ����Ӑ}�t���O�𗧂Ă邾���ɂ��A
+    //   ���ۂɂǂ��s���֔��f���邩��Update���Ŕ��f����B
     //=====================================================
 
-    // 左スティック：Move（継続的な値なので、押した/離したではなく現在値を保持するだけ）
+    // ���X�e�B�b�N�FMove�i�p���I�Ȓl�Ȃ̂ŁA������/�������ł͂Ȃ����ݒl��ێ����邾���j
     public void OnMove(InputValue value)
     {
-        // ★追加：リザルト画面モード中はスティック入力をすべて無視する（移動・しゃがみ等を無効化）
+        // ���ǉ��F���U���g��ʃ��[�h���̓X�e�B�b�N���͂����ׂĖ�������i�ړ��E���Ⴊ�ݓ��𖳌����j
         moveInput = isResultMode ? Vector2.zero : value.Get<Vector2>();
     }
 
-    // ★追加：ダウン中（HP<=0）の「根性復活」の連打を1回分カウントする。
-    //   どのボタンが押されても同じ処理になるよう、各ボタンのコールバックから呼ぶ共通処理。
+    // ���ǉ��F�_�E�����iHP<=0�j�́u���������v�̘A�ł�1�񕪃J�E���g����B
+    //   �ǂ̃{�^����������Ă����������ɂȂ�悤�A�e�{�^���̃R�[���o�b�N����Ăԋ��ʏ����B
     void RegisterMash()
     {
-        // 復活チャレンジの連打カウントとして加算するだけ
+        // �����`�������W�̘A�ŃJ�E���g�Ƃ��ĉ��Z���邾��
         mashCount++;
 
-        // 連打ボタン画像に「押された」ことを伝える。
-        // 押した画像の延長はせず、TickMashButtonVisual()が「押していない画像」を必ず挟んでから次の押下として表示する。
+        // �A�Ń{�^���摜�Ɂu�����ꂽ�v���Ƃ�`����B
+        // �������摜�̉����͂����ATickMashButtonVisual()���u�����Ă��Ȃ��摜�v��K������ł��玟�̉����Ƃ��ĕ\������B
         mashButtonPendingPress = true;
 
-        // 連打1回ごとの擬音演出（「グッ！」「ンン！」等）。
-        // 攻撃者がいないので、常にプレイヤーの正面方向を基準にHitEffectData側のBase Angleで散らす。
+        // �A��1�񂲂Ƃ̋[�����o�i�u�O�b�I�v�u�����I�v���j�B
+        // �U���҂����Ȃ��̂ŁA��Ƀv���C���[�̐��ʕ��������HitEffectData����Base Angle�ŎU�炷�B
         if (HitEffectSpawner.Instance != null && mashHitEffectData != null)
         {
-            HitEffectSpawner.Instance.SpawnBehindFacing(mashHitEffectData, transform.position, transform.forward); // 向きと反対側の斜め上へ
-            EffectDLog($"[{PlayerName}] 連打擬音エフェクト発生 pos={transform.position}");
+            HitEffectSpawner.Instance.SpawnBehindFacing(mashHitEffectData, transform.position, transform.forward); // �����Ɣ��Α��̎΂ߏ��
+            EffectDLog($"[{PlayerName}] �A�ŋ[���G�t�F�N�g���� pos={transform.position}");
         }
     }
 
-    // ジャンプボタン押下時のコールバック
-    // ※HP<=0のダウン中は「根性復活」の連打としてカウントする（どのボタンでも同じ）
+    // �W�����v�{�^���������̃R�[���o�b�N
+    // ��HP<=0�̃_�E�����́u���������v�̘A�łƂ��ăJ�E���g����i�ǂ̃{�^���ł������j
     public void OnJump(InputValue value)
     {
         if (!value.isPressed) return;
-        if (isResultMode) return; // ★リザルト画面モード：攻撃ボタン以外は無効
+        if (isResultMode) return; // �����U���g��ʃ��[�h�F�U���{�^���ȊO�͖���
 
         if (HP <= 0)
         {
-            if (mashWithAnyButton) RegisterMash(); // ★どのボタンでもOKの設定がONの時だけ連打として数える
+            if (mashWithAnyButton) RegisterMash(); // ���ǂ̃{�^���ł�OK�̐ݒ肪ON�̎������A�łƂ��Đ�����
             return;
         }
 
         wantJump = true;
     }
 
-    // パンチボタン押下時のコールバック
-    // ※HP<=0のダウン中は「根性復活」の連打判定としてこのボタンを使う
+    // �p���`�{�^���������̃R�[���o�b�N
+    // ��HP<=0�̃_�E�����́u���������v�̘A�Ŕ���Ƃ��Ă��̃{�^�����g��
     public void OnPunch(InputValue value)
     {
         if (!value.isPressed) return;
 
-        // ★リザルト画面モード：攻撃として受け付ける（通知は、実際に攻撃が出るEnterPunch内で行う）
+        // �����U���g��ʃ��[�h�F�U���Ƃ��Ď󂯕t����i�ʒm�́A���ۂɍU�����o��EnterPunch���ōs���j
         if (isResultMode)
         {
-            if (!resultInputEnabled) return; // ★勝者以外の操作は受け付けない
+            if (!resultInputEnabled) return; // �����҈ȊO�̑���͎󂯕t���Ȃ�
             wantPunch = true;
             return;
         }
 
         if (HP <= 0)
         {
-            RegisterMash(); // ダウン中は復活チャレンジの連打としてカウントするだけ
+            RegisterMash(); // �_�E�����͕����`�������W�̘A�łƂ��ăJ�E���g���邾��
             return;
         }
 
         wantPunch = true;
     }
 
-    // キックボタン押下時のコールバック（通常／上／下の分岐はUpdate側で行う）
-    // ※HP<=0のダウン中は「根性復活」の連打としてカウントする
+    // �L�b�N�{�^���������̃R�[���o�b�N�i�ʏ�^��^���̕����Update���ōs���j
+    // ��HP<=0�̃_�E�����́u���������v�̘A�łƂ��ăJ�E���g����
     public void OnKick(InputValue value)
     {
         if (!value.isPressed) return;
 
-        // ★リザルト画面モード：攻撃として受け付ける（通知は、実際に攻撃が出るEnterKick内で行う）
+        // �����U���g��ʃ��[�h�F�U���Ƃ��Ď󂯕t����i�ʒm�́A���ۂɍU�����o��EnterKick���ōs���j
         if (isResultMode)
         {
-            if (!resultInputEnabled) return; // ★勝者以外の操作は受け付けない
+            if (!resultInputEnabled) return; // �����҈ȊO�̑���͎󂯕t���Ȃ�
             wantKick = true;
             return;
         }
 
         if (HP <= 0)
         {
-            if (mashWithAnyButton) RegisterMash(); // ★どのボタンでもOKの設定がONの時だけ連打として数える
+            if (mashWithAnyButton) RegisterMash(); // ���ǂ̃{�^���ł�OK�̐ݒ肪ON�̎������A�łƂ��Đ�����
             return;
         }
 
         wantKick = true;
     }
 
-    // 仁王立ちボタン押下時のコールバック
-    // ※HP<=0のダウン中は「根性復活」の連打としてカウントする
+    // �m�������{�^���������̃R�[���o�b�N
+    // ��HP<=0�̃_�E�����́u���������v�̘A�łƂ��ăJ�E���g����
     public void OnStand(InputValue value)
     {
         if (!value.isPressed) return;
-        if (isResultMode) return; // ★リザルト画面モード：攻撃ボタン以外は無効
+        if (isResultMode) return; // �����U���g��ʃ��[�h�F�U���{�^���ȊO�͖���
 
         if (HP <= 0)
         {
-            if (mashWithAnyButton) RegisterMash(); // ★どのボタンでもOKの設定がONの時だけ連打として数える
+            if (mashWithAnyButton) RegisterMash(); // ���ǂ̃{�^���ł�OK�̐ݒ肪ON�̎������A�łƂ��Đ�����
             return;
         }
 
         wantGuard = true;
     }
 
-    // 投げボタン押下時のコールバック
-    // ※HP<=0のダウン中は「根性復活」の連打としてカウントする
+    // �����{�^���������̃R�[���o�b�N
+    // ��HP<=0�̃_�E�����́u���������v�̘A�łƂ��ăJ�E���g����
     public void OnThrow(InputValue value)
     {
         if (!value.isPressed) return;
-        if (isResultMode) return; // ★リザルト画面モード：攻撃ボタン以外は無効
+        if (isResultMode) return; // �����U���g��ʃ��[�h�F�U���{�^���ȊO�͖���
 
         if (HP <= 0)
         {
-            if (mashWithAnyButton) RegisterMash(); // ★どのボタンでもOKの設定がONの時だけ連打として数える
+            if (mashWithAnyButton) RegisterMash(); // ���ǂ̃{�^���ł�OK�̐ݒ肪ON�̎������A�łƂ��Đ�����
             return;
         }
 
         wantThrow = true;
     }
 
-    // ★追加：L1ボタン（必殺技）押下時のコールバック
-    //   ※Input Actionsアセット側に"L1"という名前のActionを追加し、
-    //     コントローラーのL1ボタンを割り当てておく必要があります。
+    // ���ǉ��FL1�{�^���i�K�E�Z�j�������̃R�[���o�b�N
+    //   ��Input Actions�A�Z�b�g����"L1"�Ƃ������O��Action��ǉ����A
+    //     �R���g���[���[��L1�{�^�������蓖�ĂĂ����K�v������܂��B
     public void OnL1(InputValue value)
     {
         if (!value.isPressed) return;
-        if (isResultMode) return; // ★リザルト画面モード：攻撃ボタン以外は無効
+        if (isResultMode) return; // �����U���g��ʃ��[�h�F�U���{�^���ȊO�͖���
 
-        // ★追加：ダウン中（HP<=0）のL1は必殺技ではなく「漢気復活」の要求として扱う
-        //   （OnPunchがダウン中は連打カウントになるのと同じ仕組み）
+        // ���ǉ��F�_�E�����iHP<=0�j��L1�͕K�E�Z�ł͂Ȃ��u���C�����v�̗v���Ƃ��Ĉ���
+        //   �iOnPunch���_�E�����͘A�ŃJ�E���g�ɂȂ�̂Ɠ����d�g�݁j
         if (HP <= 0)
         {
             wantKankiRevive = true;
-            // ★追加：L1も他のボタンと同じく連打1回分として数える（どのボタンでもOKの設定がONの時だけ。ゲージが足りなければ連打で復活を目指せる）
+            // ���ǉ��FL1�����̃{�^���Ɠ������A��1�񕪂Ƃ��Đ�����i�ǂ̃{�^���ł�OK�̐ݒ肪ON�̎������B�Q�[�W������Ȃ���ΘA�łŕ�����ڎw����j
             if (mashWithAnyButton) RegisterMash();
             return;
         }
@@ -1438,28 +1443,28 @@ public class Player : MonoBehaviour
     }
 
     //=====================================================
-    // ★フレーム管理（60fps固定の「論理フレーム」）
-    //   以前は「秒」で管理していた各種時間（攻撃後のクールダウン・やられ・ヒットストップ・投げ・復活など）を、
-    //   すべて「フレーム数」で管理する。格闘ゲームの慣習どおり 60フレーム = 1秒。
-    //   ・描画のfps（60Hz/144Hz等）に関係なく、Time.deltaTimeを溜めて1/60秒ごとに1フレームを進める。
-    //   ・クロックはstaticで共有するので、P1・P2は常に同じタイミングでフレームが進む。
-    //   ・各タイマーは「Updateの先頭で進んだフレーム数(FrameStep)」だけ減らす（描画が速い時は0のこともある）。
-    //   ・移動速度・回転速度・押しのけ速度・漢気ゲージ減少量など「毎秒あたりの速度」は従来どおり秒基準のまま。
+    // ���t���[���Ǘ��i60fps�Œ�́u�_���t���[���v�j
+    //   �ȑO�́u�b�v�ŊǗ����Ă����e�펞�ԁi�U����̃N�[���_�E���E����E�q�b�g�X�g�b�v�E�����E�����Ȃǁj���A
+    //   ���ׂāu�t���[�����v�ŊǗ�����B�i���Q�[���̊��K�ǂ��� 60�t���[�� = 1�b�B
+    //   �E�`���fps�i60Hz/144Hz���j�Ɋ֌W�Ȃ��ATime.deltaTime�𗭂߂�1/60�b���Ƃ�1�t���[����i�߂�B
+    //   �E�N���b�N��static�ŋ��L����̂ŁAP1�EP2�͏�ɓ����^�C�~���O�Ńt���[�����i�ށB
+    //   �E�e�^�C�}�[�́uUpdate�̐擪�Ői�񂾃t���[����(FrameStep)�v�������炷�i�`�悪��������0�̂��Ƃ�����j�B
+    //   �E�ړ����x�E��]���x�E�����̂����x�E���C�Q�[�W�����ʂȂǁu���b������̑��x�v�͏]���ǂ���b��̂܂܁B
     //=====================================================
     public const int FramesPerSecond = 60;
     const float SecondsPerFrame = 1f / FramesPerSecond;
-    static float frameAccumulator;          // まだフレームに換算していない端数の時間（秒）
-    static int frameClockUnityFrame = -1;   // 最後にクロックを進めたUnityの描画フレーム番号（二重加算防止）
-    static int frameStep;                   // 今回のUpdateで進んだ論理フレーム数（0以上）
+    static float frameAccumulator;          // �܂��t���[���Ɋ��Z���Ă��Ȃ��[���̎��ԁi�b�j
+    static int frameClockUnityFrame = -1;   // �Ō�ɃN���b�N��i�߂�Unity�̕`��t���[���ԍ��i��d���Z�h�~�j
+    static int frameStep;                   // �����Update�Ői�񂾘_���t���[�����i0�ȏ�j
 
-    // ゲーム開始からの累計フレーム数（多段ヒットの間隔判定や、見た目の最低表示時間などに使う）
+    // �Q�[���J�n����̗݌v�t���[�����i���i�q�b�g�̊Ԋu�����A�����ڂ̍Œ�\�����ԂȂǂɎg���j
     public static int CurrentFrame { get; private set; }
-    // 今回のUpdateで進んだ論理フレーム数
+    // �����Update�Ői�񂾘_���t���[����
     public static int FrameStep => frameStep;
-    // フレーム数を秒に換算する（UI表示用）
+    // �t���[������b�Ɋ��Z����iUI�\���p�j
     public static float FramesToSeconds(int frames) => frames / (float)FramesPerSecond;
 
-    // Play開始のたびにクロックを初期化する（Domain Reloadを切っている場合でも前回の値を引きずらないため）
+    // Play�J�n�̂��тɃN���b�N������������iDomain Reload��؂��Ă���ꍇ�ł��O��̒l����������Ȃ����߁j
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetFrameClock()
     {
@@ -1471,101 +1476,101 @@ public class Player : MonoBehaviour
     }
 
     //=====================================================
-    // ★追加：復活時の全員停止
-    //   復活に成功した瞬間から、一定フレームの間、自分・相手ともに操作・状態更新を止める。
-    //   その間カメラは、復活したキャラの正面の引きの画を映す（FightingCameraController.TriggerRebornStandUpHold）。
-    //   staticなので、P1・P2のどちらが復活しても両方に効く。
-    //   CPU(Enemy)側はEnemy.csのUpdate先頭で Player.IsRebornFreezing を見て、trueの間は何もせず return すること。
+    // ���ǉ��F�������̑S����~
+    //   �����ɐ��������u�Ԃ���A���t���[���̊ԁA�����E����Ƃ��ɑ���E��ԍX�V���~�߂�B
+    //   ���̊ԃJ�����́A���������L�����̐��ʂ̈����̉���f���iFightingCameraController.TriggerRebornStandUpHold�j�B
+    //   static�Ȃ̂ŁAP1�EP2�̂ǂ��炪�������Ă������Ɍ����B
+    //   CPU(Enemy)����Enemy.cs��Update�擪�� Player.IsRebornFreezing �����āAtrue�̊Ԃ͉������� return ���邱�ƁB
     //=====================================================
     static int rebornFreezeEndFrame;
     public static bool IsRebornFreezing => CurrentFrame < rebornFreezeEndFrame;
 
-    // Updateの先頭で呼ぶ。同じ描画フレーム内で2人目以降のPlayerが呼んでも二重には進まない。
+    // Update�̐擪�ŌĂԁB�����`��t���[������2�l�ڈȍ~��Player���Ă�ł���d�ɂ͐i�܂Ȃ��B
     static void AdvanceFrameClock()
     {
         if (frameClockUnityFrame == Time.frameCount) return;
         frameClockUnityFrame = Time.frameCount;
 
         frameAccumulator += Time.deltaTime;
-        // 1e-4fは、60Hz固定の環境で浮動小数点の誤差により「0フレーム→次に2フレーム」とブレるのを防ぐための補正
+        // 1e-4f�́A60Hz�Œ�̊��ŕ��������_�̌덷�ɂ��u0�t���[��������2�t���[���v�ƃu����̂�h�����߂̕␳
         frameStep = Mathf.FloorToInt(frameAccumulator / SecondsPerFrame + 1e-4f);
         frameAccumulator -= frameStep * SecondsPerFrame;
         CurrentFrame += frameStep;
     }
 
     // Update is called once per frame
-    // 毎フレームの更新処理。HPが尽きていれば復活チャレンジへ、
-    // そうでなければ現在の状態に応じて「拘束中のタイマー消化」か「新しい行動の受付」を行う。
+    // ���t���[���̍X�V�����BHP���s���Ă���Ε����`�������W�ցA
+    // �����łȂ���Ό��݂̏�Ԃɉ����āu�S�����̃^�C�}�[�����v���u�V�����s���̎�t�v���s���B
     void Update()
     {
-        AdvanceFrameClock(); // ★追加：60fps固定の論理フレームを進める（各タイマーはframeStep分だけ減らす）
+        AdvanceFrameClock(); // ���ǉ��F60fps�Œ�̘_���t���[����i�߂�i�e�^�C�}�[��frameStep���������炷�j
 
-        // ★追加：復活後の停止が終わったら、非表示にしていた相手を再表示する
+        // ���ǉ��F������̒�~���I�������A��\���ɂ��Ă���������ĕ\������
         if (hiddenOpponentRenderers.Count > 0 && !IsRebornFreezing) ShowOpponentAfterReborn();
 
-        // ★追加：掴みポーズで止めている最中に、被弾やダウン等でThrow状態から外れた場合の保険として必ず再生を再開する
+        // ���ǉ��F�͂݃|�[�Y�Ŏ~�߂Ă���Œ��ɁA��e��_�E������Throw��Ԃ���O�ꂽ�ꍇ�̕ی��Ƃ��ĕK���Đ����ĊJ����
         if (grabHoldFrozen && currentState != PlayerState.Throw) ResumeGrabHoldAnimation();
 
-        MaintainKankiChargeEffect(); // ★追加：漢気ゲージ1本以上の間、追従エフェクトを出し続ける
-        if (!IsRebornFreezing)       // ★追加：復活後の停止中は、攻撃力上昇・ペナルティの残り時間も進めない
+        MaintainKankiChargeEffect(); // ���ǉ��F���C�Q�[�W1�{�ȏ�̊ԁA�Ǐ]�G�t�F�N�g���o��������
+        if (!IsRebornFreezing)       // ���ǉ��F������̒�~���́A�U���͏㏸�E�y�i���e�B�̎c�莞�Ԃ��i�߂Ȃ�
         {
-            TickReviveBuff();        // ★追加：漢気復活後の攻撃力上昇の残り時間を消化する
-            TickGuardFailPenalty();  // ★追加：ガード失敗ペナルティ（ゲージ増加率ダウン／被ダメージ増加）の残り時間を消化する
+            TickReviveBuff();        // ���ǉ��F���C������̍U���͏㏸�̎c�莞�Ԃ���������
+            TickGuardFailPenalty();  // ���ǉ��F�K�[�h���s�y�i���e�B�i�Q�[�W�������_�E���^��_���[�W�����j�̎c�莞�Ԃ���������
         }
-        TickMashButtonVisual();      // ★追加：連打ボタン画像の押した／押していない切り替え
-        if (!isResultMode) ResolveOpponentIfMissing();  // ★追加：プレハブ化・再配置等で相手(enemyPlayer/enemy)の参照が切れていたら自動で探し直す
-        // ★修正：しゃがみの見た目（コライダー・アニメーター）は、
-        //   currentState（状態機械）を経由せず、毎フレーム「スティック下入力の有無」だけで直接同期する。
-        //   以前はEnterCrouch()内でcurrentStateとコライダー/アニメーターを同時に変更していたため、
-        //   しゃがみ中にキック等のボタン入力でcurrentStateがCrouch以外へ上書きされると、
-        //   その後スティックを離してもExitCrouch()が呼ばれず、しゃがみ見た目だけが残り続ける不具合があった。
-        //   ダウン中／Dead中／掴まれ中／投げ吹き飛び中はコライダー変更で見た目が破綻するので対象外にする。
+        TickMashButtonVisual();      // ���ǉ��F�A�Ń{�^���摜�̉������^�����Ă��Ȃ��؂�ւ�
+        if (!isResultMode) ResolveOpponentIfMissing();  // ���ǉ��F�v���n�u���E�Ĕz�u���ő���(enemyPlayer/enemy)�̎Q�Ƃ��؂�Ă����玩���ŒT������
+        // ���C���F���Ⴊ�݂̌����ځi�R���C�_�[�E�A�j���[�^�[�j�́A
+        //   currentState�i��ԋ@�B�j���o�R�����A���t���[���u�X�e�B�b�N�����̗͂L���v�����Œ��ړ�������B
+        //   �ȑO��EnterCrouch()����currentState�ƃR���C�_�[/�A�j���[�^�[�𓯎��ɕύX���Ă������߁A
+        //   ���Ⴊ�ݒ��ɃL�b�N���̃{�^�����͂�currentState��Crouch�ȊO�֏㏑�������ƁA
+        //   ���̌�X�e�B�b�N�𗣂��Ă�ExitCrouch()���Ă΂ꂸ�A���Ⴊ�݌����ڂ������c�葱����s����������B
+        //   �_�E�����^Dead���^�͂܂ꒆ�^����������ђ��̓R���C�_�[�ύX�Ō����ڂ��j�]����̂őΏۊO�ɂ���B
         if (currentState != PlayerState.KnockedDown && currentState != PlayerState.Dead
             && currentState != PlayerState.Grabbed && currentState != PlayerState.Thrown)
         {
-            // ★変更：やられ状態中はスティック入力を無視する（しゃがみにしない）
+            // ���ύX�F�����Ԓ��̓X�e�B�b�N���͂𖳎�����i���Ⴊ�݂ɂ��Ȃ��j
             SyncCrouchVisual(currentState != PlayerState.Stunned && moveInput.y <= crouchInputThreshold);
         }
 
-        // F2キーで漢気ゲージ専用デバッグログのON/OFFを切り替える（対象キャラクターはenableF2DebugKeyで選択）
+        // F2�L�[�Ŋ��C�Q�[�W��p�f�o�b�O���O��ON/OFF��؂�ւ���i�ΏۃL�����N�^�[��enableF2DebugKey�őI���j
         if (Keyboard.current != null && Keyboard.current.f2Key.wasPressedThisFrame)
         {
             if (enableF2DebugKey)
             {
                 kankiGaugeDebugLogEnabled = !kankiGaugeDebugLogEnabled;
-                Debug.Log($"[{PlayerName}] 漢気ゲージデバッグログ: {(kankiGaugeDebugLogEnabled ? "ON" : "OFF")}");
+                Debug.Log($"[{PlayerName}] ���C�Q�[�W�f�o�b�O���O: {(kankiGaugeDebugLogEnabled ? "ON" : "OFF")}");
             }
             else
             {
-                DLog($"[{PlayerName}] F2キーを検知しましたが、enableF2DebugKeyがOFFのため無視します。");
+                DLog($"[{PlayerName}] F2�L�[�����m���܂������AenableF2DebugKey��OFF�̂��ߖ������܂��B");
             }
         }
 
-        // ★追加：F3キーでエフェクト発生ログのON/OFFを切り替える（対象キャラクターはenableF3DebugKeyで選択）
+        // ���ǉ��FF3�L�[�ŃG�t�F�N�g�������O��ON/OFF��؂�ւ���i�ΏۃL�����N�^�[��enableF3DebugKey�őI���j
         if (Keyboard.current != null && Keyboard.current.f3Key.wasPressedThisFrame)
         {
             if (enableF3DebugKey)
             {
                 effectDebugLogEnabled = !effectDebugLogEnabled;
-                Debug.Log($"[{PlayerName}] エフェクト発生ログ: {(effectDebugLogEnabled ? "ON" : "OFF")}");
+                Debug.Log($"[{PlayerName}] �G�t�F�N�g�������O: {(effectDebugLogEnabled ? "ON" : "OFF")}");
             }
             else
             {
-                DLog($"[{PlayerName}] F3キーを検知しましたが、enableF3DebugKeyがOFFのため無視します。");
+                DLog($"[{PlayerName}] F3�L�[�����m���܂������AenableF3DebugKey��OFF�̂��ߖ������܂��B");
             }
         }
 
-        // ★デバッグ：F5キーでHPを強制的に0にする
-        //   F4の強制復活をテストする際、わざわざ相手の攻撃を受けてダウンさせる手間を省くためのキー。
-        //   対象キャラクターはInspectorのenableF5DebugKeyで選択する。
+        // ���f�o�b�O�FF5�L�[��HP�������I��0�ɂ���
+        //   F4�̋����������e�X�g����ہA�킴�킴����̍U�����󂯂ă_�E���������Ԃ��Ȃ����߂̃L�[�B
+        //   �ΏۃL�����N�^�[��Inspector��enableF5DebugKey�őI������B
         if (Keyboard.current != null && Keyboard.current.f5Key.wasPressedThisFrame)
         {
             if (enableF5DebugKey)
             {
                 HP = 0;
-                Debug.Log($"[{PlayerName}] [デバッグ]F5キーによりHPを強制的に0にしました");
+                Debug.Log($"[{PlayerName}] [�f�o�b�O]F5�L�[�ɂ��HP�������I��0�ɂ��܂���");
 
-                //UIにHPを反映させるように指示
+                //UI��HP�𔽉f������悤�Ɏw��
                 if (gameMNG != null)
                 {
                     gameMNG.Player_ReduceHP(HP, PlayerName);
@@ -1573,24 +1578,24 @@ public class Player : MonoBehaviour
             }
             else
             {
-                // 対象外のPlayerインスタンスでもF5押下自体は検知されるため、
-                // 意図的に無視していることが分かるようログを残す。
-                DLog($"[{PlayerName}] F5キーを検知しましたが、enableF5DebugKeyがOFFのため無視します。");
+                // �ΏۊO��Player�C���X�^���X�ł�F5�������̂͌��m����邽�߁A
+                // �Ӑ}�I�ɖ������Ă��邱�Ƃ�������悤���O���c���B
+                DLog($"[{PlayerName}] F5�L�[�����m���܂������AenableF5DebugKey��OFF�̂��ߖ������܂��B");
             }
         }
 
-        // ★F6キーで常時仁王立ち（ガード）デバッグモードをON/OFFする
-        //   対象キャラクターはInspectorのenableF6DebugKeyチェックボックスで選択する。
+        // ��F6�L�[�ŏ펞�m�������i�K�[�h�j�f�o�b�O���[�h��ON/OFF����
+        //   �ΏۃL�����N�^�[��Inspector��enableF6DebugKey�`�F�b�N�{�b�N�X�őI������B
         if (Keyboard.current != null && Keyboard.current.f6Key.wasPressedThisFrame)
         {
             if (enableF6DebugKey)
             {
                 debugAlwaysGuard = !debugAlwaysGuard;
-                Debug.Log($"[{PlayerName}] [デバッグ]常時仁王立ちモード: {(debugAlwaysGuard ? "ON" : "OFF")}");
+                Debug.Log($"[{PlayerName}] [�f�o�b�O]�펞�m���������[�h: {(debugAlwaysGuard ? "ON" : "OFF")}");
 
                 if (!debugAlwaysGuard)
                 {
-                    // OFFにした瞬間、通常状態へきちんと戻す（TickBusyStateの終了処理と同じ内容）
+                    // OFF�ɂ����u�ԁA�ʏ��Ԃւ�����Ɩ߂��iTickBusyState�̏I�������Ɠ������e�j
                     DisableAllHitboxes();
                     isGuarding = false;
                     canThrow = true;
@@ -1600,15 +1605,15 @@ public class Player : MonoBehaviour
             }
             else
             {
-                // 対象外のPlayerインスタンスでもF6押下自体は検知されるため、
-                // 意図的に無視していることが分かるようログを残す。
-                DLog($"[{PlayerName}] F6キーを検知しましたが、enableF6DebugKeyがOFFのため無視します。");
+                // �ΏۊO��Player�C���X�^���X�ł�F6�������̂͌��m����邽�߁A
+                // �Ӑ}�I�ɖ������Ă��邱�Ƃ�������悤���O���c���B
+                DLog($"[{PlayerName}] F6�L�[�����m���܂������AenableF6DebugKey��OFF�̂��ߖ������܂��B");
             }
         }
 
-        // ★デバッグ：F7キーで漢気ゲージを満タンにする
-        //   必殺技の動作確認等、ゲージが貯まるまで待たずにすぐ試したい時のためのキー。
-        //   対象キャラクターはInspectorのenableF7DebugKeyで選択する。
+        // ���f�o�b�O�FF7�L�[�Ŋ��C�Q�[�W�𖞃^���ɂ���
+        //   �K�E�Z�̓���m�F���A�Q�[�W�����܂�܂ő҂����ɂ��������������̂��߂̃L�[�B
+        //   �ΏۃL�����N�^�[��Inspector��enableF7DebugKey�őI������B
         if (Keyboard.current != null && Keyboard.current.f7Key.wasPressedThisFrame)
         {
             if (enableF7DebugKey)
@@ -1616,9 +1621,9 @@ public class Player : MonoBehaviour
                 float max = kankiGaugePerBar * kankiGaugeBarCount;
                 kankiGauge = max;
                 UpdateAtkByGauge();
-                Debug.Log($"[{PlayerName}] [デバッグ]F7キーにより漢気ゲージを満タン（{max:F1}）にしました");
+                Debug.Log($"[{PlayerName}] [�f�o�b�O]F7�L�[�ɂ�芿�C�Q�[�W�𖞃^���i{max:F1}�j�ɂ��܂���");
 
-                //ゲージUIを更新
+                //�Q�[�WUI���X�V
                 if (gameMNG != null)
                 {
                     gameMNG.Player_UpdateKankiGauge();
@@ -1626,17 +1631,17 @@ public class Player : MonoBehaviour
             }
             else
             {
-                // 対象外のPlayerインスタンスでもF7押下自体は検知されるため、
-                // 意図的に無視していることが分かるようログを残す。
-                DLog($"[{PlayerName}] F7キーを検知しましたが、enableF7DebugKeyがOFFのため無視します。");
+                // �ΏۊO��Player�C���X�^���X�ł�F7�������̂͌��m����邽�߁A
+                // �Ӑ}�I�ɖ������Ă��邱�Ƃ�������悤���O���c���B
+                DLog($"[{PlayerName}] F7�L�[�����m���܂������AenableF7DebugKey��OFF�̂��ߖ������܂��B");
             }
         }
 
-        // ★デバッグ：F8キーでHPを最大値まで回復する
-        //   被弾テストやダウン・復活テストを何度も繰り返す際、いちいち他の手段でHPを戻す手間を省くためのキー。
-        //   対象キャラクターはInspectorのenableF8DebugKeyで選択する。
-        //   ★追加：押した時点で根性復活チャレンジ中（KnockedDown）またはDead状態だった場合は、
-        //     HPを回復するだけでなく、F4の強制復活と同様に生存状態まで復活させる。
+        // ���f�o�b�O�FF8�L�[��HP���ő�l�܂ŉ񕜂���
+        //   ��e�e�X�g��_�E���E�����e�X�g�����x���J��Ԃ��ہA�����������̎�i��HP��߂���Ԃ��Ȃ����߂̃L�[�B
+        //   �ΏۃL�����N�^�[��Inspector��enableF8DebugKey�őI������B
+        //   ���ǉ��F���������_�ō��������`�������W���iKnockedDown�j�܂���Dead��Ԃ������ꍇ�́A
+        //     HP���񕜂��邾���łȂ��AF4�̋��������Ɠ��l�ɐ�����Ԃ܂ŕ���������B
         if (Keyboard.current != null && Keyboard.current.f8Key.wasPressedThisFrame)
         {
             if (enableF8DebugKey)
@@ -1648,9 +1653,9 @@ public class Player : MonoBehaviour
                 else
                 {
                     HP = maxHP;
-                    Debug.Log($"[{PlayerName}] [デバッグ]F8キーによりHPを最大値（{maxHP}）まで回復しました");
+                    Debug.Log($"[{PlayerName}] [�f�o�b�O]F8�L�[�ɂ��HP���ő�l�i{maxHP}�j�܂ŉ񕜂��܂���");
 
-                    //UIにHPを反映させるように指示
+                    //UI��HP�𔽉f������悤�Ɏw��
                     if (gameMNG != null)
                     {
                         gameMNG.Player_ReduceHP(HP, PlayerName);
@@ -1659,28 +1664,28 @@ public class Player : MonoBehaviour
             }
             else
             {
-                // 対象外のPlayerインスタンスでもF8押下自体は検知されるため、
-                // 意図的に無視していることが分かるようログを残す。
-                DLog($"[{PlayerName}] F8キーを検知しましたが、enableF8DebugKeyがOFFのため無視します。");
+                // �ΏۊO��Player�C���X�^���X�ł�F8�������̂͌��m����邽�߁A
+                // �Ӑ}�I�ɖ������Ă��邱�Ƃ�������悤���O���c���B
+                DLog($"[{PlayerName}] F8�L�[�����m���܂������AenableF8DebugKey��OFF�̂��ߖ������܂��B");
             }
         }
 
-        // ★デバッグ：F10キーで「やられ状態中に連続で攻撃が当たった回数」の画面表示をON/OFFする
-        //   対象キャラクターはInspectorのenableF10DebugKeyで選択する。
+        // ���f�o�b�O�FF10�L�[�Łu�����Ԓ��ɘA���ōU�������������񐔁v�̉�ʕ\����ON/OFF����
+        //   �ΏۃL�����N�^�[��Inspector��enableF10DebugKey�őI������B
         if (Keyboard.current != null && Keyboard.current.f10Key.wasPressedThisFrame)
         {
             if (enableF10DebugKey)
             {
                 showStunComboDebug = !showStunComboDebug;
-                Debug.Log($"[{PlayerName}] [デバッグ]やられ連続ヒット数表示: {(showStunComboDebug ? "ON" : "OFF")}");
+                Debug.Log($"[{PlayerName}] [�f�o�b�O]����A���q�b�g���\��: {(showStunComboDebug ? "ON" : "OFF")}");
             }
             else
             {
-                DLog($"[{PlayerName}] F10キーを検知しましたが、enableF10DebugKeyがOFFのため無視します。");
+                DLog($"[{PlayerName}] F10�L�[�����m���܂������AenableF10DebugKey��OFF�̂��ߖ������܂��B");
             }
         }
 
-        // ヒットストップ処理を最優先で消化する。動けない間は他の入力・状態処理を一切行わない。
+        // �q�b�g�X�g�b�v�������ŗD��ŏ�������B�����Ȃ��Ԃ͑��̓��́E��ԏ�������؍s��Ȃ��B
         if (hitStopTimer > 0)
         {
             hitStopTimer -= frameStep;
@@ -1692,22 +1697,22 @@ public class Player : MonoBehaviour
             return;
         }
 
-        // ★追加：復活後の停止中は、自分・相手ともに入力・状態更新を一切行わない。
-        //   ただしダウン中（HP0）のプレイヤーは止めない。同時ダウン中に片方だけ復活しても、
-        //   もう一方の復活の制限時間（rebornTimer）と連打は止めずに進める。
+        // ���ǉ��F������̒�~���́A�����E����Ƃ��ɓ��́E��ԍX�V����؍s��Ȃ��B
+        //   �������_�E�����iHP0�j�̃v���C���[�͎~�߂Ȃ��B�����_�E�����ɕЕ������������Ă��A
+        //   ��������̕����̐������ԁirebornTimer�j�ƘA�ł͎~�߂��ɐi�߂�B
         if (IsRebornFreezing && !(HP <= 0 && !isResultMode))
         {
             ClearInputIntents();
             return;
         }
 
-        // HP判定・死亡処理は、コントローラーの有無に関係なく常に実行する
-        if (HP <= 0 && !isResultMode) // ★リザルト画面モードではダウン／復活処理を行わない
+        // HP����E���S�����́A�R���g���[���[�̗L���Ɋ֌W�Ȃ���Ɏ��s����
+        if (HP <= 0 && !isResultMode) // �����U���g��ʃ��[�h�ł̓_�E���^�����������s��Ȃ�
         {
-            // ★デバッグ：F4キーでダウン中／Dead中のキャラクターを強制的に復活させる
-            //   対象キャラクターはInspectorのenableF4DebugKeyで選択する。
-            //   ※以前はcurrentState != Dead を条件にしていたが、復活チャレンジの制限時間切れで
-            //     Dead状態に入った後はF4を押しても一切反応しなくなっていたため、その条件を撤廃した。
+            // ���f�o�b�O�FF4�L�[�Ń_�E�����^Dead���̃L�����N�^�[�������I�ɕ���������
+            //   �ΏۃL�����N�^�[��Inspector��enableF4DebugKey�őI������B
+            //   ���ȑO��currentState != Dead �������ɂ��Ă������A�����`�������W�̐������Ԑ؂��
+            //     Dead��Ԃɓ��������F4�������Ă���ؔ������Ȃ��Ȃ��Ă������߁A���̏�����P�p�����B
             if (Keyboard.current != null && Keyboard.current.f4Key.wasPressedThisFrame)
             {
                 if (enableF4DebugKey)
@@ -1718,13 +1723,13 @@ public class Player : MonoBehaviour
                 }
                 else
                 {
-                    // 対象外のPlayerインスタンスでもF4押下自体は検知されるため、
-                    // 意図的に無視していることが分かるようログを残す。
-                    DLog($"[{PlayerName}] F4キーを検知しましたが、enableF4DebugKeyがOFFのため無視します。");
+                    // �ΏۊO��Player�C���X�^���X�ł�F4�������̂͌��m����邽�߁A
+                    // �Ӑ}�I�ɖ������Ă��邱�Ƃ�������悤���O���c���B
+                    DLog($"[{PlayerName}] F4�L�[�����m���܂������AenableF4DebugKey��OFF�̂��ߖ������܂��B");
                 }
             }
 
-            // ★追加：ダウンしたら漢気復活による攻撃力上昇は解除する（エフェクトも止める）
+            // ���ǉ��F�_�E�������犿�C�����ɂ��U���͏㏸�͉�������i�G�t�F�N�g���~�߂�j
             if (isReviveBuffed) EndReviveBuff();
 
             if (currentState != PlayerState.Dead)
@@ -1734,14 +1739,14 @@ public class Player : MonoBehaviour
             ClearInputIntents();
             return;
         }
-        // ここから下は「操作入力の受付」なので、コントローラー未割り当てなら止める
+        // �������牺�́u������͂̎�t�v�Ȃ̂ŁA�R���g���[���[�����蓖�ĂȂ�~�߂�
         if (playerInput != null && !playerInput.enabled)
         {
             ClearInputIntents();
             return;
         }
 
-        // ★追加：F6デバッグモードがONの間は、通常の入力処理を行わず毎フレーム強制的に仁王立ち状態を維持する
+        // ���ǉ��FF6�f�o�b�O���[�h��ON�̊Ԃ́A�ʏ�̓��͏������s�킸���t���[�������I�ɐm��������Ԃ��ێ�����
         if (debugAlwaysGuard)
         {
             currentState = PlayerState.Guard;
@@ -1750,7 +1755,7 @@ public class Player : MonoBehaviour
             return;
         }
 
-        if (!isResultMode) HandleArrowKeyAnimation(); // ★追加：矢印キーによるアニメーション再生（自由に動ける状態の時のみ）
+        if (!isResultMode) HandleArrowKeyAnimation(); // ���ǉ��F���L�[�ɂ��A�j���[�V�����Đ��i���R�ɓ������Ԃ̎��̂݁j
         bool isFree = currentState == PlayerState.Idle
                    || currentState == PlayerState.Move
                    || currentState == PlayerState.Crouch;
@@ -1764,75 +1769,94 @@ public class Player : MonoBehaviour
         }
 
         ClearInputIntents();
+
+        //�G�t�F�N�g�Ƀv���C���[�̍��W��n��
+        if(activeKankiChargeEffect_Ground != null)
+        {
+            Vector3 Player_pos = this.transform.position;
+            Player_pos.x = 0.0f;
+            Player_pos.y = 0.25f;
+
+            activeKankiChargeEffect_Ground.transform.position = Player_pos;
+        }
+        if (activeReviveBuffEffect_Ground != null)
+        {
+            Vector3 Player_pos = this.transform.position;
+            Player_pos.x = 0.0f;
+            Player_pos.y = 0.25f;
+
+            activeReviveBuffEffect_Ground.transform.position = Player_pos;
+        }
+
     }
 
-    // LateUpdate: Update内の移動処理やRigidbodyによる物理移動（ジャンプ等）がすべて反映された後に、
-    //   ①P1・P2同士が重なっていたら押しのけ合い（ResolvePlayerOverlap）、
-    //   ②最終的なワールド座標をminPosition〜maxPositionの範囲内へ強制的に収める（ClampPositionWithinBounds）。
-    //   Updateの最後ではなくLateUpdateで行うことで、物理演算(FixedUpdate)による移動分も確実に制限できる。
+    // LateUpdate: Update���̈ړ�������Rigidbody�ɂ�镨���ړ��i�W�����v���j�����ׂĔ��f���ꂽ��ɁA
+    //   �@P1�EP2���m���d�Ȃ��Ă����牟���̂������iResolvePlayerOverlap�j�A
+    //   �A�ŏI�I�ȃ��[���h���W��minPosition?maxPosition�͈͓̔��֋����I�Ɏ��߂�iClampPositionWithinBounds�j�B
+    //   Update�̍Ō�ł͂Ȃ�LateUpdate�ōs�����ƂŁA�������Z(FixedUpdate)�ɂ��ړ������m���ɐ����ł���B
     void LateUpdate()
     {
-        SyncGuardAnimation(); // ★追加：仁王立ち（Guard状態）の間だけ、仁王立ちアニメーションを再生する
+        SyncGuardAnimation(); // ���ǉ��F�m�������iGuard��ԁj�̊Ԃ����A�m�������A�j���[�V�������Đ�����
 
-        // ★リザルト画面モード：向きの自動変更・押しのけ・位置クランプを行わず、配置した位置のまま動かさない
+        // �����U���g��ʃ��[�h�F�����̎����ύX�E�����̂��E�ʒu�N�����v���s�킸�A�z�u�����ʒu�̂܂ܓ������Ȃ�
         if (isResultMode) return;
 
         if (enemy != null)
         {
-            // ★CPU戦：先に押しのけて位置を確定させてから、その位置を基準に相手の方向を向く
+            // ��CPU��F��ɉ����̂��Ĉʒu���m�肳���Ă���A���̈ʒu����ɑ���̕���������
             ResolvePlayerOverlap();
             AutoFaceOpponent();
         }
         else
         {
-            // 対人戦：従来どおりの順序
-            AutoFaceOpponent(); // ★追加：常に相手の方向を向く
+            // �ΐl��F�]���ǂ���̏���
+            AutoFaceOpponent(); // ���ǉ��F��ɑ���̕���������
             ResolvePlayerOverlap();
         }
         ClampPositionWithinBounds();
     }
 
     //=====================================================
-    // ★プレイヤー同士の押しのけ合い設定
-    //   P1・P2の胴体コライダー(Player_Collider)同士が重なった時に、
-    //   物理エンジン任せにせず自前で押しのけ合う処理。
-    //   移動(Move)がRigidbody物理ではなくtransform.Translateで直接位置を動かしているため、
-    //   Unity標準の衝突応答だけでは正しく押し返されず、すり抜けたり上に乗れてしまったりする。
-    //   この処理は「XZ平面上の水平距離」だけを見て押し合うため、
-    //   相手の真上に乗った状態でも横方向へ押し出され続け、結果的に滑り落ちるようになる。
+    // ���v���C���[���m�̉����̂������ݒ�
+    //   P1�EP2�̓��̃R���C�_�[(Player_Collider)���m���d�Ȃ������ɁA
+    //   �����G���W���C���ɂ������O�ŉ����̂����������B
+    //   �ړ�(Move)��Rigidbody�����ł͂Ȃ�transform.Translate�Œ��ڈʒu�𓮂����Ă��邽�߁A
+    //   Unity�W���̏Փˉ��������ł͐����������Ԃ��ꂸ�A���蔲�������ɏ��Ă��܂����肷��B
+    //   ���̏����́uXZ���ʏ�̐��������v���������ĉ����������߁A
+    //   ����̐^��ɏ������Ԃł��������։����o���ꑱ���A���ʓI�Ɋ��藎����悤�ɂȂ�B
     //=====================================================
-    [Header("プレイヤー同士の押しのけ合い設定")]
-    [Tooltip("ONにすると、P1・P2の胴体コライダーが重なった時にお互いを押しのけ合います。")]
+    [Header("�v���C���[���m�̉����̂������ݒ�")]
+    [Tooltip("ON�ɂ���ƁAP1�EP2�̓��̃R���C�_�[���d�Ȃ������ɂ��݂��������̂������܂��B")]
     [SerializeField] bool enablePlayerPush = true;
-    [Tooltip("押しのけ判定に使う、コライダー同士の間に余分に確保する隙間（大きいほど早めに反発し始める）")]
+    [Tooltip("�����̂�����Ɏg���A�R���C�_�[���m�̊Ԃɗ]���Ɋm�ۂ��錄�ԁi�傫���قǑ��߂ɔ������n�߂�j")]
     [SerializeField] float pushSkinWidth = 0.02f;
-    [Tooltip("1秒間に押しのけられる最大距離。大きいほど瞬時に離れ、小さいほどじわっと押し出される")]
+    [Tooltip("1�b�Ԃɉ����̂�����ő勗���B�傫���قǏu���ɗ���A�������قǂ�����Ɖ����o�����")]
     [SerializeField] float maxPushSpeed = 20f;
 
-    // 胴体コライダー同士が重なっている時に、水平方向(Z軸)へ押し出す。
-    //   ・対人戦(enemyPlayer)：P1・P2がお互いに半分ずつ押しのける。
-    //   ・★追加：CPU戦(enemy)：Enemyは押しのけ処理を持たないため、Player側だけが重なり分を全て押し戻す。
-    //     （以前はCPU戦が対象外で、プレイヤーがEnemyをすり抜けて左右が入れ替わり、自動向き合いで両者が反転していた）
-    // 相手の真上に乗ってしまった場合でも、この水平方向の押し出しにより横へずれ落ち、重力で自然に滑り落ちる。
+    // ���̃R���C�_�[���m���d�Ȃ��Ă��鎞�ɁA��������(Z��)�։����o���B
+    //   �E�ΐl��(enemyPlayer)�FP1�EP2�����݂��ɔ����������̂���B
+    //   �E���ǉ��FCPU��(enemy)�FEnemy�͉����̂������������Ȃ����߁APlayer���������d�Ȃ蕪��S�ĉ����߂��B
+    //     �i�ȑO��CPU�킪�ΏۊO�ŁA�v���C���[��Enemy�����蔲���č��E������ւ��A�������������ŗ��҂����]���Ă����j
+    // ����̐^��ɏ���Ă��܂����ꍇ�ł��A���̐��������̉����o���ɂ�艡�ւ��ꗎ���A�d�͂Ŏ��R�Ɋ��藎����B
     void ResolvePlayerOverlap()
     {
         if (!enablePlayerPush) return;
 
         Transform otherTf;
         CapsuleCollider otherCol;
-        bool otherPushesToo; // 相手側も同じ押しのけ処理をしているか（trueなら半分ずつ、falseなら自分が全部）
+        bool otherPushesToo; // ���葤�����������̂����������Ă��邩�itrue�Ȃ甼�����Afalse�Ȃ玩�����S���j
 
         if (enemy != null)
         {
-            // CPU戦：enemyを優先（GetOpponentTransformと同じ優先順位）
+            // CPU��Fenemy��D��iGetOpponentTransform�Ɠ����D�揇�ʁj
             if (Player_status == Status.Dead) return;
             otherTf = enemy.transform;
-            otherCol = enemy.GetComponent<CapsuleCollider>(); // Enemy側は自身の胴体CapsuleColliderをGetComponentで取得している（Enemy.csの変更不要）
+            otherCol = enemy.GetComponent<CapsuleCollider>(); // Enemy���͎��g�̓���CapsuleCollider��GetComponent�Ŏ擾���Ă���iEnemy.cs�̕ύX�s�v�j
             otherPushesToo = false;
         }
         else if (enemyPlayer != null)
         {
-            // ダウン中・死亡中のプレイヤーは押しのけ合いの対象から外す
+            // �_�E�����E���S���̃v���C���[�͉����̂������̑Ώۂ���O��
             if (Player_status == Status.Dead || enemyPlayer.Player_status == Status.Dead) return;
             otherTf = enemyPlayer.transform;
             otherCol = enemyPlayer.Player_Collider;
@@ -1847,14 +1871,14 @@ public class Player : MonoBehaviour
 
         CapsuleCollider myCol = Player_Collider;
 
-        // 半径はワールドスケールを考慮する（通常は1のはずだが、念のためlossyScaleを反映）
+        // ���a�̓��[���h�X�P�[�����l������i�ʏ��1�̂͂������A�O�̂���lossyScale�𔽉f�j
         float myRadius = myCol.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z);
         float otherRadius = otherCol.radius * Mathf.Max(otherTf.lossyScale.x, otherTf.lossyScale.z);
         float minDistance = myRadius + otherRadius + pushSkinWidth;
 
-        // --- 垂直方向(Y)の重なりチェック ---
-        // お互いの高さ範囲が重なっていない（例：ジャンプで相手の頭上を飛び越えている最中）場合は、
-        // 実際には接触していないので押しのけを行わない。
+        // --- ��������(Y)�̏d�Ȃ�`�F�b�N ---
+        // ���݂��̍����͈͂��d�Ȃ��Ă��Ȃ��i��F�W�����v�ő���̓�����щz���Ă���Œ��j�ꍇ�́A
+        // ���ۂɂ͐ڐG���Ă��Ȃ��̂ŉ����̂����s��Ȃ��B
         float myBottom = transform.position.y + myCol.center.y - myCol.height * 0.5f;
         float myTop = transform.position.y + myCol.center.y + myCol.height * 0.5f;
         float otherBottom = otherTf.position.y + otherCol.center.y - otherCol.height * 0.5f;
@@ -1863,15 +1887,15 @@ public class Player : MonoBehaviour
         bool verticalOverlap = myBottom < otherTop && otherBottom < myTop;
         if (!verticalOverlap) return;
 
-        // --- 水平方向(Z軸。間合いはZ軸のみで変化する仕様のため)の重なりチェック ---
+        // --- ��������(Z���B�ԍ�����Z���݂̂ŕω�����d�l�̂���)�̏d�Ȃ�`�F�b�N ---
         float deltaZ = transform.position.z - otherTf.position.z;
         float distance = Mathf.Abs(deltaZ);
 
-        if (distance >= minDistance) return; // 十分離れているので何もしない
+        if (distance >= minDistance) return; // �\������Ă���̂ŉ������Ȃ�
 
         float overlap = minDistance - distance;
-        // 対人戦は半分だけ押し出す（相手も同じ処理を自分自身に対して行うため、結果的に均等に離れる）。
-        // CPU戦は相手が押し出さないので、重なり分を全て自分が押し戻す。
+        // �ΐl��͔������������o���i����������������������g�ɑ΂��čs�����߁A���ʓI�ɋϓ��ɗ����j�B
+        // CPU��͑��肪�����o���Ȃ��̂ŁA�d�Ȃ蕪��S�Ď����������߂��B
         float share = otherPushesToo ? 0.5f : 1f;
         float pushThisFrame = Mathf.Min(overlap * share, maxPushSpeed * Time.deltaTime);
 
@@ -1882,15 +1906,15 @@ public class Player : MonoBehaviour
         }
         else
         {
-            // 完全に同じZ座標で重なっている等、符号が決まらない場合は、
-            // GameObjectのInstanceIDで押す方向を固定し、お互い矛盾なく逆方向へ分かれるようにする
+            // ���S�ɓ���Z���W�ŏd�Ȃ��Ă��铙�A���������܂�Ȃ��ꍇ�́A
+            // GameObject��InstanceID�ŉ����������Œ肵�A���݂������Ȃ��t�����֕������悤�ɂ���
             pushDir = gameObject.GetInstanceID() < otherTf.gameObject.GetInstanceID() ? -1f : 1f;
         }
 
         transform.position += new Vector3(0f, 0f, pushDir * pushThisFrame);
     }
 
-    // ワールド座標のX/Y/Zをそれぞれ設定した範囲内にクランプする
+    // ���[���h���W��X/Y/Z�����ꂼ��ݒ肵���͈͓��ɃN�����v����
     void ClampPositionWithinBounds()
     {
         Vector3 pos = transform.position;
@@ -1900,22 +1924,22 @@ public class Player : MonoBehaviour
         transform.position = pos;
     }
 
-    // ★追加：矢印キーが押された瞬間に、対応するアニメーションを再生する（Updateから毎フレーム呼ばれる）
+    // ���ǉ��F���L�[�������ꂽ�u�ԂɁA�Ή�����A�j���[�V�������Đ�����iUpdate���疈�t���[���Ă΂��j
     void HandleArrowKeyAnimation()
     {
         if (animator == null) return;
 
-        // キーボードの矢印キー
+        // �L�[�{�[�h�̖��L�[
         if (enableArrowKeyAnimation && Keyboard.current != null)
         {
             Keyboard kb = Keyboard.current;
-            if (kb.upArrowKey.wasPressedThisFrame) PlayArrowAnimation(upArrowAnimation, "↑");
-            if (kb.leftArrowKey.wasPressedThisFrame) PlayArrowAnimation(leftArrowAnimation, "←");
-            if (kb.rightArrowKey.wasPressedThisFrame) PlayArrowAnimation(rightArrowAnimation, "→");
-            if (kb.downArrowKey.wasPressedThisFrame) PlayArrowAnimation(downArrowAnimation, "↓");
+            if (kb.upArrowKey.wasPressedThisFrame) PlayArrowAnimation(upArrowAnimation, "��");
+            if (kb.leftArrowKey.wasPressedThisFrame) PlayArrowAnimation(leftArrowAnimation, "��");
+            if (kb.rightArrowKey.wasPressedThisFrame) PlayArrowAnimation(rightArrowAnimation, "��");
+            if (kb.downArrowKey.wasPressedThisFrame) PlayArrowAnimation(downArrowAnimation, "��");
         }
 
-        // ゲームパッドの十字キー（このPlayerInputに紐づいているパッドだけを見る。1P/2Pで混ざらない）
+        // �Q�[���p�b�h�̏\���L�[�i����PlayerInput�ɕR�Â��Ă���p�b�h����������B1P/2P�ō�����Ȃ��j
         if (enableDpadAnimation && playerInput != null)
         {
             foreach (InputDevice device in playerInput.devices)
@@ -1923,10 +1947,10 @@ public class Player : MonoBehaviour
                 Gamepad pad = device as Gamepad;
                 if (pad == null) continue;
 
-                if (pad.dpad.up.wasPressedThisFrame) PlayArrowAnimation(upArrowAnimation, "十字↑");
-                if (pad.dpad.left.wasPressedThisFrame) PlayArrowAnimation(leftArrowAnimation, "十字←");
-                if (pad.dpad.right.wasPressedThisFrame) PlayArrowAnimation(rightArrowAnimation, "十字→");
-                if (pad.dpad.down.wasPressedThisFrame) PlayArrowAnimation(downArrowAnimation, "十字↓");
+                if (pad.dpad.up.wasPressedThisFrame) PlayArrowAnimation(upArrowAnimation, "�\����");
+                if (pad.dpad.left.wasPressedThisFrame) PlayArrowAnimation(leftArrowAnimation, "�\����");
+                if (pad.dpad.right.wasPressedThisFrame) PlayArrowAnimation(rightArrowAnimation, "�\����");
+                if (pad.dpad.down.wasPressedThisFrame) PlayArrowAnimation(downArrowAnimation, "�\����");
             }
         }
     }
@@ -1935,11 +1959,11 @@ public class Player : MonoBehaviour
     {
         if (setting == null || string.IsNullOrEmpty(setting.animationName))
         {
-            DLog($"[{PlayerName}] {keyLabel}キー：再生するアニメーション名が未設定です。");
+            DLog($"[{PlayerName}] {keyLabel}�L�[�F�Đ�����A�j���[�V�����������ݒ�ł��B");
             return;
         }
 
-        // 移動アニメーションが残っていると、再生したアニメーションより移動が優先されてしまうので先に止める
+        // �ړ��A�j���[�V�������c���Ă���ƁA�Đ������A�j���[�V�������ړ����D�悳��Ă��܂��̂Ő�Ɏ~�߂�
         StopMoveAnimation();
         ResetAttackTriggers();
 
@@ -1952,10 +1976,10 @@ public class Player : MonoBehaviour
             animator.Play(setting.animationName, 0, 0f);
         }
 
-        DLog($"[{PlayerName}] {keyLabel}キー：アニメーション再生 {setting.animationName}（{(setting.useTrigger ? "Trigger" : "State")}）");
+        DLog($"[{PlayerName}] {keyLabel}�L�[�F�A�j���[�V�����Đ� {setting.animationName}�i{(setting.useTrigger ? "Trigger" : "State")}�j");
     }
 
-    // 1フレームで消費しなかった意図フラグを毎フレーム末尾でクリアする
+    // 1�t���[���ŏ���Ȃ������Ӑ}�t���O�𖈃t���[�������ŃN���A����
     void ClearInputIntents()
     {
         wantJump = false;
@@ -1968,78 +1992,78 @@ public class Player : MonoBehaviour
     }
 
     //-----------------------------------------------------
-    // ダウン中の連打プロンプト表示
+    // �_�E�����̘A�Ńv�����v�g�\��
     //-----------------------------------------------------
-    // ダウン（根性復活チャレンジ）中だけ、画面に大きく連打を促すメッセージを表示する。
-    // ※OnGUIによる簡易実装のため、split-screen等で複数Playerが同時に描画される構成の場合は
-    //   表示位置が重なる可能性がある。その場合はCanvas+UI Textでの実装に置き換えること。
-    [Header("復活連打メッセージ設定")]
-    [SerializeField] bool showMashPrompt = true;               // ダウン中に連打メッセージを表示するか
-    [SerializeField] string mashPromptText = "ボタンを連打しろ！"; // 表示する文言（どのボタンでもOK）
-    [SerializeField] int mashPromptFontSize = 64;               // 文字サイズ
-    [SerializeField] Color mashPromptColor = Color.yellow;      // 文字色
+    // �_�E���i���������`�������W�j�������A��ʂɑ傫���A�ł𑣂����b�Z�[�W��\������B
+    // ��OnGUI�ɂ��ȈՎ����̂��߁Asplit-screen���ŕ���Player�������ɕ`�悳���\���̏ꍇ��
+    //   �\���ʒu���d�Ȃ�\��������B���̏ꍇ��Canvas+UI Text�ł̎����ɒu�������邱�ƁB
+    [Header("�����A�Ń��b�Z�[�W�ݒ�")]
+    [SerializeField] bool showMashPrompt = true;               // �_�E�����ɘA�Ń��b�Z�[�W��\�����邩
+    [SerializeField] string mashPromptText = "�{�^����A�ł���I"; // �\�����镶���i�ǂ̃{�^���ł�OK�j
+    [SerializeField] int mashPromptFontSize = 64;               // �����T�C�Y
+    [SerializeField] Color mashPromptColor = Color.yellow;      // �����F
 
-    // ★追加：残り連打回数を画面中央に大きく表示するための設定。
-    //   押すごとに（mashCountが増えるごとに）GetRemainingMashCount()の値が減っていく。
-    [Header("残り連打回数表示設定")]
-    [SerializeField] bool showMashRemainingCount = true;        // 残り連打回数の数字を表示するか
-    [SerializeField] int mashRemainingFontSize = 150;            // 数字のフォントサイズ（Inspectorで調整可能）
-    [SerializeField] Color mashRemainingColor = Color.white;    // 数字の色
-    [SerializeField] float mashRemainingYRatio = 0.42f;         // 数字を表示するY位置（画面高さに対する割合。中央付近）
+    // ���ǉ��F�c��A�ŉ񐔂���ʒ����ɑ傫���\�����邽�߂̐ݒ�B
+    //   �������ƂɁimashCount�������邲�ƂɁjGetRemainingMashCount()�̒l�������Ă����B
+    [Header("�c��A�ŉ񐔕\���ݒ�")]
+    [SerializeField] bool showMashRemainingCount = true;        // �c��A�ŉ񐔂̐�����\�����邩
+    [SerializeField] int mashRemainingFontSize = 150;            // �����̃t�H���g�T�C�Y�iInspector�Œ����\�j
+    [SerializeField] Color mashRemainingColor = Color.white;    // �����̐F
+    [SerializeField] float mashRemainingYRatio = 0.42f;         // ������\������Y�ʒu�i��ʍ����ɑ΂��銄���B�����t�߁j
 
-    // ★追加：連打を促すボタン画像（押していない時／押した時の2枚）を差し込むための設定。
-    //   ダウン中に何かボタンを押すたびに「押した画像」へ切り替わり、少し経つと「押していない画像」へ戻る。
-    //   ※Inspectorに画像（Texture）を割り当てると表示される。未設定なら何も表示しない。
-    //   ※画像のImport Settingsは「Sprite (2D and UI)」のままでも、「Default」でもよい。
-    [Header("復活連打ボタン画像設定")]
-    [SerializeField] bool showMashButtonImage = true;            // 連打ボタン画像を表示するか
-    [Tooltip("ボタンを押していない時の画像（mash_button_normal.png）をここに入れる")]
-    [SerializeField] Texture2D mashButtonNormalImage;            // ★画像の差し込み口①：押していない時
-    [Tooltip("ボタンを押した時の画像（mash_button_pressed.png）をここに入れる")]
-    [SerializeField] Texture2D mashButtonPressedImage;           // ★画像の差し込み口②：押した時
-    [Tooltip("「押した画像」を出すフレーム数。1回出したら、連打がどれだけ速くてもこの時間で必ず終わらせる。")]
+    // ���ǉ��F�A�ł𑣂��{�^���摜�i�����Ă��Ȃ����^����������2���j���������ނ��߂̐ݒ�B
+    //   �_�E�����ɉ����{�^�����������тɁu�������摜�v�֐؂�ւ��A�����o�Ɓu�����Ă��Ȃ��摜�v�֖߂�B
+    //   ��Inspector�ɉ摜�iTexture�j�����蓖�Ă�ƕ\�������B���ݒ�Ȃ牽���\�����Ȃ��B
+    //   ���摜��Import Settings�́uSprite (2D and UI)�v�̂܂܂ł��A�uDefault�v�ł��悢�B
+    [Header("�����A�Ń{�^���摜�ݒ�")]
+    [SerializeField] bool showMashButtonImage = true;            // �A�Ń{�^���摜��\�����邩
+    [Tooltip("�{�^���������Ă��Ȃ����̉摜�imash_button_normal.png�j�������ɓ����")]
+    [SerializeField] Texture2D mashButtonNormalImage;            // ���摜�̍������݌��@�F�����Ă��Ȃ���
+    [Tooltip("�{�^�������������̉摜�imash_button_pressed.png�j�������ɓ����")]
+    [SerializeField] Texture2D mashButtonPressedImage;           // ���摜�̍������݌��A�F��������
+    [Tooltip("�u�������摜�v���o���t���[�����B1��o������A�A�ł��ǂꂾ�������Ă����̎��ԂŕK���I��点��B")]
     [SerializeField] int mashButtonPressedFrames = 4;
-    [Tooltip("「押していない画像」を最低限出すフレーム数。押した画像の後に必ずこの時間だけ挟むので、連打中でも押しっぱなしに見えない。")]
+    [Tooltip("�u�����Ă��Ȃ��摜�v���Œ���o���t���[�����B�������摜�̌�ɕK�����̎��Ԃ������ނ̂ŁA�A�Œ��ł��������ςȂ��Ɍ����Ȃ��B")]
     [SerializeField] int mashButtonReleaseMinFrames = 3;
-    [Tooltip("画像の大きさ（画面の高さに対する割合）。0.22なら画面高さの22%の正方形で表示する。")]
+    [Tooltip("�摜�̑傫���i��ʂ̍����ɑ΂��銄���j�B0.22�Ȃ��ʍ�����22%�̐����`�ŕ\������B")]
     [SerializeField] float mashButtonSizeRatio = 0.22f;
-    [Tooltip("画像を表示するX位置（画面幅に対する割合。0.5で中央）")]
+    [Tooltip("�摜��\������X�ʒu�i��ʕ��ɑ΂��銄���B0.5�Œ����j")]
     [SerializeField] float mashButtonXRatio = 0.5f;
-    [Tooltip("画像を表示するY位置（画面高さに対する割合。数字より下に出すため0.72付近）")]
+    [Tooltip("�摜��\������Y�ʒu�i��ʍ����ɑ΂��銄���B������艺�ɏo������0.72�t�߁j")]
     [SerializeField] float mashButtonYRatio = 0.72f;
 
-    bool mashButtonVisualPressed;   // 今「押した画像」を出しているか
-    int mashButtonStateEndFrame;   // 今の見た目（押した／押していない）を最低限維持する終了フレーム（CurrentFrame）
-    bool mashButtonPendingPress;    // 押された要求が溜まっている（押していない画像を挟んでから、次の押した画像にする）
+    bool mashButtonVisualPressed;   // ���u�������摜�v���o���Ă��邩
+    int mashButtonStateEndFrame;   // ���̌����ځi�������^�����Ă��Ȃ��j���Œ���ێ�����I���t���[���iCurrentFrame�j
+    bool mashButtonPendingPress;    // �����ꂽ�v�������܂��Ă���i�����Ă��Ȃ��摜������ł���A���̉������摜�ɂ���j
 
-    // ★追加：ダウン中（復活チャレンジ中）に、復活の制限時間（残り秒数）を画面上部に表示するための設定。
-    //   制限時間は上の「復活（根性）設定」のrebornTimeLimitFramesで、残りフレーム = rebornTimeLimitFrames - rebornTimer。
-    [Header("復活制限時間表示設定")]
-    [Tooltip("ダウン中に、復活の制限時間（残り秒数）を画面上部に表示するか")]
+    // ���ǉ��F�_�E�����i�����`�������W���j�ɁA�����̐������ԁi�c��b���j����ʏ㕔�ɕ\�����邽�߂̐ݒ�B
+    //   �������Ԃ͏�́u�����i�����j�ݒ�v��rebornTimeLimitFrames�ŁA�c��t���[�� = rebornTimeLimitFrames - rebornTimer�B
+    [Header("�����������ԕ\���ݒ�")]
+    [Tooltip("�_�E�����ɁA�����̐������ԁi�c��b���j����ʏ㕔�ɕ\�����邩")]
     [SerializeField] bool showRebornTimeLimit = true;
-    [Tooltip("残り秒数の前に付ける文言")]
-    [SerializeField] string rebornTimeLabel = "復活まで";
-    [SerializeField] int rebornTimeFontSize = 56;                        // 文字サイズ
-    [SerializeField] Color rebornTimeColor = Color.white;                // 通常時の色
-    [Tooltip("残り時間がこのフレーム数以下になったら、色を変えて点滅させる")]
+    [Tooltip("�c��b���̑O�ɕt���镶��")]
+    [SerializeField] string rebornTimeLabel = "�����܂�";
+    [SerializeField] int rebornTimeFontSize = 56;                        // �����T�C�Y
+    [SerializeField] Color rebornTimeColor = Color.white;                // �ʏ펞�̐F
+    [Tooltip("�c�莞�Ԃ����̃t���[�����ȉ��ɂȂ�����A�F��ς��ē_�ł�����")]
     [SerializeField] int rebornTimeLowThresholdFrames = 90;
-    [SerializeField] Color rebornTimeLowColor = new Color(1f, 0.2f, 0.2f, 1f); // 残りわずかの時の色
-    [Tooltip("文字の下に、残り時間に応じて短くなるバーを表示するか")]
+    [SerializeField] Color rebornTimeLowColor = new Color(1f, 0.2f, 0.2f, 1f); // �c��킸���̎��̐F
+    [Tooltip("�����̉��ɁA�c�莞�Ԃɉ����ĒZ���Ȃ�o�[��\�����邩")]
     [SerializeField] bool showRebornTimeBar = true;
-    [Tooltip("バーの長さ（画面幅に対する割合）")]
+    [Tooltip("�o�[�̒����i��ʕ��ɑ΂��銄���j")]
     [SerializeField] float rebornTimeBarWidthRatio = 0.4f;
-    [Tooltip("表示する位置（画面上端からの距離。画面高さに対する割合）。大きくしすぎると連打メッセージと重なる。")]
+    [Tooltip("�\������ʒu�i��ʏ�[����̋����B��ʍ����ɑ΂��銄���j�B�傫����������ƘA�Ń��b�Z�[�W�Əd�Ȃ�B")]
     [SerializeField] float rebornTimeYRatio = 0.03f;
 
-    // ★追加：復活の制限時間（残り秒数）を画面上部に表示する。OnGUIから、ダウン中だけ呼ばれる。
+    // ���ǉ��F�����̐������ԁi�c��b���j����ʏ㕔�ɕ\������BOnGUI����A�_�E���������Ă΂��B
     void DrawRebornTimeLimit(float blink, float centerX, bool dualLayout)
     {
         int remainingFrames = Mathf.Max(rebornTimeLimitFrames - rebornTimer, 0);
-        float remaining = FramesToSeconds(remainingFrames); // 画面表示は見やすいよう秒に換算する
+        float remaining = FramesToSeconds(remainingFrames); // ��ʕ\���͌��₷���悤�b�Ɋ��Z����
         float ratio = rebornTimeLimitFrames > 0 ? Mathf.Clamp01((float)remainingFrames / rebornTimeLimitFrames) : 0f;
         bool isLow = remainingFrames <= rebornTimeLowThresholdFrames;
 
-        // 残りわずかの時は色を変えて、明滅させる
+        // �c��킸���̎��͐F��ς��āA���ł�����
         Color baseColor = isLow ? rebornTimeLowColor : rebornTimeColor;
         float alpha = isLow ? blink : 1f;
         Color textColor = new Color(baseColor.r, baseColor.g, baseColor.b, alpha);
@@ -2059,7 +2083,7 @@ public class Player : MonoBehaviour
         float top = Screen.height * rebornTimeYRatio;
         Rect rect = new Rect(centerX - width / 2f, top, width, height);
 
-        // 縁取り（黒）を少しずらして重ね描きし、背景が明るくても読めるようにする
+        // �����i���j���������炵�ďd�˕`�����A�w�i�����邭�Ă��ǂ߂�悤�ɂ���
         GUIStyle outlineStyle = new GUIStyle(style)
         {
             normal = { textColor = new Color(0f, 0f, 0f, alpha) }
@@ -2071,39 +2095,39 @@ public class Player : MonoBehaviour
         }
         GUI.Label(rect, text, style);
 
-        // 残り時間に応じて右から短くなるバー
+        // �c�莞�Ԃɉ����ĉE����Z���Ȃ�o�[
         if (showRebornTimeBar)
         {
-            float barWidth = Screen.width * rebornTimeBarWidthRatio * (dualLayout ? 0.5f : 1f); // 同時ダウン時は半分の画面に収める
+            float barWidth = Screen.width * rebornTimeBarWidthRatio * (dualLayout ? 0.5f : 1f); // �����_�E�����͔����̉�ʂɎ��߂�
             float barHeight = Mathf.Max(Screen.height * 0.015f, 8f);
             float barX = centerX - barWidth / 2f;
             float barY = top + height + 4f;
 
             Color prevColor = GUI.color;
 
-            GUI.color = new Color(0f, 0f, 0f, 0.6f); // 背景（枠）
+            GUI.color = new Color(0f, 0f, 0f, 0.6f); // �w�i�i�g�j
             GUI.DrawTexture(new Rect(barX - 3f, barY - 3f, barWidth + 6f, barHeight + 6f), Texture2D.whiteTexture);
 
-            GUI.color = textColor;                    // 残り時間分のバー
+            GUI.color = textColor;                    // �c�莞�ԕ��̃o�[
             GUI.DrawTexture(new Rect(barX, barY, barWidth * ratio, barHeight), Texture2D.whiteTexture);
 
             GUI.color = prevColor;
         }
     }
 
-    // ★追加：連打ボタン画像の「押した／押していない」を毎フレーム切り替える。
-    //   押した画像は mashButtonPressedFrames で必ず終わらせ、
-    //   その後に mashButtonReleaseMinFrames だけ「押していない画像」を必ず挟む。
-    //   連打が速くて押下要求が溜まっていても、その間は押していない画像を見せるので、押しっぱなしに見えない。
+    // ���ǉ��F�A�Ń{�^���摜�́u�������^�����Ă��Ȃ��v�𖈃t���[���؂�ւ���B
+    //   �������摜�� mashButtonPressedFrames �ŕK���I��点�A
+    //   ���̌�� mashButtonReleaseMinFrames �����u�����Ă��Ȃ��摜�v��K�����ށB
+    //   �A�ł������ĉ����v�������܂��Ă��Ă��A���̊Ԃ͉����Ă��Ȃ��摜��������̂ŁA�������ςȂ��Ɍ����Ȃ��B
     void TickMashButtonVisual()
     {
-        // ダウン中以外は状態をリセットしておく（次のダウン時に前回の押下が残らないようにする）
+        // �_�E�����ȊO�͏�Ԃ����Z�b�g���Ă����i���̃_�E�����ɑO��̉������c��Ȃ��悤�ɂ���j
         if (currentState != PlayerState.KnockedDown)
         {
-            downWasDual = false; // ダウン中でなければ同時ダウンの記録は不要
+            downWasDual = false; // �_�E�����łȂ���Γ����_�E���̋L�^�͕s�v
             if (downAnimPlayed)
             {
-                // ★追加：復活／死亡の処理を通らずにダウンを抜けた場合の保険。ダウン中Boolが残らないようにする
+                // ���ǉ��F�����^���S�̏�����ʂ炸�Ƀ_�E���𔲂����ꍇ�̕ی��B�_�E����Bool���c��Ȃ��悤�ɂ���
                 downAnimPlayed = false;
                 SetDownBool(downBoolParam, false);
             }
@@ -2116,7 +2140,7 @@ public class Player : MonoBehaviour
 
         if (mashButtonVisualPressed)
         {
-            // 押した画像は決められた時間で必ず終わらせ、押していない画像へ戻す
+            // �������摜�͌��߂�ꂽ���ԂŕK���I��点�A�����Ă��Ȃ��摜�֖߂�
             if (now >= mashButtonStateEndFrame)
             {
                 mashButtonVisualPressed = false;
@@ -2125,7 +2149,7 @@ public class Player : MonoBehaviour
         }
         else
         {
-            // 押していない画像を最低限の時間出し終えていて、押された要求があれば、次の「押した画像」にする
+            // �����Ă��Ȃ��摜���Œ���̎��ԏo���I���Ă��āA�����ꂽ�v��������΁A���́u�������摜�v�ɂ���
             if (mashButtonPendingPress && now >= mashButtonStateEndFrame)
             {
                 mashButtonPendingPress = false;
@@ -2137,29 +2161,29 @@ public class Player : MonoBehaviour
 
     void OnGUI()
     {
-        DrawStunComboDebug(); // ★追加：F10のやられ連続ヒット数表示
+        DrawStunComboDebug(); // ���ǉ��FF10�̂���A���q�b�g���\��
 
         if (!showMashPrompt && !showMashRemainingCount && !showMashButtonImage && !showRebornTimeLimit) return;
         if (currentState != PlayerState.KnockedDown) return;
 
-        // 明滅させて視認性・緊張感を出す
+        // ���ł����Ď��F���E�ْ������o��
         float blink = 0.6f + 0.4f * Mathf.Sin(Time.time * 10f);
 
-        // ★追加：同時ダウン中は、P1＝画面左／P2＝画面右にUIを分けて表示する。
-        //   個別に変わる部分（制限時間・ボタン画像・残り連打数）は各自の側に、
-        //   2人で同じ内容の文言（mashPromptText）は画面中央に1つだけ表示する。
+        // ���ǉ��F�����_�E�����́AP1����ʍ��^P2����ʉE��UI�𕪂��ĕ\������B
+        //   �ʂɕς�镔���i�������ԁE�{�^���摜�E�c��A�Ő��j�͊e���̑��ɁA
+        //   2�l�œ������e�̕����imashPromptText�j�͉�ʒ�����1�����\������B
         bool dualDown = IsDualKnockedDown();
         bool rightSide = IsRightSidePlayer();
         float uiCenterX = Screen.width * 0.5f;
         if (dualDown) uiCenterX = Screen.width * (rightSide ? dualDownRightXRatio : dualDownLeftXRatio);
 
-        // ★追加：復活の制限時間（残り秒数）を画面上部に表示する
+        // ���ǉ��F�����̐������ԁi�c��b���j����ʏ㕔�ɕ\������
         if (showRebornTimeLimit)
         {
             DrawRebornTimeLimit(blink, uiCenterX, dualDown);
         }
 
-        if (showMashPrompt && (!dualDown || !rightSide)) // 同時ダウン時は中央に1つだけ（P1側のインスタンスが描く）
+        if (showMashPrompt && (!dualDown || !rightSide)) // �����_�E�����͒�����1�����iP1���̃C���X�^���X���`���j
         {
             GUIStyle style = new GUIStyle(GUI.skin.label)
             {
@@ -2175,7 +2199,7 @@ public class Player : MonoBehaviour
             float height = 120f;
             Rect rect = new Rect((Screen.width - width) / 2f, Screen.height * 0.15f, width, height);
 
-            // 縁取り（黒）を少しずらして重ね描きし、背景が明るくても読めるようにする
+            // �����i���j���������炵�ďd�˕`�����A�w�i�����邭�Ă��ǂ߂�悤�ɂ���
             GUIStyle outlineStyle = new GUIStyle(style)
             {
                 normal = { textColor = new Color(0f, 0f, 0f, blink) }
@@ -2209,7 +2233,7 @@ public class Player : MonoBehaviour
                 Screen.height * mashRemainingYRatio - height / 2f,
                 width, height);
 
-            // 縁取り（黒）を少しずらして重ね描きし、背景が明るくても読めるようにする
+            // �����i���j���������炵�ďd�˕`�����A�w�i�����邭�Ă��ǂ߂�悤�ɂ���
             GUIStyle outlineStyle = new GUIStyle(numberStyle)
             {
                 normal = { textColor = Color.black }
@@ -2223,7 +2247,7 @@ public class Player : MonoBehaviour
             GUI.Label(rect, remainingText, numberStyle);
         }
 
-        // ★追加：連打ボタン画像（押した瞬間だけ「押した画像」、それ以外は「押していない画像」）
+        // ���ǉ��F�A�Ń{�^���摜�i�������u�Ԃ����u�������摜�v�A����ȊO�́u�����Ă��Ȃ��摜�v�j
         if (showMashButtonImage)
         {
             bool pressed = mashButtonVisualPressed;
@@ -2244,9 +2268,9 @@ public class Player : MonoBehaviour
     }
 
     //-----------------------------------------------------
-    // ヒットストップ
+    // �q�b�g�X�g�b�v
     //-----------------------------------------------------
-    // ★追加：被弾アニメーション（Trigger）を予約する。実際に立てるのはFirePendingHitAnimation()。
+    // ���ǉ��F��e�A�j���[�V�����iTrigger�j��\�񂷂�B���ۂɗ��Ă�̂�FirePendingHitAnimation()�B
     void RequestHitAnimation(bool hasDirection, bool fromFront)
     {
         pendingHitTrigger = true;
@@ -2254,8 +2278,8 @@ public class Player : MonoBehaviour
         pendingHitFromFront = fromFront;
     }
 
-    // ★追加：予約していた被弾Triggerを、ここで1回だけ立てる。
-    //   この一撃でHPが0になった場合は被弾アニメーションを再生しない（直後にダウン開始のアニメーションが再生されるため）。
+    // ���ǉ��F�\�񂵂Ă�����eTrigger���A������1�񂾂����Ă�B
+    //   ���̈ꌂ��HP��0�ɂȂ����ꍇ�͔�e�A�j���[�V�������Đ����Ȃ��i����Ƀ_�E���J�n�̃A�j���[�V�������Đ�����邽�߁j�B
     void FirePendingHitAnimation()
     {
         if (!pendingHitTrigger) return;
@@ -2266,25 +2290,25 @@ public class Player : MonoBehaviour
         animator.SetTrigger("Hit");
         if (pendingHitHasDirection)
         {
-            // 反対側の未消費フラグが残っていると、次の被弾で誤ったアニメーションに遷移しうるので先に消す
+            // ���Α��̖�����t���O���c���Ă���ƁA���̔�e�Ō�����A�j���[�V�����ɑJ�ڂ�����̂Ő�ɏ���
             animator.ResetTrigger(pendingHitFromFront ? "Hit-back" : "Hit-front");
             animator.SetTrigger(pendingHitFromFront ? "Hit-front" : "Hit-back");
-            DLog($"[{PlayerName}] 被弾アニメーション再生：攻撃者は{(pendingHitFromFront ? "前方" : "後方")}（{(pendingHitFromFront ? "Hit-front" : "Hit-back")}）");
+            DLog($"[{PlayerName}] ��e�A�j���[�V�����Đ��F�U���҂�{(pendingHitFromFront ? "�O��" : "���")}�i{(pendingHitFromFront ? "Hit-front" : "Hit-back")}�j");
         }
     }
 
-    // ★追加：Triggerを使わず、HeadHitステートを頭から1回だけ直接再生する。
-    //   この一撃でHPが0になった場合は再生しない（直後にダウン開始のアニメーションが再生されるため）。
+    // ���ǉ��FTrigger���g�킸�AHeadHit�X�e�[�g�𓪂���1�񂾂����ڍĐ�����B
+    //   ���̈ꌂ��HP��0�ɂȂ����ꍇ�͍Đ����Ȃ��i����Ƀ_�E���J�n�̃A�j���[�V�������Đ�����邽�߁j�B
     void PlayHeadHitDirect()
     {
         if (animator == null || HP <= 0) return;
         animator.Play("HeadHit", 0, 0.0f);
     }
 
-    // framesフレームの間だけ、そのフレームから入力・状態更新を止めて「少しだけ動けない」状態にする。
-    // すでにヒットストップ中の場合は、残り時間を延ばしすぎないよう長い方の時間を採用する。
-    // playHeadHitAnimation: ヒットストップが終わった瞬間に"HeadHit"（被弾）アニメーションを再生するか。
-    //   通常被弾はtrue、仁王立ちガード成功時はfalse（ガードのポーズを崩したくないため）を渡す。
+    // frames�t���[���̊Ԃ����A���̃t���[��������́E��ԍX�V���~�߂āu�������������Ȃ��v��Ԃɂ���B
+    // ���łɃq�b�g�X�g�b�v���̏ꍇ�́A�c�莞�Ԃ����΂������Ȃ��悤�������̎��Ԃ��̗p����B
+    // playHeadHitAnimation: �q�b�g�X�g�b�v���I������u�Ԃ�"HeadHit"�i��e�j�A�j���[�V�������Đ����邩�B
+    //   �ʏ��e��true�A�m�������K�[�h��������false�i�K�[�h�̃|�[�Y����������Ȃ����߁j��n���B
     void StartHitStop(int frames, bool playHeadHitAnimation = true)
     {
         if (!enableHitStop || frames <= 0) return;
@@ -2294,76 +2318,76 @@ public class Player : MonoBehaviour
 
         if (freezeAnimatorDuringHitStop && animator != null)
         {
-            // ★修正：ここで即座にHeadHitを再生すると、直後にspeedを0にするせいで
-            //   1フレーム目の姿勢のまま止まってしまい「アニメーションが再生された」ようには見えなかった。
-            //   なので今は「その場でアニメーションを一時停止させる」だけにし、
-            //   実際にHeadHitを再生するのはヒットストップが終わるタイミング（EndHitStop）に任せる。
+            // ���C���F�����ő�����HeadHit���Đ�����ƁA�����speed��0�ɂ��邹����
+            //   1�t���[���ڂ̎p���̂܂܎~�܂��Ă��܂��u�A�j���[�V�������Đ����ꂽ�v�悤�ɂ͌����Ȃ������B
+            //   �Ȃ̂ō��́u���̏�ŃA�j���[�V�������ꎞ��~������v�����ɂ��A
+            //   ���ۂ�HeadHit���Đ�����̂̓q�b�g�X�g�b�v���I���^�C�~���O�iEndHitStop�j�ɔC����B
             animator.speed = 0f;
         }
 
-        DLog($"[{PlayerName}] ヒットストップ開始 {frames}フレーム");
+        DLog($"[{PlayerName}] �q�b�g�X�g�b�v�J�n {frames}�t���[��");
     }
 
-    // ヒットストップ終了時にアニメーション速度を元に戻し、必要ならHeadHitアニメーションを再生する
+    // �q�b�g�X�g�b�v�I�����ɃA�j���[�V�������x�����ɖ߂��A�K�v�Ȃ�HeadHit�A�j���[�V�������Đ�����
     void EndHitStop()
     {
         if (freezeAnimatorDuringHitStop && animator != null)
         {
-            // ★追加：掴みポーズで止めている最中は、ヒットストップが終わっても止めたままにする
+            // ���ǉ��F�͂݃|�[�Y�Ŏ~�߂Ă���Œ��́A�q�b�g�X�g�b�v���I����Ă��~�߂��܂܂ɂ���
             animator.speed = grabHoldFrozen ? 0f : 1f;
         }
 
-        // ヒットストップで一瞬止めていたぶん、止まった直後に被弾アニメーションを「1回だけ」再生する。
-        // ガード成功時のヒットストップ（pendingHeadHitAnimation=false）ではここは実行されない。
+        // �q�b�g�X�g�b�v�ň�u�~�߂Ă����Ԃ�A�~�܂�������ɔ�e�A�j���[�V�������u1�񂾂��v�Đ�����B
+        // �K�[�h�������̃q�b�g�X�g�b�v�ipendingHeadHitAnimation=false�j�ł͂����͎��s����Ȃ��B
         if (pendingHeadHitAnimation && animator != null)
         {
             if (playHeadHitStateDirectly) PlayHeadHitDirect();
             else FirePendingHitAnimation();
         }
 
-        // ★追加：ヒットストップ中は相手もアニメーションも止まっているので、
-        //   止まっている間に滑らないよう、ヒットストップが終わった瞬間にノックバックを開始する。
+        // ���ǉ��F�q�b�g�X�g�b�v���͑�����A�j���[�V�������~�܂��Ă���̂ŁA
+        //   �~�܂��Ă���ԂɊ���Ȃ��悤�A�q�b�g�X�g�b�v���I������u�ԂɃm�b�N�o�b�N���J�n����B
         if (hasPendingKnockback)
         {
             hasPendingKnockback = false;
             ApplyKnockback(pendingKnockbackVelocity);
         }
 
-        DLog($"[{PlayerName}] ヒットストップ終了");
+        DLog($"[{PlayerName}] �q�b�g�X�g�b�v�I��");
     }
 
     //-----------------------------------------------------
-    // やられ状態（行動不能）
+    // �����ԁi�s���s�\�j
     //-----------------------------------------------------
-    // 被弾すると、攻撃側の「やられ状態の時間」の間だけ行動不能（Stunned）になる。
-    // この間は入力を一切受け付けない（Updateでisfree扱いにならず、TickBusyStateで時間だけ消化される）。
-    // やられ中に再度攻撃が当たると、連続ヒット数が増え、残り時間はmax(残り, 新しい攻撃の時間)に延長される。
-    private int stunComboCount = 0;          // 今のやられ状態中に連続で当たった回数（0=やられ中ではない）
-    private int lastStunComboCount = 0;      // 直前に終わったやられ状態での連続ヒット数
-    private bool showStunComboDebug = false; // F10で切り替える、連続ヒット数の画面表示ON/OFF
-    private int stunBarTotalFrames = 0;      // ★追加：F10表示用。今のやられ状態の合計フレーム数（延長されたら増える）。消化済み部分を□で残すために使う
+    // ��e����ƁA�U�����́u�����Ԃ̎��ԁv�̊Ԃ����s���s�\�iStunned�j�ɂȂ�B
+    // ���̊Ԃ͓��͂���؎󂯕t���Ȃ��iUpdate��isfree�����ɂȂ炸�ATickBusyState�Ŏ��Ԃ������������j�B
+    // ���ꒆ�ɍēx�U����������ƁA�A���q�b�g���������A�c�莞�Ԃ�max(�c��, �V�����U���̎���)�ɉ��������B
+    private int stunComboCount = 0;          // ���̂����Ԓ��ɘA���œ��������񐔁i0=���ꒆ�ł͂Ȃ��j
+    private int lastStunComboCount = 0;      // ���O�ɏI����������Ԃł̘A���q�b�g��
+    private bool showStunComboDebug = false; // F10�Ő؂�ւ���A�A���q�b�g���̉�ʕ\��ON/OFF
+    private int stunBarTotalFrames = 0;      // ���ǉ��FF10�\���p�B���̂����Ԃ̍��v�t���[�����i�������ꂽ�瑝����j�B�����ςݕ��������Ŏc�����߂Ɏg��
 
     void StunDLog(string message)
     {
         if (showStunComboDebug) Debug.Log($"[STUN] {message}");
     }
 
-    // 被弾時に呼ぶ。frames=やられ状態のフレーム数、willBeKnockedDown=この一撃でHPが0になるか
+    // ��e���ɌĂԁBframes=�����Ԃ̃t���[�����AwillBeKnockedDown=���̈ꌂ��HP��0�ɂȂ邩
     void ApplyStun(int frames, bool willBeKnockedDown)
     {
-        // 掴み・投げ・ダウン・死亡・必殺技（無敵）中は、やられ状態に置き換えない
+        // �͂݁E�����E�_�E���E���S�E�K�E�Z�i���G�j���́A�����Ԃɒu�������Ȃ�
         if (currentState == PlayerState.Grabbed || currentState == PlayerState.Thrown
             || currentState == PlayerState.KnockedDown || currentState == PlayerState.Dead
             || currentState == PlayerState.Special) return;
-        if (currentState == PlayerState.Throw && grabbedTarget != null) return; // 相手を掴んでいる最中
+        if (currentState == PlayerState.Throw && grabbedTarget != null) return; // �����͂�ł���Œ�
 
-        // ★追加：仁王立ち（ガード）中の側には、相手の攻撃のスタン時間を一切反映しない。
-        //   ガード成功時は攻撃者側だけがApplyGuardedStunでスタンし、ガードした側はスタンしない。
+        // ���ǉ��F�m�������i�K�[�h�j���̑��ɂ́A����̍U���̃X�^�����Ԃ���ؔ��f���Ȃ��B
+        //   �K�[�h�������͍U���ґ�������ApplyGuardedStun�ŃX�^�����A�K�[�h�������̓X�^�����Ȃ��B
         if (currentState == PlayerState.Guard || isGuarding) return;
 
         bool alreadyStunned = currentState == PlayerState.Stunned;
 
-        // この一撃でダウンする場合は、やられ状態にはせず、コンボだけ確定させる（以降はダウン処理に任せる）
+        // ���̈ꌂ�Ń_�E������ꍇ�́A�����Ԃɂ͂����A�R���{�����m�肳����i�ȍ~�̓_�E�������ɔC����j
         if (willBeKnockedDown)
         {
             if (alreadyStunned) stunComboCount++;
@@ -2376,74 +2400,74 @@ public class Player : MonoBehaviour
             stunComboCount++;
             int prevTimer = stateTimer;
             stateTimer = Mathf.Max(stateTimer, frames);
-            stunBarTotalFrames += Mathf.Max(stateTimer - prevTimer, 0); // 延長された分だけバーの全長も伸ばす
+            stunBarTotalFrames += Mathf.Max(stateTimer - prevTimer, 0); // �������ꂽ�������o�[�̑S�����L�΂�
         }
         else
         {
-            if (frames <= 0) return; // 0フレーム設定の技はやられ状態にならない
+            if (frames <= 0) return; // 0�t���[���ݒ�̋Z�͂����ԂɂȂ�Ȃ�
             stunComboCount = 1;
             EnterStunned(frames);
         }
 
-        StunDLog($"[{PlayerName}] 連続ヒット={stunComboCount} / やられ残り={stateTimer}フレーム");
+        StunDLog($"[{PlayerName}] �A���q�b�g={stunComboCount} / ����c��={stateTimer}�t���[��");
     }
 
-    // ★追加：自分の攻撃が相手の仁王立ち（ガード）に防がれた時に、相手側から呼ばれる。
-    //   ガードされた側（攻撃者＝自分）を、指定フレーム数だけ行動不能（Stunned）にする。
-    //   通常の被弾（ApplyStun）と違い「連続ヒット数」は増やさない（被弾コンボではないため）。
-    //   すでにやられ状態の場合は、残りフレーム数と指定フレーム数の長い方に延長する。
+    // ���ǉ��F�����̍U��������̐m�������i�K�[�h�j�ɖh���ꂽ���ɁA���葤����Ă΂��B
+    //   �K�[�h���ꂽ���i�U���ҁ������j���A�w��t���[���������s���s�\�iStunned�j�ɂ���B
+    //   �ʏ�̔�e�iApplyStun�j�ƈႢ�u�A���q�b�g���v�͑��₳�Ȃ��i��e�R���{�ł͂Ȃ����߁j�B
+    //   ���łɂ����Ԃ̏ꍇ�́A�c��t���[�����Ǝw��t���[�����̒������ɉ�������B
     public void ApplyGuardedStun(int frames)
     {
-        if (frames <= 0) return; // 0フレーム設定ならスタンさせない
+        if (frames <= 0) return; // 0�t���[���ݒ�Ȃ�X�^�������Ȃ�
 
-        // 掴み・投げ・ダウン・死亡・必殺技（無敵）中は、やられ状態に置き換えない（ApplyStunと同じ除外条件）
+        // �͂݁E�����E�_�E���E���S�E�K�E�Z�i���G�j���́A�����Ԃɒu�������Ȃ��iApplyStun�Ɠ������O�����j
         if (currentState == PlayerState.Grabbed || currentState == PlayerState.Thrown
             || currentState == PlayerState.KnockedDown || currentState == PlayerState.Dead
             || currentState == PlayerState.Special) return;
-        if (currentState == PlayerState.Throw && grabbedTarget != null) return; // 相手を掴んでいる最中
+        if (currentState == PlayerState.Throw && grabbedTarget != null) return; // �����͂�ł���Œ�
 
         if (currentState == PlayerState.Stunned)
         {
             int prevTimer = stateTimer;
             stateTimer = Mathf.Max(stateTimer, frames);
-            stunBarTotalFrames += Mathf.Max(stateTimer - prevTimer, 0); // 延長された分だけバーの全長も伸ばす
+            stunBarTotalFrames += Mathf.Max(stateTimer - prevTimer, 0); // �������ꂽ�������o�[�̑S�����L�΂�
         }
         else
         {
             EnterStunned(frames);
         }
 
-        DLog($"[{PlayerName}] 相手の仁王立ちガードに防がれ、{frames}フレームスタン（残り{stateTimer}フレーム）");
+        DLog($"[{PlayerName}] ����̐m�������K�[�h�ɖh����A{frames}�t���[���X�^���i�c��{stateTimer}�t���[���j");
     }
 
-    // 実行中の行動を中断してやられ状態に入る
+    // ���s���̍s���𒆒f���Ă����Ԃɓ���
     void EnterStunned(int frames)
     {
         StopMoveAnimation();
         ResetAttackTriggers();
-        DisableAllHitboxes();   // 攻撃中だった場合、その当たり判定を消す
+        DisableAllHitboxes();   // �U�����������ꍇ�A���̓����蔻�������
         isGuarding = false;
         canThrow = true;
-        throwReaching = false;  // 掴み待ち（まだ掴めていない投げ動作）だった場合は中断
+        throwReaching = false;  // �͂ݑ҂��i�܂��͂߂Ă��Ȃ���������j�������ꍇ�͒��f
 
         currentState = PlayerState.Stunned;
         stateTimer = frames;
-        stunBarTotalFrames = frames; // F10表示用：バーの全長を初期化
+        stunBarTotalFrames = frames; // F10�\���p�F�o�[�̑S����������
 
-        DLog($"[{PlayerName}] やられ状態に入りました（{frames}フレーム）");
+        DLog($"[{PlayerName}] �����Ԃɓ���܂����i{frames}�t���[���j");
     }
 
-    // やられ状態の連続ヒット数を確定する（やられ状態が終わった時・ダウンした時に呼ぶ）
+    // �����Ԃ̘A���q�b�g�����m�肷��i�����Ԃ��I��������E�_�E���������ɌĂԁj
     void FinishStunCombo()
     {
         if (stunComboCount <= 0) return;
         lastStunComboCount = stunComboCount;
-        StunDLog($"[{PlayerName}] やられ状態終了。連続ヒット数={lastStunComboCount}");
+        StunDLog($"[{PlayerName}] �����ԏI���B�A���q�b�g��={lastStunComboCount}");
         stunComboCount = 0;
     }
 
-    // ★追加：F10表示用。今「通常攻撃（パンチ／キック／上キック／下キック）」のクールダウン中なら、その残り／全長フレームを返す。
-    //   全長は、命中済みなら命中時の合計フレーム、空振り中なら空振り時の合計フレーム（攻撃を出した瞬間からの合計時間）。
+    // ���ǉ��FF10�\���p�B���u�ʏ�U���i�p���`�^�L�b�N�^��L�b�N�^���L�b�N�j�v�̃N�[���_�E�����Ȃ�A���̎c��^�S���t���[����Ԃ��B
+    //   �S���́A�����ς݂Ȃ疽�����̍��v�t���[���A��U�蒆�Ȃ��U�莞�̍��v�t���[���i�U�����o�����u�Ԃ���̍��v���ԁj�B
     public bool TryGetAttackCooldown(out string attackName, out int remainFrames, out int totalFrames)
     {
         attackName = "";
@@ -2452,10 +2476,10 @@ public class Player : MonoBehaviour
 
         switch (currentState)
         {
-            case PlayerState.Punch: attackName = "パンチ"; break;
-            case PlayerState.Kick: attackName = "キック"; break;
-            case PlayerState.UpKick: attackName = "上キック"; break;
-            case PlayerState.DownKick: attackName = "下キック"; break;
+            case PlayerState.Punch: attackName = "�p���`"; break;
+            case PlayerState.Kick: attackName = "�L�b�N"; break;
+            case PlayerState.UpKick: attackName = "��L�b�N"; break;
+            case PlayerState.DownKick: attackName = "���L�b�N"; break;
             default: return false;
         }
 
@@ -2465,37 +2489,37 @@ public class Player : MonoBehaviour
         return true;
     }
 
-    // F10デバッグ表示：
-    //   ・黄色の文字…やられ状態の情報（残りフレーム／連続ヒット数）
-    //   ・水色の文字…相手が出した通常攻撃のクールタイム情報（相手が攻撃中でなければ「なし」）
-    //   ・その下に、フレームバーを「やられ状態（黄）」「相手の技のクールタイム（水色）」の順に上下で隣り合わせに並べて表示する。
-    //     ■（塗りつぶし）＝残りフレーム／□（枠だけ）＝消化済み。1マス＝1フレームで、5フレームごとに少し間を空ける。
-    //     ★変更：2本のバーは同じ大きさ・同じ間隔のマスで描くため、フォントの字幅の違いに左右されず、上下で同じフレームの位置が揃う。
-    //     P1：左端を起点に右から左へ減る／P2：右端を起点に左から右へ減る（□が左から増える）。
+    // F10�f�o�b�O�\���F
+    //   �E���F�̕����c�����Ԃ̏��i�c��t���[���^�A���q�b�g���j
+    //   �E���F�̕����c���肪�o�����ʏ�U���̃N�[���^�C�����i���肪�U�����łȂ���΁u�Ȃ��v�j
+    //   �E���̉��ɁA�t���[���o�[���u�����ԁi���j�v�u����̋Z�̃N�[���^�C���i���F�j�v�̏��ɏ㉺�ŗׂ荇�킹�ɕ��ׂĕ\������B
+    //     ���i�h��Ԃ��j���c��t���[���^���i�g�����j�������ς݁B1�}�X��1�t���[���ŁA5�t���[�����Ƃɏ����Ԃ��󂯂�B
+    //     ���ύX�F2�{�̃o�[�͓����傫���E�����Ԋu�̃}�X�ŕ`�����߁A�t�H���g�̎����̈Ⴂ�ɍ��E���ꂸ�A�㉺�œ����t���[���̈ʒu�������B
+    //     P1�F���[���N�_�ɉE���獶�֌���^P2�F�E�[���N�_�ɍ�����E�֌���i���������瑝����j�B
     void DrawStunComboDebug()
     {
         if (!showStunComboDebug) return;
 
-        // P2は画面右側に表示する。PlayerInputのindexが1、またはPlayerNameが"P2"ならP2とみなす。
+        // P2�͉�ʉE���ɕ\������BPlayerInput��index��1�A�܂���PlayerName��"P2"�Ȃ�P2�Ƃ݂Ȃ��B
         int index = playerInput != null ? playerInput.playerIndex : 0;
         bool isRightSide = index == 1 || PlayerName == "P2";
         float width = Screen.width * 0.45f;
         float x = isRightSide ? Screen.width - width - 20f : 20f;
         float y = Screen.height * 0.3f;
 
-        // ---- 数値情報（文字）----
+        // ---- ���l���i�����j----
         bool stunned = currentState == PlayerState.Stunned;
         int stunRemain = stunned ? Mathf.Max(stateTimer, 0) : 0;
         int stunTotal = stunned ? Mathf.Max(stunBarTotalFrames, stunRemain) : 0;
-        string stateText = stunned ? $"やられ中（残り{stunRemain}F）" : "通常";
-        string stunText = $"[{PlayerName}] やられ状態\n状態: {stateText}\n連続ヒット数: {stunComboCount}\n直前のコンボ: {lastStunComboCount} ヒット";
+        string stateText = stunned ? $"���ꒆ�i�c��{stunRemain}F�j" : "�ʏ�";
+        string stunText = $"[{PlayerName}] ������\n���: {stateText}\n�A���q�b�g��: {stunComboCount}\n���O�̃R���{: {lastStunComboCount} �q�b�g";
         y += DrawOutlinedLabel(new Rect(x, y, width, 0f), stunText, Color.yellow, isRightSide) + 6f;
 
         int cdRemain = 0, cdTotal = 0;
-        string cooldownText = "相手の技: なし";
+        string cooldownText = "����̋Z: �Ȃ�";
         if (enemyPlayer != null && enemyPlayer.TryGetAttackCooldown(out string atkName, out cdRemain, out cdTotal))
         {
-            cooldownText = $"相手の技: {atkName}（クールタイム残り{cdRemain}F）";
+            cooldownText = $"����̋Z: {atkName}�i�N�[���^�C���c��{cdRemain}F�j";
         }
         else
         {
@@ -2504,26 +2528,26 @@ public class Player : MonoBehaviour
         }
         y += DrawOutlinedLabel(new Rect(x, y, width, 0f), cooldownText, Color.cyan, isRightSide) + 6f;
 
-        // ---- 仁王立ち上昇倍率／ダメージ量（緑）----
+        // ---- �m�������㏸�{���^�_���[�W�ʁi�΁j----
         string buffText = isGuardBuffed
-            ? $"仁王立ち上昇倍率: ×{Mathf.Max(1f, guardBuffMultiplier):F2}（上昇中）"
-            : "仁王立ち上昇倍率: ×1.00（なし）";
+            ? $"�m�������㏸�{��: �~{Mathf.Max(1f, guardBuffMultiplier):F2}�i�㏸���j"
+            : "�m�������㏸�{��: �~1.00�i�Ȃ��j";
         string penaltyText = guardFailDamageTimer > 0
-            ? $"／ガード失敗ペナルティ中：被ダメージ×{guardFailDamageMultiplier:F2}（残り{guardFailDamageTimer}F）"
+            ? $"�^�K�[�h���s�y�i���e�B���F��_���[�W�~{guardFailDamageMultiplier:F2}�i�c��{guardFailDamageTimer}F�j"
             : "";
-        string damageText = lastDamageTaken > 0 || lastDamageKind != "なし"
-            ? $"直前に受けたダメージ: {lastDamageTaken}（{lastDamageKind}" + (lastDamageBase != lastDamageTaken ? $"／元{lastDamageBase}" : "") + "）"
-            : "直前に受けたダメージ: なし";
-        string guardInfoText = $"{buffText}\n現在の攻撃力: {atk}\n{damageText}{penaltyText}";
+        string damageText = lastDamageTaken > 0 || lastDamageKind != "�Ȃ�"
+            ? $"���O�Ɏ󂯂��_���[�W: {lastDamageTaken}�i{lastDamageKind}" + (lastDamageBase != lastDamageTaken ? $"�^��{lastDamageBase}" : "") + "�j"
+            : "���O�Ɏ󂯂��_���[�W: �Ȃ�";
+        string guardInfoText = $"{buffText}\n���݂̍U����: {atk}\n{damageText}{penaltyText}";
         y += DrawOutlinedLabel(new Rect(x, y, width, 0f), guardInfoText, Color.green, isRightSide) + 8f;
 
-        // ---- フレームバー（上：やられ状態／下：相手の技のクールタイム）----
-        float cell = f10DebugFontSize * 0.8f;   // 1フレームぶんのマスの大きさ（フォントサイズに連動）
-        float pitch = cell + 3f;                // マスの間隔
-        float groupGap = cell * 0.5f;           // 5フレームごとの追加の間
+        // ---- �t���[���o�[�i��F�����ԁ^���F����̋Z�̃N�[���^�C���j----
+        float cell = f10DebugFontSize * 0.8f;   // 1�t���[���Ԃ�̃}�X�̑傫���i�t�H���g�T�C�Y�ɘA���j
+        float pitch = cell + 3f;                // �}�X�̊Ԋu
+        float groupGap = cell * 0.5f;           // 5�t���[�����Ƃ̒ǉ��̊�
         float rowHeight = cell + 6f;
 
-        // 1行に収まるフレーム数（5の倍数）。収まらない分は次の行へ折り返す。上下のバーは同じ行位置で隣り合わせに描く。
+        // 1�s�Ɏ��܂�t���[�����i5�̔{���j�B���܂�Ȃ����͎��̍s�֐܂�Ԃ��B�㉺�̃o�[�͓����s�ʒu�ŗׂ荇�킹�ɕ`���B
         int perRow = 5;
         while (BarSlotX(perRow + 5, pitch, groupGap) - groupGap <= width) perRow += 5;
         int rows = Mathf.Max(1, Mathf.CeilToInt(Mathf.Max(stunTotal, cdTotal) / (float)perRow));
@@ -2537,14 +2561,14 @@ public class Player : MonoBehaviour
         }
     }
 
-    // バーの「何マス目(0始まり)」の起点側からの距離。5マスごとにgroupGapだけ間を空ける。
+    // �o�[�́u���}�X��(0�n�܂�)�v�̋N�_������̋����B5�}�X���Ƃ�groupGap�����Ԃ��󂯂�B
     static float BarSlotX(int slot, float pitch, float groupGap)
     {
         return slot * pitch + (slot / 5) * groupGap;
     }
 
-    // フレームバーの1行ぶん（r行目）を描く。remain個の■（塗り）と、total-remain個の□（枠のみ）。
-    // P1は左端が起点、P2は右端が起点（□が反対側＝左側から増えていく）。
+    // �t���[���o�[��1�s�Ԃ�ir�s�ځj��`���Bremain�́��i�h��j�ƁAtotal-remain�́��i�g�̂݁j�B
+    // P1�͍��[���N�_�AP2�͉E�[���N�_�i�������Α����������瑝���Ă����j�B
     void DrawFrameBarRow(float x, float y, float width, bool anchorRight, int r, int perRow,
                          int remain, int total, float cell, float pitch, float groupGap, Color color)
     {
@@ -2555,15 +2579,15 @@ public class Player : MonoBehaviour
             float cx = anchorRight ? x + width - offset - cell : x + offset;
             Rect cellRect = new Rect(cx, y, cell, cell);
 
-            // 黒い縁取り
+            // ���������
             GUI.color = Color.black;
             GUI.DrawTexture(new Rect(cellRect.x - 1f, cellRect.y - 1f, cell + 2f, cell + 2f), Texture2D.whiteTexture);
 
-            // 色付きの本体
+            // �F�t���̖{��
             GUI.color = color;
             GUI.DrawTexture(cellRect, Texture2D.whiteTexture);
 
-            // 消化済みフレームは中をくり抜いて「□」にする
+            // �����ς݃t���[���͒������蔲���āu���v�ɂ���
             if (i >= remain)
             {
                 GUI.color = new Color(0f, 0f, 0f, 0.85f);
@@ -2573,15 +2597,15 @@ public class Player : MonoBehaviour
         GUI.color = prev;
     }
 
-    // ★追加：縁取り付きのラベルを描画し、使用した高さを返す（文字が折り返しても下段と重ならないよう、高さは内容から計算する）。
-    //   rect.heightは無視して、f10DebugFontSizeと幅から算出する。
+    // ���ǉ��F�����t���̃��x����`�悵�A�g�p����������Ԃ��i�������܂�Ԃ��Ă����i�Əd�Ȃ�Ȃ��悤�A�����͓��e����v�Z����j�B
+    //   rect.height�͖������āAf10DebugFontSize�ƕ�����Z�o����B
     float DrawOutlinedLabel(Rect rect, string text, Color color, bool rightAlign)
     {
         GUIStyle style = new GUIStyle(GUI.skin.label)
         {
             fontSize = f10DebugFontSize,
             fontStyle = FontStyle.Bold,
-            alignment = rightAlign ? TextAnchor.UpperRight : TextAnchor.UpperLeft, // P2は右端に寄せる
+            alignment = rightAlign ? TextAnchor.UpperRight : TextAnchor.UpperLeft, // P2�͉E�[�Ɋ񂹂�
             wordWrap = true,
         };
         style.normal.textColor = color;
@@ -2601,17 +2625,17 @@ public class Player : MonoBehaviour
     }
 
     //-----------------------------------------------------
-    // 被弾時のノックバック
+    // ��e���̃m�b�N�o�b�N
     //-----------------------------------------------------
-    // ノックバックを要求する。ヒットストップが有効な場合はその終了時（EndHitStop）に、
-    // 無効な場合はその場ですぐにApplyKnockbackを実行する。
-    // ※StartHitStopの早期return条件（enableHitStopがfalse、またはヒットストップ時間が0以下）と揃えてある。
-    //   appliedHitStopFrames: 今回の被弾で実際にStartHitStopへ渡したヒットストップのフレーム数。
+    // �m�b�N�o�b�N��v������B�q�b�g�X�g�b�v���L���ȏꍇ�͂��̏I�����iEndHitStop�j�ɁA
+    // �����ȏꍇ�͂��̏�ł�����ApplyKnockback�����s����B
+    // ��StartHitStop�̑���return�����ienableHitStop��false�A�܂��̓q�b�g�X�g�b�v���Ԃ�0�ȉ��j�Ƒ����Ă���B
+    //   appliedHitStopFrames: ����̔�e�Ŏ��ۂ�StartHitStop�֓n�����q�b�g�X�g�b�v�̃t���[�����B
     void RequestKnockback(Vector3 velocity, int appliedHitStopFrames)
     {
-        // ★追加：攻撃が当たった瞬間に、相手(自分)の今の速度をXYZすべて0にする。
-        //   前の被弾の吹き飛び中・落下中・移動中の勢いが残ったまま、ノックバックが上乗せされるのを防ぐ。
-        //   （ヒットストップ中に前の勢いのまま滑ってしまうのも防ぐ。実際にノックバックを与えるのはその後）
+        // ���ǉ��F�U�������������u�ԂɁA����(����)�̍��̑��x��XYZ���ׂ�0�ɂ���B
+        //   �O�̔�e�̐�����ђ��E�������E�ړ����̐������c�����܂܁A�m�b�N�o�b�N����悹�����̂�h���B
+        //   �i�q�b�g�X�g�b�v���ɑO�̐����̂܂܊����Ă��܂��̂��h���B���ۂɃm�b�N�o�b�N��^����̂͂��̌�j
         ZeroRigidbodyVelocity();
 
         if (enableHitStop && appliedHitStopFrames > 0)
@@ -2625,9 +2649,9 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★追加：Rigidbodyの速度（線形速度）をXYZすべて0にする。
-    //   速度のプロパティ名がUnity 6以降はlinearVelocity、それ以前はvelocityで異なるため、バージョンで切り替える。
-    //   代入で直接0にするので、同じフレームに何度呼んでも結果は同じ（AddForceで打ち消す方式のような二重適用は起きない）。
+    // ���ǉ��FRigidbody�̑��x�i���`���x�j��XYZ���ׂ�0�ɂ���B
+    //   ���x�̃v���p�e�B����Unity 6�ȍ~��linearVelocity�A����ȑO��velocity�ňقȂ邽�߁A�o�[�W�����Ő؂�ւ���B
+    //   ����Œ���0�ɂ���̂ŁA�����t���[���ɉ��x�Ă�ł����ʂ͓����iAddForce�őł����������̂悤�ȓ�d�K�p�͋N���Ȃ��j�B
     void ZeroRigidbodyVelocity()
     {
         if (rb == null) return;
@@ -2638,38 +2662,38 @@ public class Player : MonoBehaviour
 #endif
     }
 
-    // 実際にRigidbodyへ初速を与える。LaunchByThrow()と同じくAddForce(VelocityChange)を使う
-    // （rb.velocity / rb.linearVelocity のUnityバージョン差を避けるため）。
-    // ★currentStateは変更しない（通常被弾は元々状態遷移しないため、それに合わせている）。
+    // ���ۂ�Rigidbody�֏�����^����BLaunchByThrow()�Ɠ�����AddForce(VelocityChange)���g��
+    // �irb.velocity / rb.linearVelocity ��Unity�o�[�W������������邽�߁j�B
+    // ��currentState�͕ύX���Ȃ��i�ʏ��e�͌��X��ԑJ�ڂ��Ȃ����߁A����ɍ��킹�Ă���j�B
     void ApplyKnockback(Vector3 velocity)
     {
         if (rb == null) return;
 
-        // ★追加：ノックバックを加える直前に、今の速度をすべて0にしてから加える。
-        //   ヒットストップ中に重力などで付いた速度が混ざらず、与えた初速そのものがノックバックになる。
+        // ���ǉ��F�m�b�N�o�b�N�������钼�O�ɁA���̑��x�����ׂ�0�ɂ��Ă��������B
+        //   �q�b�g�X�g�b�v���ɏd�͂Ȃǂŕt�������x�������炸�A�^�����������̂��̂��m�b�N�o�b�N�ɂȂ�B
         ZeroRigidbodyVelocity();
         rb.AddForce(velocity, ForceMode.VelocityChange);
 
-        // しっかり浮くほどの上方向速度がある場合は空中扱いにして、飛んでいる間の空中ジャンプを防ぐ。
-        // 着地時はOnCollisionEnterでtrueに戻る。
-        // （ほとんど浮かない小さな値でfalseにすると、着地イベントが来ずfalseのままになる恐れがあるためしきい値を設けている）
+        // �������蕂���قǂ̏�������x������ꍇ�͋󒆈����ɂ��āA���ł���Ԃ̋󒆃W�����v��h���B
+        // ���n����OnCollisionEnter��true�ɖ߂�B
+        // �i�قƂ�Ǖ����Ȃ������Ȓl��false�ɂ���ƁA���n�C�x���g������false�̂܂܂ɂȂ鋰�ꂪ���邽�߂������l��݂��Ă���j
         if (velocity.y >= 1f) Jumpflag = false;
 
-        DLog($"[{PlayerName}] ノックバック velocity={velocity}");
+        DLog($"[{PlayerName}] �m�b�N�o�b�N velocity={velocity}");
     }
 
     //-----------------------------------------------------
-    // ガード成功時の攻撃力上昇エフェクト（次の攻撃が当たるまで出し続ける）
+    // �K�[�h�������̍U���͏㏸�G�t�F�N�g�i���̍U����������܂ŏo��������j
     //-----------------------------------------------------
 
-    // 攻撃力上昇エフェクトを開始する。すでに出ている場合は再生し直すだけで多重生成はしない。
+    // �U���͏㏸�G�t�F�N�g���J�n����B���łɏo�Ă���ꍇ�͍Đ������������ő��d�����͂��Ȃ��B
     void StartGuardBuffEffect()
     {
         if (!enableGuardBuffEffect || guardBuffEffectPrefab == null) return;
 
         if (activeGuardBuffEffect != null)
         {
-            // 連続でガード成功した場合はそのまま再生を継続（作り直さない）
+            // �A���ŃK�[�h���������ꍇ�͂��̂܂܍Đ����p���i��蒼���Ȃ��j
             if (!activeGuardBuffEffect.isPlaying) activeGuardBuffEffect.Play();
             return;
         }
@@ -2678,37 +2702,37 @@ public class Player : MonoBehaviour
             guardBuffEffectPrefab,
             transform.position + guardBuffEffectOffset,
             Quaternion.Euler(-90f, 0f, 0f),
-            transform); // プレイヤーに追従させるため子オブジェクトにする
+            transform); // �v���C���[�ɒǏ]�����邽�ߎq�I�u�W�F�N�g�ɂ���
         activeGuardBuffEffect.transform.localPosition = guardBuffEffectOffset;
         activeGuardBuffEffect.Play();
 
-        DLog($"[{PlayerName}] 攻撃力上昇エフェクト開始");
-        EffectDLog($"[{PlayerName}] 攻撃力上昇(ガードバフ)エフェクト開始 pos={activeGuardBuffEffect.transform.position}");
+        DLog($"[{PlayerName}] �U���͏㏸�G�t�F�N�g�J�n");
+        EffectDLog($"[{PlayerName}] �U���͏㏸(�K�[�h�o�t)�G�t�F�N�g�J�n pos={activeGuardBuffEffect.transform.position}");
     }
 
-    // 攻撃力上昇エフェクトを停止する（次の攻撃が当たった時に呼ばれる）
+    // �U���͏㏸�G�t�F�N�g���~����i���̍U���������������ɌĂ΂��j
     void StopGuardBuffEffect()
     {
         if (activeGuardBuffEffect == null) return;
 
-        // 新規パーティクルの発生だけ止め、出ている分は自然にフェードアウトさせる
+        // �V�K�p�[�e�B�N���̔��������~�߁A�o�Ă��镪�͎��R�Ƀt�F�[�h�A�E�g������
         activeGuardBuffEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
         Destroy(activeGuardBuffEffect.gameObject, activeGuardBuffEffect.main.startLifetime.constantMax + 0.5f);
         activeGuardBuffEffect = null;
 
-        DLog($"[{PlayerName}] 攻撃力上昇エフェクト終了");
-        EffectDLog($"[{PlayerName}] 攻撃力上昇(ガードバフ)エフェクト終了");
+        DLog($"[{PlayerName}] �U���͏㏸�G�t�F�N�g�I��");
+        EffectDLog($"[{PlayerName}] �U���͏㏸(�K�[�h�o�t)�G�t�F�N�g�I��");
     }
 
     //-----------------------------------------------------
-    // 拘束のない状態（Idle/Move/Crouch）での入力処理
+    // �S���̂Ȃ���ԁiIdle/Move/Crouch�j�ł̓��͏���
     //-----------------------------------------------------
-    // 優先度：必殺技 ＞ ジャンプ ＞ 投げ ＞ パンチ ＞ キック ＞ 仁王立ち ＞ 移動
+    // �D��x�F�K�E�Z �� �W�����v �� ���� �� �p���` �� �L�b�N �� �m������ �� �ړ�
     void HandleFreeInput()
     {
         bool isCrouchInput = moveInput.y <= crouchInputThreshold;
 
-        // --- しゃがみの状態遷移（見た目の同期は毎フレームUpdate冒頭のSyncCrouchVisual()が別途担当）---
+        // --- ���Ⴊ�݂̏�ԑJ�ځi�����ڂ̓����͖��t���[��Update�`����SyncCrouchVisual()���ʓr�S���j---
         if (isCrouchInput && currentState != PlayerState.Crouch)
         {
             EnterCrouch();
@@ -2718,7 +2742,7 @@ public class Player : MonoBehaviour
             ExitCrouch();
         }
 
-        // --- アクションボタン ---
+        // --- �A�N�V�����{�^�� ---
         if (wantSpecial)
         {
             if (CanUseSpecial())
@@ -2726,7 +2750,7 @@ public class Player : MonoBehaviour
                 EnterSpecial();
                 return;
             }
-            GaugeDLog($"[{PlayerName}] 漢気ゲージが足りず必殺技を発動できません（現在{kankiGauge}/{specialRequiredGauge}）");
+            GaugeDLog($"[{PlayerName}] ���C�Q�[�W�����肸�K�E�Z�𔭓��ł��܂���i����{kankiGauge}/{specialRequiredGauge}�j");
         }
         if (wantJump && Jumpflag)
         {
@@ -2754,7 +2778,7 @@ public class Player : MonoBehaviour
             return;
         }
 
-        // --- 移動（ボタン入力が無い時、かつしゃがみ入力でない時のみ）---
+        // --- �ړ��i�{�^�����͂��������A�����Ⴊ�ݓ��͂łȂ����̂݁j---
         if (!isCrouchInput)
         {
             if (moveInput.x >= moveInputThreshold)
@@ -2768,23 +2792,23 @@ public class Player : MonoBehaviour
             else if (currentState == PlayerState.Move)
             {
                 currentState = PlayerState.Idle;
-                lastMoveDir = MoveDirection.None; // 次に動き出した時、必ずTriggerが再発火するようにリセット
+                lastMoveDir = MoveDirection.None; // ���ɓ����o�������A�K��Trigger���Ĕ��΂���悤�Ƀ��Z�b�g
             }
         }
-        //動いていないときはアニメーターをMoveをfalseにする
+        //�����Ă��Ȃ��Ƃ��̓A�j���[�^�[��Move��false�ɂ���
         if(PlayerState.Idle == currentState)
         {
             animator.SetBool("Move", false);
         }
     }
 
-    // ★追加：アクション（パンチ・キック・ガード・投げ・必殺技・ジャンプ）へ遷移する際に、
-    //   Animatorの"Move"boolをOFFにするための共通処理。
-    //   これを呼ばないと、移動中にアクションボタンを押した瞬間、状態(currentState)側は
-    //   正しくアクションへ切り替わっているのに、Animator側だけ"Move"=trueが残り続け、
-    //   移動アニメーションが優先されているように見えてしまう。
-    //   合わせてlastMoveDirもリセットし、アクション終了後に再度動き出した時、
-    //   Move()側のTrigger発火判定（currentState != Moveの分岐）が正しく効くようにする。
+    // ���ǉ��F�A�N�V�����i�p���`�E�L�b�N�E�K�[�h�E�����E�K�E�Z�E�W�����v�j�֑J�ڂ���ۂɁA
+    //   Animator��"Move"bool��OFF�ɂ��邽�߂̋��ʏ����B
+    //   ������Ă΂Ȃ��ƁA�ړ����ɃA�N�V�����{�^�����������u�ԁA���(currentState)����
+    //   �������A�N�V�����֐؂�ւ���Ă���̂ɁAAnimator������"Move"=true���c�葱���A
+    //   �ړ��A�j���[�V�������D�悳��Ă���悤�Ɍ����Ă��܂��B
+    //   ���킹��lastMoveDir�����Z�b�g���A�A�N�V�����I����ɍēx�����o�������A
+    //   Move()����Trigger���Δ���icurrentState != Move�̕���j�������������悤�ɂ���B
     void StopMoveAnimation()
     {
         animator.SetBool("Move", false);
@@ -2792,55 +2816,55 @@ public class Player : MonoBehaviour
         lastMoveDir = MoveDirection.None;
     }
 
-    // プレイヤーを指定方向へ移動させ、その方向を向かせる
+    // �v���C���[���w������ֈړ������A���̕�������������
     void Move(Vector3 worldDirection)
     {
         bool isForward = worldDirection == Vector3.forward;
         MoveDirection newDir = isForward ? MoveDirection.Forward : MoveDirection.Backward;
 
-        // ★追加：移動を開始した瞬間、または移動方向が切り替わった瞬間だけTriggerを発火する
-        //   （毎フレーム発火させると同じアニメーションが再生し直され続けてカクつくため）
+        // ���ǉ��F�ړ����J�n�����u�ԁA�܂��͈ړ��������؂�ւ�����u�Ԃ���Trigger�𔭉΂���
+        //   �i���t���[�����΂�����Ɠ����A�j���[�V�������Đ��������ꑱ���ăJ�N�����߁j
         if (currentState != PlayerState.Move || newDir != lastMoveDir)
         {
             animator.SetBool("Move", true);
             lastMoveDir = newDir;
         }
 
-        // ★追加：スティックの倒し具合（0〜1）に応じて、移動アニメーションの再生速度を変化させる
-        //   moveInput.xの絶対値をそのまま「移動量」として扱い、minMoveAnimSpeed〜maxMoveAnimSpeedの範囲へ変換する
+        // ���ǉ��F�X�e�B�b�N�̓|����i0?1�j�ɉ����āA�ړ��A�j���[�V�����̍Đ����x��ω�������
+        //   moveInput.x�̐�Βl�����̂܂܁u�ړ��ʁv�Ƃ��Ĉ����AminMoveAnimSpeed?maxMoveAnimSpeed�͈̔͂֕ϊ�����
         float inputMagnitude = Mathf.Clamp01(Mathf.Abs(moveInput.x));
         float animSpeed = Mathf.Lerp(minMoveAnimSpeed, maxMoveAnimSpeed, inputMagnitude);
         animator.SetFloat("MoveSpeedMultiplier", animSpeed);
 
-        // ★追加：実際の移動速度（moveSpeed）も同じinputMagnitudeを使って可変にする。
-        //   入力が閾値ギリギリ（0扱い）でもminMoveSpeedRatio分は必ず動き、最大まで倒すとmoveSpeedそのまま出る。
+        // ���ǉ��F���ۂ̈ړ����x�imoveSpeed�j������inputMagnitude���g���ĉςɂ���B
+        //   ���͂�臒l�M���M���i0�����j�ł�minMoveSpeedRatio���͕K�������A�ő�܂œ|����moveSpeed���̂܂܏o��B
         float speedRatio = Mathf.Lerp(minMoveSpeedRatio, 1f, inputMagnitude);
         float actualMoveSpeed = moveSpeed * speedRatio;
 
         currentState = PlayerState.Move;
-        // ※Space.Worldを指定し、向きが変わっても常に世界座標の指定方向へ移動するようにする
+        // ��Space.World���w�肵�A�������ς���Ă���ɐ��E���W�̎w������ֈړ�����悤�ɂ���
         transform.Translate(worldDirection * actualMoveSpeed * Time.deltaTime, Space.World);
 
-        // ★変更：自動向き合いがONの間は、移動方向ではなく相手の方向を向く（LateUpdateのAutoFaceOpponentが担当）。
-        //   従来の「移動方向を向く」挙動は、自動向き合いをOFFにした時だけ使う。
+        // ���ύX�F��������������ON�̊Ԃ́A�ړ������ł͂Ȃ�����̕����������iLateUpdate��AutoFaceOpponent���S���j�B
+        //   �]���́u�ړ������������v�����́A��������������OFF�ɂ����������g���B
         if (!enableAutoFacing) FaceDirection(worldDirection);
 
-        // ★追加：相手から離れる方向（後退）かどうかをAnimatorへ伝える。
-        //   相手の方を向いたまま下がるため、Animator側で後退モーションへ分岐させたい場合に使う（任意）。
+        // ���ǉ��F���肩�痣�������i��ށj���ǂ�����Animator�֓`����B
+        //   ����̕����������܂܉����邽�߁AAnimator���Ō�ރ��[�V�����֕��򂳂������ꍇ�Ɏg���i�C�Ӂj�B
         if (hasMoveBackwardParam) animator.SetBool("MoveBackward", IsRetreating(worldDirection));
 
-        // 漢気ゲージ：相手から離れる方向へ移動している間は減らす
+        // ���C�Q�[�W�F���肩�痣�������ֈړ����Ă���Ԃ͌��炷
         ApplyGaugeLossIfRetreating(worldDirection);
     }
 
-    // 相手の現在位置を基準に「今の移動方向が相手から離れる方向かどうか」を判定し、
-    // 離れる方向であれば漢気ゲージを1秒あたりgaugeLossOnRetreatだけ減らす。
+    // ����̌��݈ʒu����Ɂu���̈ړ����������肩�痣���������ǂ����v�𔻒肵�A
+    // ���������ł���Ί��C�Q�[�W��1�b������gaugeLossOnRetreat�������炷�B
     void ApplyGaugeLossIfRetreating(Vector3 worldDirection)
     {
         Transform opponentTf = GetOpponentTransform();
         if (opponentTf == null)
         {
-            GaugeDLog($"[{PlayerName}] 後退判定スキップ：enemyPlayer/enemyのどちらもInspectorで未設定です。");
+            GaugeDLog($"[{PlayerName}] ��ޔ���X�L�b�v�FenemyPlayer/enemy�̂ǂ����Inspector�Ŗ��ݒ�ł��B");
             return;
         }
 
@@ -2848,19 +2872,19 @@ public class Player : MonoBehaviour
         toOpponent.y = 0f;
         if (toOpponent.sqrMagnitude < 0.0001f) return;
 
-        // 移動方向と「相手への方向」の内積が負＝相手から離れる方向へ動いている
+        // �ړ������Ɓu����ւ̕����v�̓��ς��������肩�痣�������֓����Ă���
         float dot = Vector3.Dot(worldDirection.normalized, toOpponent.normalized);
-        GaugeDLog($"[{PlayerName}] 後退判定：dot={dot:F2}（負なら後退とみなす）");
+        GaugeDLog($"[{PlayerName}] ��ޔ���Fdot={dot:F2}�i���Ȃ��ނƂ݂Ȃ��j");
         if (dot < 0f)
         {
             ReduceKankiGauge(gaugeLossOnRetreat * Time.deltaTime);
         }
     }
 
-    // ★追加：指定した相手が、自分の向いている方向に対して前方にいるか（true）後方にいるか（false）を返す。
-    //   高さ(Y)は無視し、XZ平面上で自分の正面(transform.forward)と相手への方向の内積で判定する
-    //   （後退判定ApplyGaugeLossIfRetreating()や投げの向き判定と同じ考え方）。
-    //   ほぼ同じ位置に重なっていて方向が決められない場合は、前方として扱う。
+    // ���ǉ��F�w�肵�����肪�A�����̌����Ă�������ɑ΂��đO���ɂ��邩�itrue�j����ɂ��邩�ifalse�j��Ԃ��B
+    //   ����(Y)�͖������AXZ���ʏ�Ŏ����̐���(transform.forward)�Ƒ���ւ̕����̓��ςŔ��肷��
+    //   �i��ޔ���ApplyGaugeLossIfRetreating()�Ⓤ���̌�������Ɠ����l�����j�B
+    //   �قړ����ʒu�ɏd�Ȃ��Ă��ĕ��������߂��Ȃ��ꍇ�́A�O���Ƃ��Ĉ����B
     bool IsOpponentInFront(Transform opponentTf)
     {
         Vector3 toOpponent = opponentTf.position - transform.position;
@@ -2874,11 +2898,11 @@ public class Player : MonoBehaviour
         return Vector3.Dot(forward.normalized, toOpponent.normalized) >= 0f;
     }
 
-    // 対人戦(enemyPlayer)／対CPU戦(enemy)どちらの場合でも、相手のTransformを取得する
-    // ★変更：enemy(CPU)が設定されているならCPU戦とみなし、enemyを優先する。
-    //   以前はenemyPlayerを先に見ていたため、CPU戦でenemyPlayerに別のPlayer（古い参照やシーン内の別Player）が
-    //   入っていると、Enemyではなくそのオブジェクトを基準に向きが決まり、プレイヤーだけ反転することがあった。
-    Transform opponentLogged; // ★追加：どの相手を基準にしているかをログに出すための記録
+    // �ΐl��(enemyPlayer)�^��CPU��(enemy)�ǂ���̏ꍇ�ł��A�����Transform���擾����
+    // ���ύX�Fenemy(CPU)���ݒ肳��Ă���Ȃ�CPU��Ƃ݂Ȃ��Aenemy��D�悷��B
+    //   �ȑO��enemyPlayer���Ɍ��Ă������߁ACPU���enemyPlayer�ɕʂ�Player�i�Â��Q�Ƃ�V�[�����̕�Player�j��
+    //   �����Ă���ƁAEnemy�ł͂Ȃ����̃I�u�W�F�N�g����Ɍ��������܂�A�v���C���[�������]���邱�Ƃ��������B
+    Transform opponentLogged; // ���ǉ��F�ǂ̑������ɂ��Ă��邩�����O�ɏo�����߂̋L�^
     Transform GetOpponentTransform()
     {
         Transform tf = null;
@@ -2888,16 +2912,16 @@ public class Player : MonoBehaviour
         if (tf != opponentLogged)
         {
             opponentLogged = tf;
-            if (tf != null) Debug.Log($"[{PlayerName}] 向き合いの基準にする相手: '{tf.gameObject.name}'", this);
+            if (tf != null) Debug.Log($"[{PlayerName}] ���������̊�ɂ��鑊��: '{tf.gameObject.name}'", this);
         }
         return tf;
     }
 
-    // ★追加：相手の方向へ自動で向きを変える（LateUpdateから毎フレーム呼ばれる）。
-    //   ・向きは「相手が+Z側にいれば+Z、-Z側にいれば-Z」の2択（P1/P2の間合いはZ軸で決まる仕様に合わせている）。
-    //   ・相手がジャンプで頭上を飛び越えて左右が入れ替わった場合も、自動で向き直る。
-    //   ・掴まれ中／投げ飛ばされ中／ダウン中／死亡中は、演出を崩さないよう向きを変えない。
-    //   ・最初に相手を認識した1回だけは補間せず即座に向き合わせる（開始直後にゆっくり回る見た目を防ぐ）。
+    // ���ǉ��F����̕����֎����Ō�����ς���iLateUpdate���疈�t���[���Ă΂��j�B
+    //   �E�����́u���肪+Z���ɂ����+Z�A-Z���ɂ����-Z�v��2���iP1/P2�̊ԍ�����Z���Ō��܂�d�l�ɍ��킹�Ă���j�B
+    //   �E���肪�W�����v�œ�����щz���č��E������ւ�����ꍇ���A�����Ō�������B
+    //   �E�͂܂ꒆ�^������΂��ꒆ�^�_�E�����^���S���́A���o������Ȃ��悤������ς��Ȃ��B
+    //   �E�ŏ��ɑ����F������1�񂾂��͕�Ԃ��������Ɍ������킹��i�J�n����ɂ�������錩���ڂ�h���j�B
     void AutoFaceOpponent()
     {
         if (!enableAutoFacing) return;
@@ -2930,7 +2954,7 @@ public class Player : MonoBehaviour
         if (opponentTf == null) return;
 
         float deltaZ = opponentTf.position.z - transform.position.z;
-        if (Mathf.Abs(deltaZ) < autoFaceDeadZone) return; // ほぼ同じ位置：今の向きを維持
+        if (Mathf.Abs(deltaZ) < autoFaceDeadZone) return; // �قړ����ʒu�F���̌������ێ�
 
         float desiredSign = Mathf.Sign(deltaZ);
 
@@ -2942,22 +2966,22 @@ public class Player : MonoBehaviour
             return;
         }
 
-        // ★追加：向きの切り替えにヒステリシスを持たせる。
-        //   相手とほぼ密着している間はZの左右関係が不安定（押しのけ・ノックバック・攻撃の踏み込み等）なので、
-        //   相手が反対側へ autoFaceFlipThreshold 以上回り込んだ時だけ、向きを切り替える。
-        //   ★CPU戦(enemyが設定されている時)限定。対人戦は閾値0（＝従来どおり毎フレーム即座に相手の方向へ）。
+        // ���ǉ��F�����̐؂�ւ��Ƀq�X�e���V�X����������B
+        //   ����Ƃقږ������Ă���Ԃ�Z�̍��E�֌W���s����i�����̂��E�m�b�N�o�b�N�E�U���̓��ݍ��ݓ��j�Ȃ̂ŁA
+        //   ���肪���Α��� autoFaceFlipThreshold �ȏ��荞�񂾎������A������؂�ւ���B
+        //   ��CPU��(enemy���ݒ肳��Ă��鎞)����B�ΐl���臒l0�i���]���ǂ��薈�t���[�������ɑ���̕����ցj�B
         bool isCpuBattle = enemy != null;
         float flipThreshold = isCpuBattle ? autoFaceFlipThreshold : 0f;
         if (desiredSign != autoFaceSign && Mathf.Abs(deltaZ) >= flipThreshold)
         {
             autoFaceSign = desiredSign;
-            if (isCpuBattle) Debug.Log($"[{PlayerName}] 向きを切り替え: {(autoFaceSign > 0f ? "+Z" : "-Z")}方向へ（相手とのZ差={deltaZ:F2}, 状態={currentState}）", this);
+            if (isCpuBattle) Debug.Log($"[{PlayerName}] ������؂�ւ�: {(autoFaceSign > 0f ? "+Z" : "-Z")}�����ցi����Ƃ�Z��={deltaZ:F2}, ���={currentState}�j", this);
         }
 
         FaceDirection(new Vector3(0f, 0f, autoFaceSign));
     }
 
-    // ★追加：指定した移動方向が「相手から離れる方向（後退）」かどうかを返す。
+    // ���ǉ��F�w�肵���ړ��������u���肩�痣�������i��ށj�v���ǂ�����Ԃ��B
     bool IsRetreating(Vector3 worldDirection)
     {
         Transform opponentTf = GetOpponentTransform();
@@ -2969,7 +2993,7 @@ public class Player : MonoBehaviour
         return Mathf.Sign(deltaZ) != Mathf.Sign(worldDirection.z);
     }
 
-    // 指定した世界座標方向へプレイヤーの向きを滑らかに回転させる
+    // �w�肵�����E���W�����փv���C���[�̌��������炩�ɉ�]������
     void FaceDirection(Vector3 worldDirection)
     {
         if (worldDirection.sqrMagnitude < 0.0001f) return;
@@ -2978,12 +3002,12 @@ public class Player : MonoBehaviour
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, turnSpeed * Time.deltaTime);
     }
 
-    // ★追加：しゃがみの見た目（コライダー・アニメーター）を、スティック下入力の有無だけで同期する。
-    //   currentStateが何であっても（攻撃中・ガード中等でも）この判定だけで見た目が決まるため、
-    //   「入力を離したのにしゃがみっぱなしになる」不具合が起きなくなる。
-    // ★追加：右向き(+Z)か左向き(-Z)かを返す。
-    //   右入力＝Move(Vector3.forward)なので、+Z側を向いていれば右向きとみなす。
-    //   Slerpで回転途中でもZ成分の符号で判定できる。
+    // ���ǉ��F���Ⴊ�݂̌����ځi�R���C�_�[�E�A�j���[�^�[�j���A�X�e�B�b�N�����̗͂L�������œ�������B
+    //   currentState�����ł����Ă��i�U�����E�K�[�h�����ł��j���̔��肾���Ō����ڂ����܂邽�߁A
+    //   �u���͂𗣂����̂ɂ��Ⴊ�݂��ςȂ��ɂȂ�v�s����N���Ȃ��Ȃ�B
+    // ���ǉ��F�E����(+Z)��������(-Z)����Ԃ��B
+    //   �E���́�Move(Vector3.forward)�Ȃ̂ŁA+Z���������Ă���ΉE�����Ƃ݂Ȃ��B
+    //   Slerp�ŉ�]�r���ł�Z�����̕����Ŕ���ł���B
     bool IsFacingRight()
     {
         return transform.forward.z >= 0f;
@@ -2991,18 +3015,18 @@ public class Player : MonoBehaviour
 
     void SyncCrouchVisual(bool isCrouchInput)
     {
-        if (isCrouchInput == isCrouchVisual) return; // 前フレームから変化なし
+        if (isCrouchInput == isCrouchVisual) return; // �O�t���[������ω��Ȃ�
 
         if (isCrouchInput)
         {
             Player_Collider.height = crouchHeight;
             Player_Collider.center = crouchCenter;
 
-            // ★追加：しゃがむ瞬間の向きをAnimatorへ渡す（"Crouch"より先にセットすること）。
-            //   Animator側で CrouchFacingRight の値によって右向き/左向きのしゃがみアニメーションへ分岐させる。
+            // ���ǉ��F���Ⴊ�ޏu�Ԃ̌�����Animator�֓n���i"Crouch"����ɃZ�b�g���邱�Ɓj�B
+            //   Animator���� CrouchFacingRight �̒l�ɂ���ĉE����/�������̂��Ⴊ�݃A�j���[�V�����֕��򂳂���B
             bool facingRight = IsFacingRight();
             animator.SetBool("CrouchFacingRight", facingRight);
-            DLog($"[{PlayerName}] しゃがみ開始：{(facingRight ? "右向き" : "左向き")}");
+            DLog($"[{PlayerName}] ���Ⴊ�݊J�n�F{(facingRight ? "�E����" : "������")}");
         }
         else
         {
@@ -3013,70 +3037,70 @@ public class Player : MonoBehaviour
         isCrouchVisual = isCrouchInput;
     }
 
-    // しゃがみ開始処理（状態機械のcurrentStateのみ管理。見た目はSyncCrouchVisual()が別途担当）
+    // ���Ⴊ�݊J�n�����i��ԋ@�B��currentState�̂݊Ǘ��B�����ڂ�SyncCrouchVisual()���ʓr�S���j
     void EnterCrouch()
     {
-        // ★修正：左右移動入力が入ったままスティックを下に倒してしゃがみへ遷移した際、
-        //   Moveアニメーション(bool)がONのまま残り、しゃがみアニメーションが正しく
-        //   表示されない（＝しゃがめないように見える）不具合を解消する。
+        // ���C���F���E�ړ����͂��������܂܃X�e�B�b�N�����ɓ|���Ă��Ⴊ�݂֑J�ڂ����ہA
+        //   Move�A�j���[�V����(bool)��ON�̂܂܎c��A���Ⴊ�݃A�j���[�V������������
+        //   �\������Ȃ��i�����Ⴊ�߂Ȃ��悤�Ɍ�����j�s�����������B
         StopMoveAnimation();
 
         currentState = PlayerState.Crouch;
     }
 
-    // しゃがみ終了処理（状態機械のcurrentStateのみ管理。見た目はSyncCrouchVisual()が別途担当）
+    // ���Ⴊ�ݏI�������i��ԋ@�B��currentState�̂݊Ǘ��B�����ڂ�SyncCrouchVisual()���ʓr�S���j
     void ExitCrouch()
     {
         currentState = PlayerState.Idle;
     }
 
-    // ジャンプ処理。アニメーション再生とRigidbodyへの力の付与を行う
+    // �W�����v�����B�A�j���[�V�����Đ���Rigidbody�ւ̗͂̕t�^���s��
     void DoJump()
     {
-        // ★修正：移動中にジャンプへ遷移した際、Moveアニメーション(bool)がONのまま残り、
-        //   ジャンプよりも移動が優先されているように見えてしまう不具合を解消する。
+        // ���C���F�ړ����ɃW�����v�֑J�ڂ����ہAMove�A�j���[�V����(bool)��ON�̂܂܎c��A
+        //   �W�����v�����ړ����D�悳��Ă���悤�Ɍ����Ă��܂��s�����������B
         StopMoveAnimation();
 
-        animator.ResetTrigger("Land"); // ★追加：前回の着地フラグが未消費で残っていた場合に、次の着地で誤再生しないよう消す
+        animator.ResetTrigger("Land"); // ���ǉ��F�O��̒��n�t���O��������Ŏc���Ă����ꍇ�ɁA���̒��n�Ō�Đ����Ȃ��悤����
         animator.SetTrigger("Jump");
         rb.AddForce(force);
-        Jumpflag = false; // 空中に出たので再度ジャンプできないようにする
+        Jumpflag = false; // �󒆂ɏo���̂ōēx�W�����v�ł��Ȃ��悤�ɂ���
     }
 
     //-----------------------------------------------------
-    // 拘束のある状態（攻撃・ガード・投げ）への遷移
+    // �S���̂����ԁi�U���E�K�[�h�E�����j�ւ̑J��
     //-----------------------------------------------------
 
-    // パンチ（弱攻撃）処理。地上か空中かでアニメーションと当たり判定を切り替える
+    // �p���`�i��U���j�����B�n�ォ�󒆂��ŃA�j���[�V�����Ɠ����蔻���؂�ւ���
     void EnterPunch()
     {
-        // ★リザルト画面モード：パンチが実際に出たことを通知する（クールダウン中は、ここへ来ないので通知されない）
+        // �����U���g��ʃ��[�h�F�p���`�����ۂɏo�����Ƃ�ʒm����i�N�[���_�E�����́A�����֗��Ȃ��̂Œʒm����Ȃ��j
         if (isResultMode) ResultAttackPressed?.Invoke(this);
 
-        // ★修正：移動中にパンチへ遷移した際、Moveアニメーション(bool)がONのまま残り、
-        //   パンチよりも移動が優先されているように見えてしまう不具合を解消する。
+        // ���C���F�ړ����Ƀp���`�֑J�ڂ����ہAMove�A�j���[�V����(bool)��ON�̂܂܎c��A
+        //   �p���`�����ړ����D�悳��Ă���悤�Ɍ����Ă��܂��s�����������B
         StopMoveAnimation();
 
         ResetAttackTriggers();
         currentState = PlayerState.Punch;
         stateTimer = punchMissFrames;
         currentAttackMissFrames = punchMissFrames;
-        attackLandedThisAttack = false; // 空振り判定用にリセット
-        ResetMultiHitCount();           // 多段ヒットカウントを新しい攻撃用にリセット
+        attackLandedThisAttack = false; // ��U�蔻��p�Ƀ��Z�b�g
+        ResetMultiHitCount();           // ���i�q�b�g�J�E���g��V�����U���p�Ƀ��Z�b�g
 
-        // パンチの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映して攻撃力を確定する
+        // �p���`�̍U���́iInspector�ݒ�l�j����ɁA���C�Q�[�W�␳�𔽉f���čU���͂��m�肷��
         baseAtk = GetAttackPower(AttackType.Punch);
         UpdateAtkByGauge();
 
         if (Jumpflag)
         {
-            //弱攻撃(パンチ)
+            //��U��(�p���`)
             animator.SetTrigger("Punch");
             RightHand.enabled = true;
         }
         else
         {
-            //空中攻撃
+            //�󒆍U��
             animator.SetTrigger("Flying-kick");
             LeftFoot.enabled = true;
             LeftLeg.enabled = true;
@@ -3084,19 +3108,19 @@ public class Player : MonoBehaviour
         }
     }
 
-    // キック処理。スティックの上下入力で通常／上／下キックに分岐する
+    // �L�b�N�����B�X�e�B�b�N�̏㉺���͂Œʏ�^��^���L�b�N�ɕ��򂷂�
     void EnterKick(bool isCrouchInput)
     {
-        // ★リザルト画面モード：キックが実際に出たことを通知する（クールダウン中は、ここへ来ないので通知されない）
+        // �����U���g��ʃ��[�h�F�L�b�N�����ۂɏo�����Ƃ�ʒm����i�N�[���_�E�����́A�����֗��Ȃ��̂Œʒm����Ȃ��j
         if (isResultMode) ResultAttackPressed?.Invoke(this);
 
-        // ★修正：移動中にキックへ遷移した際、Moveアニメーション(bool)がONのまま残り、
-        //   キックよりも移動が優先されているように見えてしまう不具合を解消する。
+        // ���C���F�ړ����ɃL�b�N�֑J�ڂ����ہAMove�A�j���[�V����(bool)��ON�̂܂܎c��A
+        //   �L�b�N�����ړ����D�悳��Ă���悤�Ɍ����Ă��܂��s�����������B
         StopMoveAnimation();
 
         ResetAttackTriggers();
-        attackLandedThisAttack = false; // 空振り判定用にリセット
-        ResetMultiHitCount();           // 多段ヒットカウントを新しい攻撃用にリセット
+        attackLandedThisAttack = false; // ��U�蔻��p�Ƀ��Z�b�g
+        ResetMultiHitCount();           // ���i�q�b�g�J�E���g��V�����U���p�Ƀ��Z�b�g
 
         if (isCrouchInput)
         {
@@ -3107,7 +3131,7 @@ public class Player : MonoBehaviour
             RightFoot.enabled = true;
             RightLeg.enabled = true;
 
-            // 下キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
+            // ���L�b�N�̍U���́iInspector�ݒ�l�j����ɁA���C�Q�[�W�␳�𔽉f����
             baseAtk = GetAttackPower(AttackType.DownKick);
             UpdateAtkByGauge();
         }
@@ -3117,12 +3141,12 @@ public class Player : MonoBehaviour
             stateTimer = upKickMissFrames;
             currentAttackMissFrames = upKickMissFrames;
             animator.SetTrigger("UpKick");
-            DLog($"[{PlayerName}] UpKick発動：Triggerを立てました（moveInput.y={moveInput.y:F2}）");
-            DebugUpKickAnimator(); // ★デバッグ：Animatorが実際にどのステートへ遷移したかを確認する
+            DLog($"[{PlayerName}] UpKick�����FTrigger�𗧂Ă܂����imoveInput.y={moveInput.y:F2}�j");
+            DebugUpKickAnimator(); // ���f�o�b�O�FAnimator�����ۂɂǂ̃X�e�[�g�֑J�ڂ��������m�F����
             RightFoot.enabled = true;
             RightLeg.enabled = true;
 
-            // 上キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
+            // ��L�b�N�̍U���́iInspector�ݒ�l�j����ɁA���C�Q�[�W�␳�𔽉f����
             baseAtk = GetAttackPower(AttackType.UpKick);
             UpdateAtkByGauge();
         }
@@ -3136,16 +3160,16 @@ public class Player : MonoBehaviour
             RightUpLeg.enabled = true;
             RightLeg.enabled = true;
 
-            // 通常キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
+            // �ʏ�L�b�N�̍U���́iInspector�ݒ�l�j����ɁA���C�Q�[�W�␳�𔽉f����
             baseAtk = GetAttackPower(AttackType.Kick);
             UpdateAtkByGauge();
         }
     }
 
-    // ★デバッグ：UpKickのTriggerを立てた後、Animatorが実際に何を再生しているかをログに出す。
-    //   ・"UpKick"パラメータがAnimatorに存在するか／Trigger型か
-    //   ・0.15秒後に再生されているクリップ名、遷移中かどうか、animator.speed、レイヤー数
-    //   enableDebugLogがONの時だけ動く。原因が分かったら呼び出しごと削除してよい。
+    // ���f�o�b�O�FUpKick��Trigger�𗧂Ă���AAnimator�����ۂɉ����Đ����Ă��邩�����O�ɏo���B
+    //   �E"UpKick"�p�����[�^��Animator�ɑ��݂��邩�^Trigger�^��
+    //   �E0.15�b��ɍĐ�����Ă���N���b�v���A�J�ڒ����ǂ����Aanimator.speed�A���C���[��
+    //   enableDebugLog��ON�̎����������B����������������Ăяo�����ƍ폜���Ă悢�B
     void DebugUpKickAnimator()
     {
         if (!enableDebugLog || animator == null) return;
@@ -3156,12 +3180,12 @@ public class Player : MonoBehaviour
             if (p.name == "UpKick")
             {
                 found = true;
-                DLog($"[{PlayerName}] UpKickパラメータ確認：型={p.type}（Triggerなら正常）");
+                DLog($"[{PlayerName}] UpKick�p�����[�^�m�F�F�^={p.type}�iTrigger�Ȃ琳��j");
             }
         }
         if (!found)
         {
-            Debug.LogError($"[{PlayerName}] AnimatorにUpKickというパラメータが存在しません。名前の変更・削除がないか確認してください。", this);
+            Debug.LogError($"[{PlayerName}] Animator��UpKick�Ƃ����p�����[�^�����݂��܂���B���O�̕ύX�E�폜���Ȃ����m�F���Ă��������B", this);
         }
 
         StartCoroutine(LogAnimatorStateAfter(0.15f));
@@ -3171,17 +3195,17 @@ public class Player : MonoBehaviour
     {
         yield return new WaitForSeconds(delay);
         var clips = animator.GetCurrentAnimatorClipInfo(0);
-        string clipName = clips.Length > 0 ? clips[0].clip.name : "(なし)";
+        string clipName = clips.Length > 0 ? clips[0].clip.name : "(�Ȃ�)";
         float clipLength = clips.Length > 0 ? clips[0].clip.length : 0f;
         var st = animator.GetCurrentAnimatorStateInfo(0);
-        DLog($"[{PlayerName}] UpKick発動{delay}秒後：再生中クリップ={clipName}（クリップ長={clipLength:F2}秒） / ステートのSpeed={st.speed} / Multiplier(パラメータ)の現在値={st.speedMultiplier} / 遷移中={animator.IsInTransition(0)} / animator.speed={animator.speed} / レイヤー数={animator.layerCount}");
+        DLog($"[{PlayerName}] UpKick����{delay}�b��F�Đ����N���b�v={clipName}�i�N���b�v��={clipLength:F2}�b�j / �X�e�[�g��Speed={st.speed} / Multiplier(�p�����[�^)�̌��ݒl={st.speedMultiplier} / �J�ڒ�={animator.IsInTransition(0)} / animator.speed={animator.speed} / ���C���[��={animator.layerCount}");
     }
 
-    // ★変更：Animatorの"Guard"(Trigger)を、Guard状態に「入った瞬間」だけ立てる。
-    //   Guardへ入る／出る経路は複数あるため（通常のガード、被弾、掴まれ、F6デバッグの切り替え等）、
-    //   個々の箇所で出し入れせず、状態だけを見て毎フレーム同期する。
-    //   Boolと違いトリガーは「出る」合図を持たないため、Guardから抜けた時は未消費のトリガーを消すだけにし、
-    //   仁王立ちステートから抜ける遷移はAnimator側（Exit Time等）で設定する。
+    // ���ύX�FAnimator��"Guard"(Trigger)���AGuard��ԂɁu�������u�ԁv�������Ă�B
+    //   Guard�֓���^�o��o�H�͕������邽�߁i�ʏ�̃K�[�h�A��e�A�͂܂�AF6�f�o�b�O�̐؂�ւ����j�A
+    //   �X�̉ӏ��ŏo�����ꂹ���A��Ԃ��������Ė��t���[����������B
+    //   Bool�ƈႢ�g���K�[�́u�o��v���}�������Ȃ����߁AGuard���甲�������͖�����̃g���K�[�����������ɂ��A
+    //   �m�������X�e�[�g���甲����J�ڂ�Animator���iExit Time���j�Őݒ肷��B
     void SyncGuardAnimation()
     {
         if (!hasGuardParam || animator == null) return;
@@ -3193,29 +3217,29 @@ public class Player : MonoBehaviour
 
         if (inGuard)
         {
-            // Guardに入った瞬間：仁王立ちアニメーションを1回発火する
+            // Guard�ɓ������u�ԁF�m�������A�j���[�V������1�񔭉΂���
             animator.SetTrigger(GuardParam);
         }
         else
         {
-            // Guardを抜けた：未消費の"Guard"トリガーが残って後から誤再生されないよう消しておく
+            // Guard�𔲂����F�������"Guard"�g���K�[���c���Čォ���Đ�����Ȃ��悤�����Ă���
             animator.ResetTrigger(GuardParam);
-            // ガードを抜けた後に、未消費のGuard-successトリガーが残って後から誤再生されないよう消しておく
+            // �K�[�h�𔲂�����ɁA�������Guard-success�g���K�[���c���Čォ���Đ�����Ȃ��悤�����Ă���
             if (hasGuardSuccessParam) animator.ResetTrigger(GuardSuccessParam);
         }
     }
 
-    // 仁王立ち（ガード）処理。ガードフラグを立て、演出用パーティクルを再生する
+    // �m�������i�K�[�h�j�����B�K�[�h�t���O�𗧂āA���o�p�p�[�e�B�N�����Đ�����
     void EnterGuard()
     {
-        // ★修正：移動中にガードへ遷移した際、Moveアニメーション(bool)がONのまま残り、
-        //   ガードよりも移動が優先されているように見えてしまう不具合を解消する。
+        // ���C���F�ړ����ɃK�[�h�֑J�ڂ����ہAMove�A�j���[�V����(bool)��ON�̂܂܎c��A
+        //   �K�[�h�����ړ����D�悳��Ă���悤�Ɍ����Ă��܂��s�����������B
         StopMoveAnimation();
 
         currentState = PlayerState.Guard;
         stateTimer = guardFrames;
         isGuarding = true;
-        guardBlockedThisGuard = false; // 今回の仁王立ちでまだ受け止めていない（終了時もfalseなら失敗）
+        guardBlockedThisGuard = false; // ����̐m�������ł܂��󂯎~�߂Ă��Ȃ��i�I������false�Ȃ玸�s�j
 
         ParticleSystem newParticle = Instantiate(
             Men_particle,
@@ -3223,91 +3247,91 @@ public class Player : MonoBehaviour
             Quaternion.Euler(-90f, 0f, 0f));
         newParticle.Play();
         Destroy(newParticle.gameObject, 1.0f);
-        EffectDLog($"[{PlayerName}] 仁王立ちエフェクト発生 pos={newParticle.transform.position}");
+        EffectDLog($"[{PlayerName}] �m�������G�t�F�N�g���� pos={newParticle.transform.position}");
     }
 
-    // 投げ（掴み）処理。★仕様変更：この時点ではまだ投げ飛ばさず、
-    //   手の当たり判定が接触した相手を「掴まれ状態(Grabbed)」へ移行させるだけにする。
-    //   実際に相手を投げ飛ばす（放物線状に飛ばす）のは、この掴み拘束(throwFrames)が終わる瞬間
-    //   （TickBusyState→ResolveThrowLaunch）であり、掴んでいる間の移動スティック入力で方向が決まる。
+    // �����i�͂݁j�����B���d�l�ύX�F���̎��_�ł͂܂�������΂����A
+    //   ��̓����蔻�肪�ڐG����������u�͂܂���(Grabbed)�v�ֈڍs�����邾���ɂ���B
+    //   ���ۂɑ���𓊂���΂��i��������ɔ�΂��j�̂́A���̒͂ݍS��(throwFrames)���I���u��
+    //   �iTickBusyState��ResolveThrowLaunch�j�ł���A�͂�ł���Ԃ̈ړ��X�e�B�b�N���͂ŕ��������܂�B
     void EnterThrow()
     {
-        // ★修正：移動中に投げへ遷移した際、Moveアニメーション(bool)がONのまま残り、
-        //   投げよりも移動が優先されているように見えてしまう不具合を解消する。
+        // ���C���F�ړ����ɓ����֑J�ڂ����ہAMove�A�j���[�V����(bool)��ON�̂܂܎c��A
+        //   ���������ړ����D�悳��Ă���悤�Ɍ����Ă��܂��s�����������B
         StopMoveAnimation();
 
         currentState = PlayerState.Throw;
         stateTimer = throwFrames;
-        animator.SetTrigger("Throw-start"); // 掴み（ホールド）モーション。飛ばす瞬間は別トリガー"Throw-release"を使う
+        animator.SetTrigger("Throw-start"); // �͂݁i�z�[���h�j���[�V�����B��΂��u�Ԃ͕ʃg���K�["Throw-release"���g��
         grabbedTarget = null;
 
-        // ★変更：掴みの成立を「間合い(Z距離)の判定」から「手の当たり判定の接触」へ変更した。
-        //   投げ動作の間、左手(P-LeftHand)・左前腕(P-LeftForeArm)の当たり判定をONにしておき、
-        //   相手の体に触れた瞬間に掴みが成立する（相手側のOnTriggerEnter → OnGrabHitboxContact）。
-        //   触れないまま投げ動作(throwFrames)が終われば空振りで、掴めなかった時と同じく何も起きずにIdleへ戻る。
+        // ���ύX�F�݂͂̐������u�ԍ���(Z����)�̔���v����u��̓����蔻��̐ڐG�v�֕ύX�����B
+        //   ��������̊ԁA����(P-LeftHand)�E���O�r(P-LeftForeArm)�̓����蔻���ON�ɂ��Ă����A
+        //   ����̑̂ɐG�ꂽ�u�Ԃɒ݂͂���������i���葤��OnTriggerEnter �� OnGrabHitboxContact�j�B
+        //   �G��Ȃ��܂ܓ�������(throwFrames)���I���΋�U��ŁA�͂߂Ȃ��������Ɠ����������N������Idle�֖߂�B
         throwReaching = true;
         grabHoldFrozen = false;
         if (LeftHand != null) LeftHand.enabled = true;
         if (LeftForeArm != null) LeftForeArm.enabled = true;
-        DLog($"[{PlayerName}] 投げ開始：左手・左前腕の当たり判定をON（接触した相手を掴む）");
+        DLog($"[{PlayerName}] �����J�n�F����E���O�r�̓����蔻���ON�i�ڐG���������͂ށj");
     }
 
-    // ★追加：今が投げ動作中で、colliderが「掴み用の手の当たり判定（左手／左前腕）」かどうかを返す。
-    //   相手側のOnTriggerEnterから、「これは通常の攻撃ヒットではなく掴みの接触だ」と区別するために使う。
-    //   ※掴み成立後（throwReachingがfalse）でも、同じ物理フレームに残りの手のイベントが届くことがあるため、
-    //     throwReachingは見ずに、投げ状態(Throw)であることだけで判定する（ダメージ処理へ流れないようにするため）。
+    // ���ǉ��F�����������쒆�ŁAcollider���u�͂ݗp�̎�̓����蔻��i����^���O�r�j�v���ǂ�����Ԃ��B
+    //   ���葤��OnTriggerEnter����A�u����͒ʏ�̍U���q�b�g�ł͂Ȃ��݂͂̐ڐG���v�Ƌ�ʂ��邽�߂Ɏg���B
+    //   ���͂ݐ�����ithrowReaching��false�j�ł��A���������t���[���Ɏc��̎�̃C�x���g���͂����Ƃ����邽�߁A
+    //     throwReaching�͌����ɁA�������(Throw)�ł��邱�Ƃ����Ŕ��肷��i�_���[�W�����֗���Ȃ��悤�ɂ��邽�߁j�B
     public bool IsGrabHitbox(Collider c)
     {
         return currentState == PlayerState.Throw && (c == LeftHand || c == LeftForeArm);
     }
 
-    // ★追加：投げ動作中の手の当たり判定が相手(target)の体に接触した時に、相手側のOnTriggerEnterから呼ばれる。
-    //   ここで初めて掴みを成立させ、以降は従来どおりの投げ処理（相手をGrabbedへ→脱出判定→
-    //   拘束時間が終わったらResolveThrowLaunchで投げ飛ばす）に入る。
+    // ���ǉ��F�������쒆�̎�̓����蔻�肪����(target)�̑̂ɐڐG�������ɁA���葤��OnTriggerEnter����Ă΂��B
+    //   �����ŏ��߂Ē݂͂𐬗������A�ȍ~�͏]���ǂ���̓��������i�����Grabbed�ց��E�o���聨
+    //   �S�����Ԃ��I�������ResolveThrowLaunch�œ�����΂��j�ɓ���B
     public void OnGrabHitboxContact(Player target)
     {
-        // 既に掴んだ後の2つ目の手の接触や、掴めない状態（ジャンプ中等）の相手への接触は何もしない
+        // ���ɒ͂񂾌��2�ڂ̎�̐ڐG��A�͂߂Ȃ���ԁi�W�����v�����j�̑���ւ̐ڐG�͉������Ȃ�
         if (currentState != PlayerState.Throw || !throwReaching || grabbedTarget != null) return;
         if (!canThrow || target == null || !target.CanBeGrabbed()) return;
 
-        DLog($"[{PlayerName}] 掴み成立（手が接触）：{target.PlayerName}");
+        DLog($"[{PlayerName}] �͂ݐ����i�肪�ڐG�j�F{target.PlayerName}");
         throwReaching = false;
-        canThrow = false;                      // 一度成立したら再度多重に発動しないようにする
+        canThrow = false;                      // ��x����������ēx���d�ɔ������Ȃ��悤�ɂ���
         grabbedTarget = target;
 
-        // 手の当たり判定は役目を終えたのでOFFにする（以降の接触でダメージ判定へ流れないようにする）
+        // ��̓����蔻��͖�ڂ��I�����̂�OFF�ɂ���i�ȍ~�̐ڐG�Ń_���[�W����֗���Ȃ��悤�ɂ���j
         DisableAllHitboxes();
 
-        // 接触した瞬間から数えてthrowFrames後に投げ飛ばす（脱出判定の猶予もこの間）
+        // �ڐG�����u�Ԃ��琔����throwFrames��ɓ�����΂��i�E�o����̗P�\�����̊ԁj
         stateTimer = throwFrames;
 
-        target.transform.Translate(0f, 0f, -0.0025f); // 敵を少し引き寄せる（既存の演出を踏襲）
-        target.EnterGrabbed(this);                    // 相手を掴まれ状態へ移行させる（脱出タイマーは相手のHPから決まる）
+        target.transform.Translate(0f, 0f, -0.0025f); // �G�����������񂹂�i�����̉��o�𓥏P�j
+        target.EnterGrabbed(this);                    // �����͂܂��Ԃֈڍs������i�E�o�^�C�}�[�͑����HP���猈�܂�j
 
-        // ★アニメーションの止め方はInspectorのenableThrowStartPlayで切り替える。
-        //   止めたアニメーションは、投げ成立／不成立の瞬間にResumeGrabHoldAnimation()で再開される。
+        // ���A�j���[�V�����̎~�ߕ���Inspector��enableThrowStartPlay�Ő؂�ւ���B
+        //   �~�߂��A�j���[�V�����́A���������^�s�����̏u�Ԃ�ResumeGrabHoldAnimation()�ōĊJ�����B
         if (enableThrowStartPlay && throwStartPlayFrames > 0)
         {
-            // ON：接触後throwStartPlayFramesフレームだけ再生を続け、その後に止める（TickBusyStateで残り時間を監視）
+            // ON�F�ڐG��throwStartPlayFrames�t���[�������Đ��𑱂��A���̌�Ɏ~�߂�iTickBusyState�Ŏc�莞�Ԃ��Ď��j
             grabHoldTimer = throwStartPlayFrames;
             grabHoldFrozen = false;
         }
         else
         {
-            // OFF：接触した瞬間にアニメーションを止める
+            // OFF�F�ڐG�����u�ԂɃA�j���[�V�������~�߂�
             grabHoldTimer = 0;
             grabHoldFrozen = true;
             if (animator != null) animator.speed = 0f;
         }
     }
 
-    // ★追加：外部（掴んでくる相手）から「今、掴まれる（投げられる）ことができる状態か」を問い合わせるための公開メソッド。
-    //   Player_status(Attack)は他の処理でほとんど更新されておらず信頼できないため、
-    //   実際の行動状態であるcurrentStateを基準に判定する。
+    // ���ǉ��F�O���i�͂�ł��鑊��j����u���A�͂܂��i��������j���Ƃ��ł����Ԃ��v��₢���킹�邽�߂̌��J���\�b�h�B
+    //   Player_status(Attack)�͑��̏����łقƂ�ǍX�V����Ă��炸�M���ł��Ȃ����߁A
+    //   ���ۂ̍s����Ԃł���currentState����ɔ��肷��B
     public bool CanBeGrabbed()
     {
-        // ★追加：ジャンプ中（空中）の相手は掴めない。Jumpflag==true が「接地している」状態を表す。
-        //   （通常ジャンプ・被弾ノックバックで浮いている間はfalseになる）
+        // ���ǉ��F�W�����v���i�󒆁j�̑���͒͂߂Ȃ��BJumpflag==true ���u�ڒn���Ă���v��Ԃ�\���B
+        //   �i�ʏ�W�����v�E��e�m�b�N�o�b�N�ŕ����Ă���Ԃ�false�ɂȂ�j
         return HP > 0
             && Jumpflag
             && currentState != PlayerState.Grabbed
@@ -3316,56 +3340,56 @@ public class Player : MonoBehaviour
             && currentState != PlayerState.Dead;
     }
 
-    // ★追加：現在のHPから、掴まれた際に脱出（振りほどき）に必要な時間を算出する。
-    //   HPが高いほど短時間で脱出でき、HPが低いほど脱出に時間がかかる（＝投げられやすい）仕様。
+    // ���ǉ��F���݂�HP����A�͂܂ꂽ�ۂɒE�o�i�U��قǂ��j�ɕK�v�Ȏ��Ԃ��Z�o����B
+    //   HP�������قǒZ���ԂŒE�o�ł��AHP���Ⴂ�قǒE�o�Ɏ��Ԃ�������i���������₷���j�d�l�B
     int CalculateEscapeFrames()
     {
         float hpRatio = maxHP > 0 ? Mathf.Clamp01((float)HP / maxHP) : 0f;
         return Mathf.RoundToInt(Mathf.Lerp(escapeFramesAtZeroHp, escapeFramesAtFullHp, hpRatio));
     }
 
-    // ★追加：相手に掴まれた瞬間に、相手側(grabber)から呼び出される。
-    //   ここではまだダメージは発生させず（ダメージは実際に投げ飛ばされた瞬間に発生させる）、
-    //   脱出のための拘束状態(Grabbed)に入るだけにする。
+    // ���ǉ��F����ɒ͂܂ꂽ�u�ԂɁA���葤(grabber)����Ăяo�����B
+    //   �����ł͂܂��_���[�W�͔����������i�_���[�W�͎��ۂɓ�����΂��ꂽ�u�Ԃɔ���������j�A
+    //   �E�o�̂��߂̍S�����(Grabbed)�ɓ��邾���ɂ���B
     public void EnterGrabbed(Player grabber)
     {
         StopMoveAnimation();
-        DisableAllHitboxes(); // 掴まれた瞬間に自分の攻撃判定は念のため止めておく
+        DisableAllHitboxes(); // �͂܂ꂽ�u�ԂɎ����̍U������͔O�̂��ߎ~�߂Ă���
         isGuarding = false;
 
         currentState = PlayerState.Grabbed;
         grabbingPlayer = grabber;
         escapeTimer = CalculateEscapeFrames();
-        // 掴まれた瞬間にスティックを倒していても、それを「抵抗入力」とは数えない
+        // �͂܂ꂽ�u�ԂɃX�e�B�b�N��|���Ă��Ă��A������u��R���́v�Ƃ͐����Ȃ�
         grabStickWasActive = Mathf.Abs(moveInput.x) >= moveInputThreshold
                           || Mathf.Abs(moveInput.y) >= moveInputThreshold;
 
-        animator.SetTrigger("Grabbed"); // ★要Animator追加：掴まれ中（もがき）専用のアニメーション。"Thrown"（飛んでいる間）とは別にする
+        animator.SetTrigger("Grabbed"); // ���vAnimator�ǉ��F�͂܂ꒆ�i�������j��p�̃A�j���[�V�����B"Thrown"�i���ł���ԁj�Ƃ͕ʂɂ���
 
-        DLog($"[{PlayerName}] 掴まれた！脱出に必要なフレーム数={escapeTimer}（HP={HP}/{maxHP}）");
+        DLog($"[{PlayerName}] �͂܂ꂽ�I�E�o�ɕK�v�ȃt���[����={escapeTimer}�iHP={HP}/{maxHP}�j");
     }
 
-    // ★追加：今、投げの方向入力（前／後のスティック入力）をしているか。
-    //   掴んでいる側がこれをtrueにしている間は、掴まれている側は脱出できない（入力した時点で投げが確定するため）。
+    // ���ǉ��F���A�����̕������́i�O�^��̃X�e�B�b�N���́j�����Ă��邩�B
+    //   �͂�ł��鑤�������true�ɂ��Ă���Ԃ́A�͂܂�Ă��鑤�͒E�o�ł��Ȃ��i���͂������_�œ������m�肷�邽�߁j�B
     public bool IsInputtingThrowDirection => Mathf.Abs(moveInput.x) >= moveInputThreshold;
 
-    // ★追加：掴んでいる側が「今この瞬間に投げを確定させられる」か。
-    //   掴みが成立してからthrowInputStartDelayFramesフレーム以上経過していて、かつ方向入力をしている場合にtrue。
-    //   （掴み成立時にstateTimer=throwFramesへ設定しているので、経過フレーム = throwFrames - stateTimer）
+    // ���ǉ��F�͂�ł��鑤���u�����̏u�Ԃɓ������m�肳������v���B
+    //   �݂͂��������Ă���throwInputStartDelayFrames�t���[���ȏ�o�߂��Ă��āA���������͂����Ă���ꍇ��true�B
+    //   �i�͂ݐ�������stateTimer=throwFrames�֐ݒ肵�Ă���̂ŁA�o�߃t���[�� = throwFrames - stateTimer�j
     bool CanCommitThrowNow =>
         currentState == PlayerState.Throw && grabbedTarget != null
         && IsInputtingThrowDirection
         && (throwFrames - stateTimer) >= throwInputStartDelayFrames;
 
-    // ★追加：掴まれている間、毎フレーム呼ばれる。時間経過に加え、
-    //   ボタン（既存の意図フラグ）かスティックの入力があるたびに追加で脱出時間を短縮する。
+    // ���ǉ��F�͂܂�Ă���ԁA���t���[���Ă΂��B���Ԍo�߂ɉ����A
+    //   �{�^���i�����̈Ӑ}�t���O�j���X�e�B�b�N�̓��͂����邽�тɒǉ��ŒE�o���Ԃ�Z�k����B
     void TickGrabbed()
     {
         escapeTimer -= frameStep;
 
-        // ★修正：スティックは「倒した瞬間」だけを入力として数える。
-        //   以前は倒している間ずっと毎フレーム短縮されていたため、押しっぱなしで一瞬で脱出でき、
-        //   HPによる脱出時間の差がほぼ意味を持たなくなっていた。
+        // ���C���F�X�e�B�b�N�́u�|�����u�ԁv��������͂Ƃ��Đ�����B
+        //   �ȑO�͓|���Ă���Ԃ����Ɩ��t���[���Z�k����Ă������߁A�������ςȂ��ň�u�ŒE�o�ł��A
+        //   HP�ɂ��E�o���Ԃ̍����قڈӖ��������Ȃ��Ȃ��Ă����B
         bool stickActive = Mathf.Abs(moveInput.x) >= moveInputThreshold
                         || Mathf.Abs(moveInput.y) >= moveInputThreshold;
         bool stickPressedNow = stickActive && !grabStickWasActive;
@@ -3378,8 +3402,8 @@ public class Player : MonoBehaviour
             escapeTimer -= escapeReductionFramesPerInput;
         }
 
-        // ★変更：掴んでいる側が方向入力をしている間は脱出させない（その入力で掴んだ側のUpdateが即座に投げを確定させる）。
-        //   Update順がP1/P2で入れ替わっても、同じフレームに「脱出」と「投げ」が競合しないようにするため。
+        // ���ύX�F�͂�ł��鑤���������͂����Ă���Ԃ͒E�o�����Ȃ��i���̓��͂Œ͂񂾑���Update�������ɓ������m�肳����j�B
+        //   Update����P1/P2�œ���ւ���Ă��A�����t���[���Ɂu�E�o�v�Ɓu�����v���������Ȃ��悤�ɂ��邽�߁B
         bool grabberCommittingThrow = grabbingPlayer != null && grabbingPlayer.CanCommitThrowNow;
         if (escapeTimer <= 0 && !grabberCommittingThrow)
         {
@@ -3387,13 +3411,13 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★追加：掴みからの脱出に成功した時の処理。自分をIdleへ戻し、掴んでいた相手の投げ動作も中断させる。
+    // ���ǉ��F�݂͂���̒E�o�ɐ����������̏����B������Idle�֖߂��A�͂�ł�������̓�����������f������B
     void EscapeFromGrab()
     {
-        DLog($"[{PlayerName}] 掴みから脱出成功！");
+        DLog($"[{PlayerName}] �݂͂���E�o�����I");
 
         currentState = PlayerState.Idle;
-        animator.SetTrigger("Grab-escape"); // ★要Animator追加（任意）：脱出演出用トリガー。未設定でも動作に支障はない
+        animator.SetTrigger("Grab-escape"); // ���vAnimator�ǉ��i�C�Ӂj�F�E�o���o�p�g���K�[�B���ݒ�ł�����Ɏx��͂Ȃ�
 
         if (grabbingPlayer != null)
         {
@@ -3402,70 +3426,70 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★追加：掴んでいた相手に脱出された時、掴んでいる側から呼び出される。
-    //   投げ拘束(Throw)を即座に打ち切ってIdleへ戻す。
+    // ���ǉ��F�͂�ł�������ɒE�o���ꂽ���A�͂�ł��鑤����Ăяo�����B
+    //   �����S��(Throw)�𑦍��ɑł��؂���Idle�֖߂��B
     public void NotifyGrabEscaped()
     {
-        if (currentState != PlayerState.Throw) return; // 既に自分の掴み拘束が終わっていれば何もしない
+        if (currentState != PlayerState.Throw) return; // ���Ɏ����̒͂ݍS�����I����Ă���Ή������Ȃ�
 
-        DLog($"[{PlayerName}] 掴んでいた相手に逃げられた");
+        DLog($"[{PlayerName}] �͂�ł�������ɓ�����ꂽ");
 
         grabbedTarget = null;
         DisableAllHitboxes();
         isGuarding = false;
         canThrow = true;
         currentState = PlayerState.Idle;
-        ResumeGrabHoldAnimation();           // ★追加：止めていたアニメーションを再開してからトリガーを上げる（速度0のままだと遷移しないため）
-        animator.SetTrigger("Throw-whiff"); // 投げ失敗（逃げられた）演出用トリガー
+        ResumeGrabHoldAnimation();           // ���ǉ��F�~�߂Ă����A�j���[�V�������ĊJ���Ă���g���K�[���グ��i���x0�̂܂܂��ƑJ�ڂ��Ȃ����߁j
+        animator.SetTrigger("Throw-whiff"); // �������s�i������ꂽ�j���o�p�g���K�[
     }
 
-    // ★追加：掴み拘束(throwFrames)が時間切れになった＝相手が脱出できなかった時に、
-    //   TickBusyState()から呼ばれる。掴んでいる側が方向入力をしていれば実際にダメージを与えて
-    //   放物線状に投げ飛ばす。方向入力が無かった場合は「投げ不成立」として扱い、
-    //   （脱出できた時と同様に）お互いを後方へ押し出すだけにする。
+    // ���ǉ��F�͂ݍS��(throwFrames)�����Ԑ؂�ɂȂ��������肪�E�o�ł��Ȃ��������ɁA
+    //   TickBusyState()����Ă΂��B�͂�ł��鑤���������͂����Ă���Ύ��ۂɃ_���[�W��^����
+    //   ��������ɓ�����΂��B�������͂����������ꍇ�́u�����s�����v�Ƃ��Ĉ����A
+    //   �i�E�o�ł������Ɠ��l�Ɂj���݂�������։����o�������ɂ���B
     void ResolveThrowLaunch()
     {
-        if (grabbedTarget == null) return; // 掴み自体が不成立（空振り）だった場合は何もしない
+        if (grabbedTarget == null) return; // �͂ݎ��̂��s�����i��U��j�������ꍇ�͉������Ȃ�
 
         bool hasDirectionInput = Mathf.Abs(moveInput.x) >= moveInputThreshold;
 
         if (!hasDirectionInput)
         {
-            // ★変更：方向入力が無いまま拘束時間切れ＝投げ不成立。
-            //   ダメージは発生させないが、お互いを相手から離れる方向へ放物線を描いて吹き飛ばす。
-            DLog($"[{PlayerName}] 方向入力が無いまま拘束時間切れ。投げ不成立扱いで{grabbedTarget.PlayerName}と共に後方へ吹き飛ぶ");
+            // ���ύX�F�������͂������܂܍S�����Ԑ؂ꁁ�����s�����B
+            //   �_���[�W�͔��������Ȃ����A���݂��𑊎肩�痣�������֕�������`���Đ�����΂��B
+            DLog($"[{PlayerName}] �������͂������܂܍S�����Ԑ؂�B�����s����������{grabbedTarget.PlayerName}�Ƌ��Ɍ���֐������");
 
-            // ★変更：止めていた掴みモーションを再開する（速度0のままだとThrow-whiffへ遷移できない）。
-            //   投げ失敗のトリガー"Throw-whiff"は、掴んでいた側・掴まれていた側とも
-            //   PushBackFromGrabFailure()→LaunchByThrow()の中で上げる（二重にトリガーを立てて競合しないため）。
+            // ���ύX�F�~�߂Ă����͂݃��[�V�������ĊJ����i���x0�̂܂܂���Throw-whiff�֑J�ڂł��Ȃ��j�B
+            //   �������s�̃g���K�["Throw-whiff"�́A�͂�ł������E�͂܂�Ă������Ƃ�
+            //   PushBackFromGrabFailure()��LaunchByThrow()�̒��ŏグ��i��d�Ƀg���K�[�𗧂Ăċ������Ȃ����߁j�B
             ResumeGrabHoldAnimation();
 
-            grabbedTarget.ReleaseFromGrabWithoutThrow(this); // 相手側もGrabbedを終了させ、放物線で後方へ吹き飛ばす
-            PushBackFromGrabFailure(grabbedTarget);          // 自分も相手から離れる方向へ放物線で後方へ吹き飛ぶ
+            grabbedTarget.ReleaseFromGrabWithoutThrow(this); // ���葤��Grabbed���I�������A�������Ō���֐�����΂�
+            PushBackFromGrabFailure(grabbedTarget);          // ���������肩�痣�������֕������Ō���֐������
 
             grabbedTarget = null;
             return;
         }
 
-        DLog($"[{PlayerName}] 投げ成立！{grabbedTarget.PlayerName}を投げ飛ばす");
+        DLog($"[{PlayerName}] ���������I{grabbedTarget.PlayerName}�𓊂���΂�");
 
-        ResumeGrabHoldAnimation();            // ★追加：止めていた掴みモーションを再開してからトリガーを上げる
-        animator.SetTrigger("Throw-release"); // 投げ成立時だけ上げる「投げ飛ばす」モーション用トリガー
+        ResumeGrabHoldAnimation();            // ���ǉ��F�~�߂Ă����͂݃��[�V�������ĊJ���Ă���g���K�[���グ��
+        animator.SetTrigger("Throw-release"); // ���������������グ��u������΂��v���[�V�����p�g���K�[
 
-        grabbedTarget.damege(throwAtk); // ダメージは掴み成立時ではなく、実際に投げが決まった瞬間に与える
+        grabbedTarget.damege(throwAtk); // �_���[�W�͒͂ݐ������ł͂Ȃ��A���ۂɓ��������܂����u�Ԃɗ^����
 
         Vector3 launchDir = GetThrowDirectionFromStick();
 
-        // ★追加：後ろ投げ（自分の向きと逆方向へ投げ飛ばした場合）は、お互いの向きを反転させる。
-        //   相手が自分の背後へ飛んでいくため、そのままだと背中を向け合ったままになってしまう。
-        //   向きの判定は投げる前の自分の向き(transform.forward)で行う。
+        // ���ǉ��F��듊���i�����̌����Ƌt�����֓�����΂����ꍇ�j�́A���݂��̌����𔽓]������B
+        //   ���肪�����̔w��֔��ł������߁A���̂܂܂��Ɣw���������������܂܂ɂȂ��Ă��܂��B
+        //   �����̔���͓�����O�̎����̌���(transform.forward)�ōs���B
         bool isBackThrow = Vector3.Dot(launchDir, transform.forward) < 0f;
 
         grabbedTarget.LaunchByThrow(launchDir, throwHorizontalSpeed, throwUpSpeed, "Thrown", throwStunFrames);
 
         if (isBackThrow)
         {
-            DLog($"[{PlayerName}] 後ろ投げのため、{grabbedTarget.PlayerName}と互いの向きを反転");
+            DLog($"[{PlayerName}] ��듊���̂��߁A{grabbedTarget.PlayerName}�ƌ݂��̌����𔽓]");
             FlipFacing();
             grabbedTarget.FlipFacing();
         }
@@ -3473,38 +3497,38 @@ public class Player : MonoBehaviour
         grabbedTarget = null;
     }
 
-    // ★追加：投げ不成立（掴んだ側の無入力タイムアウト）時に、掴まれていた側から呼び出される。
-    //   Grabbed状態を終了してIdleへ戻し、掴んでいた相手から離れる方向へ後方へ押し出される。
+    // ���ǉ��F�����s�����i�͂񂾑��̖����̓^�C���A�E�g�j���ɁA�͂܂�Ă���������Ăяo�����B
+    //   Grabbed��Ԃ��I������Idle�֖߂��A�͂�ł������肩�痣�������֌���։����o�����B
     public void ReleaseFromGrabWithoutThrow(Player grabber)
     {
-        if (currentState != PlayerState.Grabbed) return; // 既にGrabbedでなければ何もしない
+        if (currentState != PlayerState.Grabbed) return; // ����Grabbed�łȂ���Ή������Ȃ�
 
         grabbingPlayer = null;
 
-        // ★変更：以前はここでIdleへ戻してから瞬間的に押し出していたが、
-        //   PushBackFromGrabFailure()がLaunchByThrow()を流用してThrown状態へ遷移させ、
-        //   放物線を描いて吹き飛ばした上で着地時に自動でIdleへ戻すようにした。
+        // ���ύX�F�ȑO�͂�����Idle�֖߂��Ă���u�ԓI�ɉ����o���Ă������A
+        //   PushBackFromGrabFailure()��LaunchByThrow()�𗬗p����Thrown��Ԃ֑J�ڂ����A
+        //   ��������`���Đ�����΂�����Œ��n���Ɏ�����Idle�֖߂��悤�ɂ����B
         PushBackFromGrabFailure(grabber);
 
-        DLog($"[{PlayerName}] 投げ不成立のため掴みが解け、後方へ吹き飛んだ");
+        DLog($"[{PlayerName}] �����s�����̂��ߒ݂͂������A����֐������");
     }
 
-    // ★変更：投げ不成立時に、相手(other)から離れる方向（Z軸）へ、放物線を描いて吹き飛ぶ。
-    //   以前は transform.Translate による瞬間的な押し出しだったが、仕様変更により
-    //   LaunchByThrow()を流用して実際にThrown状態へ遷移させ、重力に任せて放物線を描かせた上で
-    //   着地時（OnCollisionEnter→LandFromThrow）に自動でIdleへ復帰させるようにした。
-    //   速度は投げ成立時(throwHorizontalSpeed/throwUpSpeed)より弱いgrabFailHorizontalSpeed/grabFailUpSpeedを使う。
+    // ���ύX�F�����s�������ɁA����(other)���痣�������iZ���j�ցA��������`���Đ�����ԁB
+    //   �ȑO�� transform.Translate �ɂ��u�ԓI�ȉ����o�����������A�d�l�ύX�ɂ��
+    //   LaunchByThrow()�𗬗p���Ď��ۂ�Thrown��Ԃ֑J�ڂ����A�d�͂ɔC���ĕ�������`���������
+    //   ���n���iOnCollisionEnter��LandFromThrow�j�Ɏ�����Idle�֕��A������悤�ɂ����B
+    //   ���x�͓���������(throwHorizontalSpeed/throwUpSpeed)���アgrabFailHorizontalSpeed/grabFailUpSpeed���g���B
     void PushBackFromGrabFailure(Player other)
     {
         Vector3 awayDirection = GetAwayDirectionFrom(other);
 
-        // ★変更：投げ不成立時は、掴んでいた側・掴まれていた側ともに"Throw-whiff"トリガーを上げる
-        //   （以前は専用の"Grab-fail-fly"を使っていた。Animator側でThrow-whiffから吹き飛びモーションへ遷移させること）。
+        // ���ύX�F�����s�������́A�͂�ł������E�͂܂�Ă������Ƃ���"Throw-whiff"�g���K�[���グ��
+        //   �i�ȑO�͐�p��"Grab-fail-fly"���g���Ă����BAnimator����Throw-whiff���琁����у��[�V�����֑J�ڂ����邱�Ɓj�B
         LaunchByThrow(awayDirection, grabFailHorizontalSpeed, grabFailUpSpeed, "Throw-whiff");
     }
 
-    // ★追加：相手(other)から見て自分が離れるべき方向（Z軸、±Vector3.forward）を返すヘルパー。
-    //   PushBackFromGrabFailure専用に、Z座標の位置関係から決定する（同一Z座標の場合はInstanceIDで決定的に振り分ける）。
+    // ���ǉ��F����(other)���猩�Ď����������ׂ������iZ���A�}Vector3.forward�j��Ԃ��w���p�[�B
+    //   PushBackFromGrabFailure��p�ɁAZ���W�̈ʒu�֌W���猈�肷��i����Z���W�̏ꍇ��InstanceID�Ō���I�ɐU�蕪����j�B
     Vector3 GetAwayDirectionFrom(Player other)
     {
         float deltaZ = transform.position.z - other.transform.position.z;
@@ -3521,9 +3545,9 @@ public class Player : MonoBehaviour
         return new Vector3(0f, 0f, dir);
     }
 
-    // ★追加：掴んでいる間の移動スティック入力から、投げ飛ばす水平方向を決定する。
-    //   Move()と同じくX入力で前方/後方(Vector3.forward/back)を判定し、
-    //   ニュートラルなら自分が向いている方向へ飛ばす。
+    // ���ǉ��F�͂�ł���Ԃ̈ړ��X�e�B�b�N���͂���A������΂��������������肷��B
+    //   Move()�Ɠ�����X���͂őO��/���(Vector3.forward/back)�𔻒肵�A
+    //   �j���[�g�����Ȃ玩���������Ă�������֔�΂��B
     Vector3 GetThrowDirectionFromStick()
     {
         if (moveInput.x >= moveInputThreshold) return Vector3.forward;
@@ -3531,17 +3555,17 @@ public class Player : MonoBehaviour
         return transform.forward;
     }
 
-    private int pendingThrowStunFrames = 0; // ★追加：投げで飛ばされた後、着地時に入るやられ状態のフレーム数
+    private int pendingThrowStunFrames = 0; // ���ǉ��F�����Ŕ�΂��ꂽ��A���n���ɓ�������Ԃ̃t���[����
 
-    // ★追加：投げ技によって、放物線状に吹き飛ばされる処理。掴んでいた相手から呼び出される。
-    //   Rigidbodyに初速を与えるだけで、あとは重力(既存のJump同様の物理設定)に任せて放物線を描かせる。
-    //   ★変更：投げ成立時（相手を飛ばす）だけでなく、投げ不成立時にお互いが後方へ吹き飛ぶ演出
-    //   （PushBackFromGrabFailure）でも共用できるよう、再生するアニメーショントリガーを引数化した。
-    //   省略時は従来通り"Thrown"（通常の投げ成立で飛ばされる側のモーション）を使う。
+    // ���ǉ��F�����Z�ɂ���āA��������ɐ�����΂���鏈���B�͂�ł������肩��Ăяo�����B
+    //   Rigidbody�ɏ�����^���邾���ŁA���Ƃ͏d��(������Jump���l�̕����ݒ�)�ɔC���ĕ�������`������B
+    //   ���ύX�F�����������i������΂��j�����łȂ��A�����s�������ɂ��݂�������֐�����ԉ��o
+    //   �iPushBackFromGrabFailure�j�ł����p�ł���悤�A�Đ�����A�j���[�V�����g���K�[�������������B
+    //   �ȗ����͏]���ʂ�"Thrown"�i�ʏ�̓��������Ŕ�΂���鑤�̃��[�V�����j���g���B
     public void LaunchByThrow(Vector3 horizontalDirection, float horizontalSpeed, float upSpeed, string animTrigger = "Thrown", int stunAfterLanding = 0)
     {
-        // ★追加：着地後にやられ状態へ移行する時間を記録する（0なら着地後は通常復帰）。
-        //   投げ不成立の吹き飛び(PushBackFromGrabFailure)は引数省略＝0なので、やられ状態にはならない。
+        // ���ǉ��F���n��ɂ����Ԃֈڍs���鎞�Ԃ��L�^����i0�Ȃ璅�n��͒ʏ한�A�j�B
+        //   �����s�����̐������(PushBackFromGrabFailure)�͈����ȗ���0�Ȃ̂ŁA�����Ԃɂ͂Ȃ�Ȃ��B
         pendingThrowStunFrames = stunAfterLanding;
 
         StopMoveAnimation();
@@ -3551,97 +3575,97 @@ public class Player : MonoBehaviour
         currentState = PlayerState.Thrown;
         grabbingPlayer = null;
 
-        animator.SetTrigger(animTrigger); // 飛んでいる間の専用アニメーション（Grabbedとは別のモーション）
+        animator.SetTrigger(animTrigger); // ���ł���Ԃ̐�p�A�j���[�V�����iGrabbed�Ƃ͕ʂ̃��[�V�����j
 
         if (rb != null)
         {
-            // ★Note：rb.velocity / rb.linearVelocity はUnityのバージョンによってプロパティ名が異なるため、
-            //   どちらの環境でも動くようにAddForce(ForceMode.VelocityChange)で速度を直接加算する方式にしている。
-            //   掴まれている間は移動していない想定なので、既存の速度への加算でほぼ意図通りの初速になる。
+            // ��Note�Frb.velocity / rb.linearVelocity ��Unity�̃o�[�W�����ɂ���ăv���p�e�B�����قȂ邽�߁A
+            //   �ǂ���̊��ł������悤��AddForce(ForceMode.VelocityChange)�ő��x�𒼐ډ��Z��������ɂ��Ă���B
+            //   �͂܂�Ă���Ԃ͈ړ����Ă��Ȃ��z��Ȃ̂ŁA�����̑��x�ւ̉��Z�łقڈӐ}�ʂ�̏����ɂȂ�B
             Vector3 launchVelocity = horizontalDirection.normalized * horizontalSpeed + Vector3.up * upSpeed;
             rb.AddForce(launchVelocity, ForceMode.VelocityChange);
         }
 
-        DLog($"[{PlayerName}] 投げられて吹き飛んだ！（trigger={animTrigger}）");
+        DLog($"[{PlayerName}] �������Đ�����񂾁I�itrigger={animTrigger}�j");
     }
 
-    // ★追加：向きをその場で180度反転させる（後ろ投げの後、お互いが再び向かい合うようにするため）。
-    //   通常の向き変更(FaceDirection)は徐々に回るが、こちらは投げの瞬間に即座に反転させる。
-    //   相手(grabbedTarget)側からも呼ぶため public。
+    // ���ǉ��F���������̏��180�x���]������i��듊���̌�A���݂����Ăь����������悤�ɂ��邽�߁j�B
+    //   �ʏ�̌����ύX(FaceDirection)�͏��X�ɉ�邪�A������͓����̏u�Ԃɑ����ɔ��]������B
+    //   ����(grabbedTarget)��������ĂԂ��� public�B
     public void FlipFacing()
     {
         Vector3 flipped = -transform.forward;
         flipped.y = 0f;
         if (flipped.sqrMagnitude < 0.0001f) return;
         transform.rotation = Quaternion.LookRotation(flipped.normalized, Vector3.up);
-        autoFaceSign = flipped.z >= 0f ? 1f : -1f; // ★追加：反転後の向きをAutoFaceの確定方向にも反映（直後に元の向きへ戻されないように）
+        autoFaceSign = flipped.z >= 0f ? 1f : -1f; // ���ǉ��F���]��̌�����AutoFace�̊m������ɂ����f�i����Ɍ��̌����֖߂���Ȃ��悤�Ɂj
     }
 
-    // ★追加：掴みポーズで止めていたアニメーションを再開する。
-    //   animator.speedが0のままだとトリガーを上げても遷移しないため、Throw-release／Throw-whiffを上げる直前に必ず呼ぶ。
+    // ���ǉ��F�͂݃|�[�Y�Ŏ~�߂Ă����A�j���[�V�������ĊJ����B
+    //   animator.speed��0�̂܂܂��ƃg���K�[���グ�Ă��J�ڂ��Ȃ����߁AThrow-release�^Throw-whiff���グ�钼�O�ɕK���ĂԁB
     void ResumeGrabHoldAnimation()
     {
         grabHoldFrozen = false;
-        if (animator != null && hitStopTimer <= 0) animator.speed = 1f; // ヒットストップ中ならEndHitStopが戻す
+        if (animator != null && hitStopTimer <= 0) animator.speed = 1f; // �q�b�g�X�g�b�v���Ȃ�EndHitStop���߂�
     }
 
-    // ★追加：投げで吹き飛ばされた後、地面に着地した瞬間にOnCollisionEnterから呼ばれる。
-    //   Thrown状態を終えてIdleへ戻す。
+    // ���ǉ��F�����Ő�����΂��ꂽ��A�n�ʂɒ��n�����u�Ԃ�OnCollisionEnter����Ă΂��B
+    //   Thrown��Ԃ��I����Idle�֖߂��B
     void LandFromThrow()
     {
-        DLog($"[{PlayerName}] 投げから着地して復帰");
+        DLog($"[{PlayerName}] �������璅�n���ĕ��A");
         currentState = PlayerState.Idle;
 
-        // ★追加：投げ成立で飛ばされていた場合、着地した瞬間からやられ状態（行動不能）に入る。
-        //   ダメージでHPが0になっている場合は、ダウン処理（HandleKnockedDown）に任せるため入らない。
+        // ���ǉ��F���������Ŕ�΂���Ă����ꍇ�A���n�����u�Ԃ�������ԁi�s���s�\�j�ɓ���B
+        //   �_���[�W��HP��0�ɂȂ��Ă���ꍇ�́A�_�E�������iHandleKnockedDown�j�ɔC���邽�ߓ���Ȃ��B
         int landStun = pendingThrowStunFrames;
         pendingThrowStunFrames = 0;
         if (landStun > 0 && HP > 0)
         {
-            stunComboCount = 1; // 投げを1ヒットとして数える（やられ中にさらに被弾すると加算される）
+            stunComboCount = 1; // ������1�q�b�g�Ƃ��Đ�����i���ꒆ�ɂ���ɔ�e����Ɖ��Z�����j
             EnterStunned(landStun);
-            StunDLog($"[{PlayerName}] 投げ着地→やられ状態 {landStun}フレーム");
+            StunDLog($"[{PlayerName}] �������n�������� {landStun}�t���[��");
         }
 
-        animator.SetTrigger("Thrown-land"); // ★要Animator追加（任意）：着地モーション用トリガー。未設定でも動作に支障はない
+        animator.SetTrigger("Thrown-land"); // ���vAnimator�ǉ��i�C�Ӂj�F���n���[�V�����p�g���K�[�B���ݒ�ł�����Ɏx��͂Ȃ�
     }
 
-    // 現在の漢気ゲージで必殺技を発動できるかどうか
+    // ���݂̊��C�Q�[�W�ŕK�E�Z�𔭓��ł��邩�ǂ���
     bool CanUseSpecial()
     {
         return kankiGauge >= specialRequiredGauge;
     }
 
-    // 必殺技発動処理。左足（LeftFoot/LeftUpLeg/LeftLeg）の当たり判定をONにして、
-    // その状態でspecialFramesフレーム（既定180F=3秒）だけ攻撃を行う。
-    // この間は移動のみ可能（攻撃・ガード・投げ・ジャンプ・必殺技の再発動は不可）で、
-    // かつ相手からの攻撃を一切受けない（無敵。OnTriggerEnter側で判定）。
-    // 相手に左足の判定が当たった場合のみ、specialAtk（Inspector設定）のダメージを与える。
+    // �K�E�Z���������B�����iLeftFoot/LeftUpLeg/LeftLeg�j�̓����蔻���ON�ɂ��āA
+    // ���̏�Ԃ�specialFrames�t���[���i����180F=3�b�j�����U�����s���B
+    // ���̊Ԃ͈ړ��̂݉\�i�U���E�K�[�h�E�����E�W�����v�E�K�E�Z�̍Ĕ����͕s�j�ŁA
+    // �����肩��̍U������؎󂯂Ȃ��i���G�BOnTriggerEnter���Ŕ���j�B
+    // ����ɍ����̔��肪���������ꍇ�̂݁AspecialAtk�iInspector�ݒ�j�̃_���[�W��^����B
     void EnterSpecial()
     {
-        // ★修正：移動中に必殺技へ遷移した際、Moveアニメーション(bool)がONのまま残り、
-        //   必殺技よりも移動が優先されているように見えてしまう不具合を解消する。
+        // ���C���F�ړ����ɕK�E�Z�֑J�ڂ����ہAMove�A�j���[�V����(bool)��ON�̂܂܎c��A
+        //   �K�E�Z�����ړ����D�悳��Ă���悤�Ɍ����Ă��܂��s�����������B
         StopMoveAnimation();
 
         currentState = PlayerState.Special;
         stateTimer = specialFrames;
-        attackLandedThisAttack = false; // 空振り判定用にリセット
-        ResetMultiHitCount();           // 多段ヒットカウントを新しい攻撃用にリセット
+        attackLandedThisAttack = false; // ��U�蔻��p�Ƀ��Z�b�g
+        ResetMultiHitCount();           // ���i�q�b�g�J�E���g��V�����U���p�Ƀ��Z�b�g
 
-        // ★Animator Controller側に"waza"という名前のTriggerパラメータを追加しておくこと。
-        //   currentState=Specialの間、移動以外の入力(攻撃・ガード・投げ・ジャンプ・必殺技)は
-        //   TickBusyState()側で受け付けないため、stateTimer(=specialFrames)が0になって
-        //   PlayerState.Idleへ戻るまで次の技は出せない（＝アニメーションが終わるまで次の技を出せない）。
-        //   specialFramesは"waza"アニメーションの実際の長さと一致させること。
+        // ��Animator Controller����"waza"�Ƃ������O��Trigger�p�����[�^��ǉ����Ă������ƁB
+        //   currentState=Special�̊ԁA�ړ��ȊO�̓���(�U���E�K�[�h�E�����E�W�����v�E�K�E�Z)��
+        //   TickBusyState()���Ŏ󂯕t���Ȃ����߁AstateTimer(=specialFrames)��0�ɂȂ���
+        //   PlayerState.Idle�֖߂�܂Ŏ��̋Z�͏o���Ȃ��i���A�j���[�V�������I���܂Ŏ��̋Z���o���Ȃ��j�B
+        //   specialFrames��"waza"�A�j���[�V�����̎��ۂ̒����ƈ�v�����邱�ƁB
         animator.SetTrigger("waza");
 
-        // 左足（3箇所）の攻撃用当たり判定をON。オフに戻す処理はTickBusyState()の
-        // 拘束時間終了処理（DisableAllHitboxes）で他の技と共通して行われる。
+        // �����i3�ӏ��j�̍U���p�����蔻���ON�B�I�t�ɖ߂�������TickBusyState()��
+        // �S�����ԏI�������iDisableAllHitboxes�j�ő��̋Z�Ƌ��ʂ��čs����B
         LeftFoot.enabled = true;
         LeftUpLeg.enabled = true;
         LeftLeg.enabled = true;
 
-        // 必殺技の攻撃力（Inspector設定値=specialAtk）を基準に、漢気ゲージ補正を反映して攻撃力を確定する
+        // �K�E�Z�̍U���́iInspector�ݒ�l=specialAtk�j����ɁA���C�Q�[�W�␳�𔽉f���čU���͂��m�肷��
         baseAtk = specialAtk;
         UpdateAtkByGauge();
 
@@ -3652,10 +3676,10 @@ public class Player : MonoBehaviour
 
         if (specialEffectPrefab != null)
         {
-            // ★修正：プレイヤーの子オブジェクトとして生成することで、必殺技中プレイヤーが移動しても
-            //   エフェクトが追従し続けるようにする（親を指定しないと生成位置に固定されたままになる）。
-            //   guardBuffEffectPrefabと同じ仕組み：生成後にlocalPositionを明示設定し、
-            //   生成時のプレイヤーの向きに関わらずオフセットがズレないようにする。
+            // ���C���F�v���C���[�̎q�I�u�W�F�N�g�Ƃ��Đ������邱�ƂŁA�K�E�Z���v���C���[���ړ����Ă�
+            //   �G�t�F�N�g���Ǐ]��������悤�ɂ���i�e���w�肵�Ȃ��Ɛ����ʒu�ɌŒ肳�ꂽ�܂܂ɂȂ�j�B
+            //   guardBuffEffectPrefab�Ɠ����d�g�݁F�������localPosition�𖾎��ݒ肵�A
+            //   �������̃v���C���[�̌����Ɋւ�炸�I�t�Z�b�g���Y���Ȃ��悤�ɂ���B
             ParticleSystem fx = Instantiate(
                 specialEffectPrefab,
                 transform.position + specialEffectOffset,
@@ -3664,32 +3688,32 @@ public class Player : MonoBehaviour
             fx.transform.localPosition = specialEffectOffset;
             fx.Play();
             Destroy(fx.gameObject, specialEffectLifetime);
-            EffectDLog($"[{PlayerName}] 必殺技エフェクト発生 pos={fx.transform.position}");
+            EffectDLog($"[{PlayerName}] �K�E�Z�G�t�F�N�g���� pos={fx.transform.position}");
         }
 
-        // 自分の漢気ゲージを消費する
+        // �����̊��C�Q�[�W�������
         ReduceKankiGauge(specialGaugeCost);
 
-        DLog($"[{PlayerName}] 必殺技発動！（消費ゲージ={specialGaugeCost} / 攻撃力={atk} / 拘束フレーム数={specialFrames} / 無敵）");
+        DLog($"[{PlayerName}] �K�E�Z�����I�i����Q�[�W={specialGaugeCost} / �U����={atk} / �S���t���[����={specialFrames} / ���G�j");
     }
 
-    // 攻撃系トリガーの予約をすべてクリアする（前の攻撃予約が残って誤発火するのを防ぐ）
+    // �U���n�g���K�[�̗\������ׂăN���A����i�O�̍U���\�񂪎c���Č딭�΂���̂�h���j
     void ResetAttackTriggers()
     {
         animator.ResetTrigger("Punch");
         animator.ResetTrigger("Flying-kick");
         animator.ResetTrigger("Kick");
-        animator.ResetTrigger("UpKick");   // ★追加：上キック/下キックのトリガー予約も消す
+        animator.ResetTrigger("UpKick");   // ���ǉ��F��L�b�N/���L�b�N�̃g���K�[�\�������
         animator.ResetTrigger("DownKick");
         animator.ResetTrigger("Jump");
     }
 
-    // ★追加：必殺技(Special)中だけ許可される移動処理。
-    //   通常のMove()はcurrentStateをPlayerState.Moveへ書き換えてしまい、それをやると
-    //   「isFree扱い」になってTickBusyState()ではなくHandleFreeInput()側に処理が移ってしまい、
-    //   必殺技の拘束時間・当たり判定・無敵状態が途中で解除されてしまう。
-    //   そのためcurrentStateやアニメーターの"Move"パラメータには一切触れず、
-    //   スティック入力に応じて位置と向きだけを更新する。
+    // ���ǉ��F�K�E�Z(Special)�������������ړ������B
+    //   �ʏ��Move()��currentState��PlayerState.Move�֏��������Ă��܂��A���������
+    //   �uisFree�����v�ɂȂ���TickBusyState()�ł͂Ȃ�HandleFreeInput()���ɏ������ڂ��Ă��܂��A
+    //   �K�E�Z�̍S�����ԁE�����蔻��E���G��Ԃ��r���ŉ�������Ă��܂��B
+    //   ���̂���currentState��A�j���[�^�[��"Move"�p�����[�^�ɂ͈�ؐG�ꂸ�A
+    //   �X�e�B�b�N���͂ɉ����Ĉʒu�ƌ����������X�V����B
     void MoveDuringSpecial()
     {
         Vector3 worldDirection;
@@ -3703,7 +3727,7 @@ public class Player : MonoBehaviour
         }
         else
         {
-            return; // 入力なし：移動しない
+            return; // ���͂Ȃ��F�ړ����Ȃ�
         }
 
         float inputMagnitude = Mathf.Clamp01(Mathf.Abs(moveInput.x));
@@ -3711,29 +3735,29 @@ public class Player : MonoBehaviour
         float actualMoveSpeed = moveSpeed * speedRatio;
 
         transform.Translate(worldDirection * actualMoveSpeed * Time.deltaTime, Space.World);
-        if (!enableAutoFacing) FaceDirection(worldDirection); // ★変更：自動向き合いONの間は相手を向いたまま
+        if (!enableAutoFacing) FaceDirection(worldDirection); // ���ύX�F������������ON�̊Ԃ͑�����������܂�
     }
 
-    // 拘束中の行動（攻撃・ガード・投げ・必殺技）のタイマーを進め、時間切れになったらIdleへ戻す。
-    // ただし必殺技(Special)中に限り、タイマー消化と並行して移動だけは受け付ける。
+    // �S�����̍s���i�U���E�K�[�h�E�����E�K�E�Z�j�̃^�C�}�[��i�߁A���Ԑ؂�ɂȂ�����Idle�֖߂��B
+    // �������K�E�Z(Special)���Ɍ���A�^�C�}�[�����ƕ��s���Ĉړ������͎󂯕t����B
     void TickBusyState()
     {
-        // ★追加：掴まれている間は専用の脱出判定（TickGrabbed）だけを行い、
-        //   通常の拘束時間消化（stateTimer）とは別ロジックで終了条件を管理する。
+        // ���ǉ��F�͂܂�Ă���Ԃ͐�p�̒E�o����iTickGrabbed�j�������s���A
+        //   �ʏ�̍S�����ԏ����istateTimer�j�Ƃ͕ʃ��W�b�N�ŏI���������Ǘ�����B
         if (currentState == PlayerState.Grabbed)
         {
             TickGrabbed();
             return;
         }
 
-        // ★追加：投げ飛ばされて飛んでいる間は、着地判定(OnCollisionEnter→LandFromThrow)で
-        //   終了するため、ここでは何もしない（stateTimerも消化しない）。
+        // ���ǉ��F������΂���Ĕ��ł���Ԃ́A���n����(OnCollisionEnter��LandFromThrow)��
+        //   �I�����邽�߁A�����ł͉������Ȃ��istateTimer���������Ȃ��j�B
         if (currentState == PlayerState.Thrown)
         {
             return;
         }
 
-        // ★追加：やられ状態（行動不能）。時間だけ消化して、終わったらIdleへ戻る。
+        // ���ǉ��F�����ԁi�s���s�\�j�B���Ԃ����������āA�I�������Idle�֖߂�B
         if (currentState == PlayerState.Stunned)
         {
             stateTimer -= frameStep;
@@ -3741,7 +3765,7 @@ public class Player : MonoBehaviour
 
             FinishStunCombo();
             currentState = PlayerState.Idle;
-            DLog($"[{PlayerName}] やられ状態が終わりました");
+            DLog($"[{PlayerName}] �����Ԃ��I���܂���");
             return;
         }
 
@@ -3750,7 +3774,7 @@ public class Player : MonoBehaviour
             MoveDuringSpecial();
         }
 
-        // ★追加：掴み成立後、throwStartPlayFramesフレームだけ掴みモーションを再生したら、そのポーズで止める
+        // ���ǉ��F�͂ݐ�����AthrowStartPlayFrames�t���[�������͂݃��[�V�������Đ�������A���̃|�[�Y�Ŏ~�߂�
         if (currentState == PlayerState.Throw && grabbedTarget != null && !grabHoldFrozen)
         {
             grabHoldTimer -= frameStep;
@@ -3761,51 +3785,51 @@ public class Player : MonoBehaviour
             }
         }
 
-        // ★追加：掴んでいる間に方向入力（前／後）があったら、拘束時間の終了を待たずにその場で投げ飛ばす。
-        //   以前は拘束時間が切れるまで投げが決まらず、その前に掴まれた側のHPで決まる脱出時間（特にHP満タン時は短い）が
-        //   先に来て「入力しているのに脱出成功になる」ことがあった。入力を受けた時点で投げを確定させる。
-        //   ★ただし、掴み成立からthrowInputStartDelayFramesフレームの間は入力を受け付けず、掴んだ状態を保つ。
+        // ���ǉ��F�͂�ł���Ԃɕ������́i�O�^��j����������A�S�����Ԃ̏I����҂����ɂ��̏�œ�����΂��B
+        //   �ȑO�͍S�����Ԃ��؂��܂œ��������܂炸�A���̑O�ɒ͂܂ꂽ����HP�Ō��܂�E�o���ԁi����HP���^�����͒Z���j��
+        //   ��ɗ��āu���͂��Ă���̂ɒE�o�����ɂȂ�v���Ƃ��������B���͂��󂯂����_�œ������m�肳����B
+        //   ���������A�͂ݐ�������throwInputStartDelayFrames�t���[���̊Ԃ͓��͂��󂯕t�����A�͂񂾏�Ԃ�ۂB
         if (CanCommitThrowNow)
         {
-            ResolveThrowLaunch(); // 方向入力ありなので必ず「投げ成立」になる（grabbedTargetはnullに戻る）
-            stateTimer = Mathf.Min(stateTimer, throwReleaseRecoveryFrames); // 投げ飛ばしモーションぶんだけ硬直してからIdleへ戻る
+            ResolveThrowLaunch(); // �������͂���Ȃ̂ŕK���u���������v�ɂȂ�igrabbedTarget��null�ɖ߂�j
+            stateTimer = Mathf.Min(stateTimer, throwReleaseRecoveryFrames); // ������΂����[�V�����Ԃ񂾂��d�����Ă���Idle�֖߂�
             return;
         }
 
         stateTimer -= frameStep;
         if (stateTimer > 0) return;
 
-        // 攻撃系の状態（パンチ/キック/上キック/下キック）が、
-        // 一度も命中通知(NotifyAttackLanded)を受けないまま終了したら「空振り」とみなす
+        // �U���n�̏�ԁi�p���`/�L�b�N/��L�b�N/���L�b�N�j���A
+        // ��x�������ʒm(NotifyAttackLanded)���󂯂Ȃ��܂܏I��������u��U��v�Ƃ݂Ȃ�
         if (CurrentAttackType != AttackType.None && !attackLandedThisAttack)
         {
             if (HitEffectSpawner.Instance != null && missHitEffectData != null)
             {
-                //出す位置の調整
+                //�o���ʒu�̒���
                 Vector3 transkunn = transform.position;
                 transkunn.y += 2.0f;
-                HitEffectSpawner.Instance.SpawnBehindFacing(missHitEffectData, transkunn, transform.forward); // 向きと反対側の斜め上へ
-                EffectDLog($"[{PlayerName}] 空振り擬音エフェクト発生 pos={transkunn}");
+                HitEffectSpawner.Instance.SpawnBehindFacing(missHitEffectData, transkunn, transform.forward); // �����Ɣ��Α��̎΂ߏ��
+                EffectDLog($"[{PlayerName}] ��U��[���G�t�F�N�g���� pos={transkunn}");
             }
         }
 
-        // ★追加：掴み拘束が時間切れになった＝相手が脱出できなかった場合、ここで実際に投げ飛ばす
+        // ���ǉ��F�͂ݍS�������Ԑ؂�ɂȂ��������肪�E�o�ł��Ȃ������ꍇ�A�����Ŏ��ۂɓ�����΂�
         if (currentState == PlayerState.Throw)
         {
             ResolveThrowLaunch();
         }
 
-        // ★追加：投げ不成立（方向入力なしのタイムアウト）で自分自身もPushBackFromGrabFailure()により
-        //   Thrown状態へ遷移した場合は、ここで即座にIdleへ戻さない。
-        //   放物線飛行中の状態管理はThrown用の分岐（このメソッド冒頭）と、
-        //   着地判定(OnCollisionEnter→LandFromThrow)に委ねる。
+        // ���ǉ��F�����s�����i�������͂Ȃ��̃^�C���A�E�g�j�Ŏ������g��PushBackFromGrabFailure()�ɂ��
+        //   Thrown��Ԃ֑J�ڂ����ꍇ�́A�����ő�����Idle�֖߂��Ȃ��B
+        //   ��������s���̏�ԊǗ���Thrown�p�̕���i���̃��\�b�h�`���j�ƁA
+        //   ���n����(OnCollisionEnter��LandFromThrow)�Ɉς˂�B
         if (currentState == PlayerState.Thrown)
         {
             canThrow = true;
             return;
         }
 
-        // ★追加：仁王立ちが、相手の攻撃を一度も受け止めないまま終わったら「ガード失敗」としてペナルティを与える
+        // ���ǉ��F�m���������A����̍U������x���󂯎~�߂Ȃ��܂܏I�������u�K�[�h���s�v�Ƃ��ăy�i���e�B��^����
         if (currentState == PlayerState.Guard && !guardBlockedThisGuard)
         {
             ApplyGuardFailPenalty();
@@ -3814,32 +3838,32 @@ public class Player : MonoBehaviour
         DisableAllHitboxes();
         isGuarding = false;
         canThrow = true;
-        throwReaching = false; // ★追加：掴めないまま投げ動作が終わった場合も、掴み待ちを終える
+        throwReaching = false; // ���ǉ��F�͂߂Ȃ��܂ܓ������삪�I������ꍇ���A�͂ݑ҂����I����
         currentState = PlayerState.Idle;
     }
 
     //-----------------------------------------------------
-    // 復活チャレンジ（ダウン中の処理）
+    // �����`�������W�i�_�E�����̏����j
     //-----------------------------------------------------
-    // 復活に必要な連打回数のしきい値を計算する（復活回数が増えるほど厳しくなる）
-    // ★追加：HandleKnockedDown()とOnGUI()の両方から参照するため共通メソッド化。
+    // �����ɕK�v�ȘA�ŉ񐔂̂������l���v�Z����i�����񐔂�������قǌ������Ȃ�j
+    // ���ǉ��FHandleKnockedDown()��OnGUI()�̗�������Q�Ƃ��邽�ߋ��ʃ��\�b�h���B
     int CurrentMashThreshold()
     {
         return mashThresholdBase + mashThresholdStep * rebornCount;
     }
 
-    // 現在の残り連打回数（0未満にはならない）を計算する。
-    // mashCountがmashThresholdを超えた瞬間に復活成功するため、必要な残り回数は
-    // 「しきい値 + 1 - 現在の連打数」になる。
+    // ���݂̎c��A�ŉ񐔁i0�����ɂ͂Ȃ�Ȃ��j���v�Z����B
+    // mashCount��mashThreshold�𒴂����u�Ԃɕ����������邽�߁A�K�v�Ȏc��񐔂�
+    // �u�������l + 1 - ���݂̘A�Ő��v�ɂȂ�B
     int GetRemainingMashCount()
     {
         int mashThreshold = CurrentMashThreshold();
         return Mathf.Max(mashThreshold + 1 - mashCount, 0);
     }
 
-    // ★追加：P1・P2が同時にダウンしている（両方HP0で、どちらもまだ死亡していない）か。
-    //   同時ダウン中はカメラの引き（クローズアップ）をせず、UIを左右に分けて表示する。
-    //   ※片方が先にダウンして、もう片方が後から0になる場合は同時ダウンとは扱わない（先に復活／死亡が決まるため）。
+    // ���ǉ��FP1�EP2�������Ƀ_�E�����Ă���i����HP0�ŁA�ǂ�����܂����S���Ă��Ȃ��j���B
+    //   �����_�E�����̓J�����̈����i�N���[�Y�A�b�v�j�������AUI�����E�ɕ����ĕ\������B
+    //   ���Е�����Ƀ_�E�����āA�����Е����ォ��0�ɂȂ�ꍇ�͓����_�E���Ƃ͈���Ȃ��i��ɕ����^���S�����܂邽�߁j�B
     bool IsDualKnockedDown()
     {
         if (!enableDualDownLayout || isResultMode || enemyPlayer == null) return false;
@@ -3847,14 +3871,14 @@ public class Player : MonoBehaviour
             && currentState != PlayerState.Dead && enemyPlayer.currentState != PlayerState.Dead;
     }
 
-    // ★追加：画面右側（P2側）のプレイヤーか。PlayerInputのindexが1、またはPlayerNameが"P2"ならP2とみなす。
+    // ���ǉ��F��ʉE���iP2���j�̃v���C���[���BPlayerInput��index��1�A�܂���PlayerName��"P2"�Ȃ�P2�Ƃ݂Ȃ��B
     bool IsRightSidePlayer()
     {
         int index = playerInput != null ? playerInput.playerIndex : 0;
         return index == 1 || PlayerName == "P2";
     }
 
-    // ★追加：Animatorにその名前・型のパラメータがあるか（無い名前でSetTrigger/SetBoolすると警告が出るため先に確認する）
+    // ���ǉ��FAnimator�ɂ��̖��O�E�^�̃p�����[�^�����邩�i�������O��SetTrigger/SetBool����ƌx�����o�邽�ߐ�Ɋm�F����j
     bool HasAnimatorParam(string paramName, AnimatorControllerParameterType type)
     {
         if (animator == null || string.IsNullOrEmpty(paramName)) return false;
@@ -3875,8 +3899,8 @@ public class Player : MonoBehaviour
         if (HasAnimatorParam(paramName, AnimatorControllerParameterType.Bool)) animator.SetBool(paramName, value);
     }
 
-    // ★追加：ダウン開始（ダウンした瞬間に1回だけ呼ぶ）。Triggerを立て、ダウン中Boolをtrueにする。
-    //   移動・攻撃のアニメーションが残っているとダウンに遷移できないことがあるので、先に止める。
+    // ���ǉ��F�_�E���J�n�i�_�E�������u�Ԃ�1�񂾂��Ăԁj�BTrigger�𗧂āA�_�E����Bool��true�ɂ���B
+    //   �ړ��E�U���̃A�j���[�V�������c���Ă���ƃ_�E���ɑJ�ڂł��Ȃ����Ƃ�����̂ŁA��Ɏ~�߂�B
     void OnDownStart()
     {
         if (animator == null) return;
@@ -3886,26 +3910,26 @@ public class Player : MonoBehaviour
 
         SetDownBool(downBoolParam, true);
         SetDownTrigger(downStartTrigger);
-        DLog($"[{PlayerName}] ダウン開始アニメーション（{downStartTrigger} / {downBoolParam}=true）");
+        DLog($"[{PlayerName}] �_�E���J�n�A�j���[�V�����i{downStartTrigger} / {downBoolParam}=true�j");
     }
 
-    // ★追加：復活成功の瞬間に呼ぶ。ダウン中Boolをfalseに戻し、復活Triggerを立てる。
+    // ���ǉ��F���������̏u�ԂɌĂԁB�_�E����Bool��false�ɖ߂��A����Trigger�𗧂Ă�B
     void OnDownRevive()
     {
         downAnimPlayed = false;
         bool wasDual = downWasDual;
         downWasDual = false;
-        StartRebornFreeze(!wasDual); // ★追加：復活の瞬間から、自分・相手ともに動けなくする（同時ダウン後でなければ相手を非表示にする）
+        StartRebornFreeze(!wasDual); // ���ǉ��F�����̏u�Ԃ���A�����E����Ƃ��ɓ����Ȃ�����i�����_�E����łȂ���Α�����\���ɂ���j
         if (animator == null) return;
 
         SetDownBool(downBoolParam, false);
         SetDownTrigger(downReviveTrigger);
-        DLog($"[{PlayerName}] 復活アニメーション（{downReviveTrigger} / {downBoolParam}=false）");
+        DLog($"[{PlayerName}] �����A�j���[�V�����i{downReviveTrigger} / {downBoolParam}=false�j");
     }
 
-    // ★追加：復活した瞬間のカメラ。
-    //   同時ダウン後の復活：カメラが寄る・引く演出は一切せず、通常の追従カメラへ戻す。
-    //   それ以外：後方へ回り込まず、復活したキャラ正面の引きの画を停止時間ぶん映す。
+    // ���ǉ��F���������u�Ԃ̃J�����B
+    //   �����_�E����̕����F�J���������E�������o�͈�؂����A�ʏ�̒Ǐ]�J�����֖߂��B
+    //   ����ȊO�F����։�荞�܂��A���������L�������ʂ̈����̉���~���ԂԂ�f���B
     void StartRebornStandUpCamera()
     {
         if (fightingCamera == null) return;
@@ -3919,10 +3943,10 @@ public class Player : MonoBehaviour
         fightingCamera.TriggerRebornStandUpHold(transform, FramesToSeconds(rebornStandUpFreezeFrames));
     }
 
-    // ★追加：復活停止中、相手（P2またはCPU）の見た目を隠す。隠す前に有効だったRendererだけを記録し、後で元に戻す。
+    // ���ǉ��F������~���A����iP2�܂���CPU�j�̌����ڂ��B���B�B���O�ɗL��������Renderer�������L�^���A��Ō��ɖ߂��B
     void HideOpponentForReborn()
     {
-        if (hiddenOpponentRenderers.Count > 0) return; // すでに隠している
+        if (hiddenOpponentRenderers.Count > 0) return; // ���łɉB���Ă���
 
         Component opponent = enemyPlayer != null ? (Component)enemyPlayer : (Component)enemy;
         if (opponent == null) return;
@@ -3935,7 +3959,7 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★追加：非表示にしていた相手のRendererを元に戻す。
+    // ���ǉ��F��\���ɂ��Ă��������Renderer�����ɖ߂��B
     void ShowOpponentAfterReborn()
     {
         foreach (UnityEngine.Renderer r in hiddenOpponentRenderers)
@@ -3945,8 +3969,8 @@ public class Player : MonoBehaviour
         hiddenOpponentRenderers.Clear();
     }
 
-    // ★追加：復活の瞬間から rebornStandUpFreezeFrames の間、自分・相手ともに動けなくする。
-    //   動作の途中だった相手の攻撃は、当たり判定を消して待機に戻す（止まったまま当たり判定が残らないように）。
+    // ���ǉ��F�����̏u�Ԃ��� rebornStandUpFreezeFrames �̊ԁA�����E����Ƃ��ɓ����Ȃ�����B
+    //   ����̓r������������̍U���́A�����蔻��������đҋ@�ɖ߂��i�~�܂����܂ܓ����蔻�肪�c��Ȃ��悤�Ɂj�B
     void StartRebornFreeze(bool hideOpponent)
     {
         if (rebornStandUpFreezeFrames <= 0) return;
@@ -3954,12 +3978,12 @@ public class Player : MonoBehaviour
         rebornFreezeEndFrame = CurrentFrame + rebornStandUpFreezeFrames;
         CancelAttackForFreeze();
         if (enemyPlayer != null) enemyPlayer.CancelAttackForFreeze();
-        if (hideOpponent && hideOpponentDuringRebornFreeze) HideOpponentForReborn(); // 復活演出のカメラに相手が映り込まないようにする
+        if (hideOpponent && hideOpponentDuringRebornFreeze) HideOpponentForReborn(); // �������o�̃J�����ɑ��肪�f�荞�܂Ȃ��悤�ɂ���
 
-        DLog($"[{PlayerName}] 復活：{rebornStandUpFreezeFrames}フレーム、全員停止");
+        DLog($"[{PlayerName}] �����F{rebornStandUpFreezeFrames}�t���[���A�S����~");
     }
 
-    // ★追加：全員停止の開始時に、攻撃動作の途中だった場合だけ待機に戻す。
+    // ���ǉ��F�S����~�̊J�n���ɁA�U������̓r���������ꍇ�����ҋ@�ɖ߂��B
     void CancelAttackForFreeze()
     {
         if (currentState != PlayerState.Punch && currentState != PlayerState.Kick
@@ -3972,7 +3996,7 @@ public class Player : MonoBehaviour
         currentState = PlayerState.Idle;
     }
 
-    // ★追加：復活失敗（Dead）の瞬間に呼ぶ。ダウン中Boolをfalseに戻し、復活失敗Triggerを立てる。
+    // ���ǉ��F�������s�iDead�j�̏u�ԂɌĂԁB�_�E����Bool��false�ɖ߂��A�������sTrigger�𗧂Ă�B
     void OnDownFail()
     {
         downAnimPlayed = false;
@@ -3980,13 +4004,13 @@ public class Player : MonoBehaviour
 
         SetDownBool(downBoolParam, false);
         SetDownTrigger(downFailTrigger);
-        DLog($"[{PlayerName}] 復活失敗アニメーション（{downFailTrigger} / {downBoolParam}=false）");
+        DLog($"[{PlayerName}] �������s�A�j���[�V�����i{downFailTrigger} / {downBoolParam}=false�j");
     }
 
-    // HPが0になった際に毎フレーム呼ばれる、根性復活（ボタン連打による復活）の処理
+    // HP��0�ɂȂ����ۂɖ��t���[���Ă΂��A���������i�{�^���A�łɂ�镜���j�̏���
     void HandleKnockedDown()
     {
-        FinishStunCombo(); // ★追加：やられ中にダウンした場合、連続ヒット数を確定する
+        FinishStunCombo(); // ���ǉ��F���ꒆ�Ƀ_�E�������ꍇ�A�A���q�b�g�����m�肷��
         currentState = PlayerState.KnockedDown;
 
         //gameMNG.PlayerUI(rebornTimer, mashCount);
@@ -3995,43 +4019,43 @@ public class Player : MonoBehaviour
         Player_status = Status.Reborn;
         if (gameMNG != null) gameMNG.SettestStatus(PlayerName, Status.Reborn);
 
-        // ★追加：ダウンした瞬間、一度だけダウン開始アニメーション（Trigger）を立て、ダウン中Boolをtrueにする
+        // ���ǉ��F�_�E�������u�ԁA��x�����_�E���J�n�A�j���[�V�����iTrigger�j�𗧂āA�_�E����Bool��true�ɂ���
         if (!downAnimPlayed)
         {
             downAnimPlayed = true;
             OnDownStart();
         }
 
-        // ★追加：同時ダウン中はカメラの引き（クローズアップ）をしない。すでに始めていた場合は通常カメラへ戻す
+        // ���ǉ��F�����_�E�����̓J�����̈����i�N���[�Y�A�b�v�j�����Ȃ��B���łɎn�߂Ă����ꍇ�͒ʏ�J�����֖߂�
         bool dualDown = IsDualKnockedDown();
-        if (dualDown) downWasDual = true; // 復活時にカメラ演出をしないための記録
+        if (dualDown) downWasDual = true; // �������ɃJ�������o�����Ȃ����߂̋L�^
         if (dualDown && rebornCamStarted && fightingCamera != null)
         {
             fightingCamera.ClearReborn();
             rebornCamStarted = false;
         }
 
-        //ダウンした瞬間、一度だけ顔・拳へのクローズアップカメラを開始する
+        //�_�E�������u�ԁA��x������E���ւ̃N���[�Y�A�b�v�J�������J�n����
         if (!dualDown && !rebornCamStarted && fightingCamera != null)
         {
             fightingCamera.StartRebornCloseUp(transform);
             rebornCamStarted = true;
         }
 
-        // ★追加：漢気復活。制限時間内にL1が押され、漢気ゲージが足りていれば、連打せずに即座に復活する
+        // ���ǉ��F���C�����B�������ԓ���L1��������A���C�Q�[�W������Ă���΁A�A�ł����ɑ����ɕ�������
         if (wantKankiRevive && rebornTimer < rebornTimeLimitFrames && TryKankiRevive())
         {
             return;
         }
 
-        // 復活に必要な連打回数のしきい値（復活回数が増えるほど厳しくなる）
+        // �����ɕK�v�ȘA�ŉ񐔂̂������l�i�����񐔂�������قǌ������Ȃ�j
         int mashThreshold = CurrentMashThreshold();
 
         if (rebornTimer < rebornTimeLimitFrames)
         {
             if (mashCount <= mashThreshold)
             {
-                //連打の進捗に応じて復活レベルを算出し、カメラを徐々に引かせる
+                //�A�ł̐i���ɉ����ĕ������x�����Z�o���A�J���������X�Ɉ�������
                 if (fightingCamera != null && mashThreshold > 0 && !dualDown)
                 {
                     float progress = (float)mashCount / mashThreshold;
@@ -4041,31 +4065,31 @@ public class Player : MonoBehaviour
             }
             else
             {
-                //復活成功（最大HPのrebornHpRatio割合まで回復）
+                //���������i�ő�HP��rebornHpRatio�����܂ŉ񕜁j
                 HP = Mathf.RoundToInt(maxHP * rebornHpRatio);
                 rebornCount++;
                 mashCount = 0;
                 rebornTimer = 0;
                 currentState = PlayerState.Idle;
                 Player_status = Status.Live;
-                //UIにHPを反映させるように指示
+                //UI��HP�𔽉f������悤�Ɏw��
                 if (gameMNG != null) gameMNG.Player_ReduceHP(HP, PlayerName);
-                //根性復活成功！咆哮して立ち上がる漢を中心に、カメラが180度高速で回り込む
+                //�������������I���K���ė����オ�銿�𒆐S�ɁA�J������180�x�����ŉ�荞��
                 if (fightingCamera != null)
                 {
                     fightingCamera.SetRebornLevel(fightingCamera.rebornMaxLevel);
-                    StartRebornStandUpCamera(); // 同時ダウン後はカメラ演出なし／それ以外は正面の引きを映す
+                    StartRebornStandUpCamera(); // �����_�E����̓J�������o�Ȃ��^����ȊO�͐��ʂ̈������f��
                 }
-                rebornCamStarted = false; //次回のダウンに備えてリセット
-                OnDownRevive(); // ★追加：復活アニメーション
+                rebornCamStarted = false; //����̃_�E���ɔ����ă��Z�b�g
+                OnDownRevive(); // ���ǉ��F�����A�j���[�V����
             }
         }
         else
         {
-            //制限時間内に復活できず力尽きた
+            //�������ԓ��ɕ����ł����͐s����
             currentState = PlayerState.Dead;
             Player_status = Status.Dead;
-            DLog($"[{PlayerName}] 根性復活失敗。HP={HP}のままDead状態へ移行。");
+            DLog($"[{PlayerName}] �����������s�BHP={HP}�̂܂�Dead��Ԃֈڍs�B");
             if (gameMNG != null) gameMNG.SettestStatus(PlayerName, Status.Dead);
 
             if (fightingCamera != null)
@@ -4073,15 +4097,15 @@ public class Player : MonoBehaviour
                 fightingCamera.ClearReborn();
             }
             rebornCamStarted = false;
-            OnDownFail(); // ★追加：復活失敗アニメーション
+            OnDownFail(); // ���ǉ��F�������s�A�j���[�V����
         }
     }
 
     //-----------------------------------------------------
-    // ★追加：漢気復活（ダウン中に漢気ゲージを消費して、連打せずに即座に復活する）
+    // ���ǉ��F���C�����i�_�E�����Ɋ��C�Q�[�W������āA�A�ł����ɑ����ɕ�������j
     //-----------------------------------------------------
-    // 漢気ゲージが足りていればゲージを消費して復活し、trueを返す。足りなければ何もせずfalseを返す。
-    // 復活後の状態リセット・カメラ演出・UI更新は、通常の根性復活成功時（HandleKnockedDown）と同じ。
+    // ���C�Q�[�W������Ă���΃Q�[�W������ĕ������Atrue��Ԃ��B����Ȃ���Ή�������false��Ԃ��B
+    // ������̏�ԃ��Z�b�g�E�J�������o�EUI�X�V�́A�ʏ�̍��������������iHandleKnockedDown�j�Ɠ����B
     bool TryKankiRevive()
     {
         if (!enableKankiRevive) return false;
@@ -4089,14 +4113,14 @@ public class Player : MonoBehaviour
         float cost = kankiGaugePerBar * Mathf.Max(1, kankiReviveBarCost);
         if (kankiGauge < cost)
         {
-            DLog($"[{PlayerName}] 漢気復活できません：ゲージ不足（必要={cost:F1} / 現在={kankiGauge:F1}）");
+            DLog($"[{PlayerName}] ���C�����ł��܂���F�Q�[�W�s���i�K�v={cost:F1} / ����={kankiGauge:F1}�j");
             return false;
         }
 
-        // 漢気ゲージを消費（UIの更新もこの中で行われる）
+        // ���C�Q�[�W������iUI�̍X�V�����̒��ōs����j
         ReduceKankiGauge(cost);
 
-        // 最大HPのrebornHpRatio割合まで回復し、ダウン状態をリセットする
+        // �ő�HP��rebornHpRatio�����܂ŉ񕜂��A�_�E����Ԃ����Z�b�g����
         HP = Mathf.RoundToInt(maxHP * rebornHpRatio);
         rebornCount++;
         mashCount = 0;
@@ -4110,28 +4134,28 @@ public class Player : MonoBehaviour
             gameMNG.SettestStatus(PlayerName, Status.Live);
         }
 
-        // 咆哮して立ち上がる漢を中心に、カメラが回り込む（通常の復活成功時と同じ演出）
+        // ���K���ė����オ�銿�𒆐S�ɁA�J��������荞�ށi�ʏ�̕����������Ɠ������o�j
         if (fightingCamera != null)
         {
             fightingCamera.SetRebornLevel(fightingCamera.rebornMaxLevel);
-            StartRebornStandUpCamera(); // 同時ダウン後はカメラ演出なし／それ以外は正面の引きを映す
+            StartRebornStandUpCamera(); // �����_�E����̓J�������o�Ȃ��^����ȊO�͐��ʂ̈������f��
         }
-        rebornCamStarted = false; // 次回のダウンに備えてリセット
-        OnDownRevive(); // ★追加：復活アニメーション
+        rebornCamStarted = false; // ����̃_�E���ɔ����ă��Z�b�g
+        OnDownRevive(); // ���ǉ��F�����A�j���[�V����
 
-        SpawnKankiReviveEffect(); // 復活した瞬間のエフェクト
-        StartReviveBuff();        // 攻撃力上昇（＋上昇中エフェクト）を開始
+        SpawnKankiReviveEffect(); // ���������u�Ԃ̃G�t�F�N�g
+        StartReviveBuff();        // �U���͏㏸�i�{�㏸���G�t�F�N�g�j���J�n
 
-        DLog($"[{PlayerName}] 漢気復活！（消費ゲージ={cost:F1} / 復活後HP={HP} / 攻撃力={atk} / 上昇フレーム数={reviveAtkBuffFrames}）");
+        DLog($"[{PlayerName}] ���C�����I�i����Q�[�W={cost:F1} / ������HP={HP} / �U����={atk} / �㏸�t���[����={reviveAtkBuffFrames}�j");
         return true;
     }
 
-    // 復活した瞬間に1回だけ出すエフェクト。プレイヤーの子オブジェクトとして生成し、一定時間後に破棄する。
+    // ���������u�Ԃ�1�񂾂��o���G�t�F�N�g�B�v���C���[�̎q�I�u�W�F�N�g�Ƃ��Đ������A��莞�Ԍ�ɔj������B
     void SpawnKankiReviveEffect()
     {
-        if (kankiReviveEffectPrefab == null)
+        if (kankiReviveEffectPrefab == null && kankiReviveEffectPrefab_Ground)
         {
-            Debug.LogWarning($"[{PlayerName}] kankiReviveEffectPrefabが未設定のため、漢気復活エフェクトを出せません。Inspectorで設定してください。", this);
+            Debug.LogWarning($"[{PlayerName}] kankiReviveEffectPrefab�����ݒ�̂��߁A���C�����G�t�F�N�g���o���܂���BInspector�Őݒ肵�Ă��������B", this);
             return;
         }
 
@@ -4144,32 +4168,45 @@ public class Player : MonoBehaviour
         fx.Play();
         Destroy(fx.gameObject, kankiReviveEffectLifetime);
 
-        EffectDLog($"[{PlayerName}] 漢気復活エフェクト発生 pos={fx.transform.position}");
+        ParticleSystem fx_Ground = Instantiate(
+            kankiReviveEffectPrefab,
+            transform.position + kankiReviveEffectOffset,
+            Quaternion.Euler(-90f, 0f, 0f));
+        fx_Ground.transform.localPosition = kankiReviveEffectOffset;
+        fx_Ground.Play();
+        Destroy(fx_Ground.gameObject, kankiReviveEffectLifetime);
+
+
+
+
+
+
+        EffectDLog($"[{PlayerName}] ���C�����G�t�F�N�g���� pos={fx.transform.position}");
     }
 
-    // 攻撃力上昇を開始する（すでに上昇中なら残り時間を延ばし直す）
+    // �U���͏㏸���J�n����i���łɏ㏸���Ȃ�c�莞�Ԃ����΂������j
     void StartReviveBuff()
     {
         isReviveBuffed = true;
         reviveBuffTimer = reviveAtkBuffFrames;
-        UpdateAtkByGauge(); // 上昇倍率をatkへ反映
+        UpdateAtkByGauge(); // �㏸�{����atk�֔��f
         StartReviveBuffEffect();
     }
 
-    // 攻撃力上昇を終了する（時間切れ・ダウン時に呼ばれる）
+    // �U���͏㏸���I������i���Ԑ؂�E�_�E�����ɌĂ΂��j
     void EndReviveBuff()
     {
         if (!isReviveBuffed) return;
 
         isReviveBuffed = false;
         reviveBuffTimer = 0;
-        UpdateAtkByGauge(); // 上昇倍率を外したatkへ戻す
+        UpdateAtkByGauge(); // �㏸�{�����O����atk�֖߂�
         StopReviveBuffEffect();
 
-        DLog($"[{PlayerName}] 漢気復活による攻撃力上昇が終了（攻撃力={atk}）");
+        DLog($"[{PlayerName}] ���C�����ɂ��U���͏㏸���I���i�U����={atk}�j");
     }
 
-    // 毎フレームUpdateから呼ばれ、攻撃力上昇の残り時間を消化する
+    // ���t���[��Update����Ă΂�A�U���͏㏸�̎c�莞�Ԃ���������
     void TickReviveBuff()
     {
         if (!isReviveBuffed) return;
@@ -4178,12 +4215,12 @@ public class Player : MonoBehaviour
         if (reviveBuffTimer <= 0) EndReviveBuff();
     }
 
-    // 攻撃力上昇中のエフェクトを開始する。プレイヤーに追従し、上昇が終わるまでループし続ける。
+    // �U���͏㏸���̃G�t�F�N�g���J�n����B�v���C���[�ɒǏ]���A�㏸���I���܂Ń��[�v��������B
     void StartReviveBuffEffect()
     {
         if (reviveBuffEffectPrefab == null)
         {
-            Debug.LogWarning($"[{PlayerName}] reviveBuffEffectPrefabが未設定のため、攻撃力上昇中のエフェクトを出せません。Inspectorで設定してください。", this);
+            Debug.LogWarning($"[{PlayerName}] reviveBuffEffectPrefab�����ݒ�̂��߁A�U���͏㏸���̃G�t�F�N�g���o���܂���BInspector�Őݒ肵�Ă��������B", this);
             return;
         }
 
@@ -4197,10 +4234,22 @@ public class Player : MonoBehaviour
             reviveBuffEffectPrefab,
             transform.position + reviveBuffEffectOffset,
             Quaternion.Euler(-90f, 0f, 0f),
-            transform); // プレイヤーに追従させるため子オブジェクトにする
+            transform); // �v���C���[�ɒǏ]�����邽�ߎq�I�u�W�F�N�g�ɂ���
         activeReviveBuffEffect.transform.localPosition = reviveBuffEffectOffset;
 
-        // Prefab側のLoop設定に関係なく、上昇中は出し続けるようループを強制する
+
+        activeReviveBuffEffect_Ground = Instantiate(
+            reviveBuffEffectPrefab_Ground,
+            transform.position + reviveBuffEffectOffset,
+            Quaternion.Euler(-90f, 0f, 0f)); // �v���C���[�ɒǏ]�����邽�ߎq�I�u�W�F�N�g�ɂ���
+        activeReviveBuffEffect_Ground.transform.localPosition = reviveBuffEffectOffset;
+
+
+
+
+
+
+        // Prefab����Loop�ݒ�Ɋ֌W�Ȃ��A�㏸���͏o��������悤���[�v����������
         foreach (var ps in activeReviveBuffEffect.GetComponentsInChildren<ParticleSystem>(true))
         {
             var main = ps.main;
@@ -4210,10 +4259,10 @@ public class Player : MonoBehaviour
 
         activeReviveBuffEffect.Play();
 
-        EffectDLog($"[{PlayerName}] 漢気復活の攻撃力上昇エフェクト開始 pos={activeReviveBuffEffect.transform.position}");
+        EffectDLog($"[{PlayerName}] ���C�����̍U���͏㏸�G�t�F�N�g�J�n pos={activeReviveBuffEffect.transform.position}");
     }
 
-    // 攻撃力上昇中のエフェクトを止める（新規発生だけ止め、出ている分は自然にフェードアウトさせる）
+    // �U���͏㏸���̃G�t�F�N�g���~�߂�i�V�K���������~�߁A�o�Ă��镪�͎��R�Ƀt�F�[�h�A�E�g������j
     void StopReviveBuffEffect()
     {
         if (activeReviveBuffEffect == null) return;
@@ -4222,20 +4271,20 @@ public class Player : MonoBehaviour
         Destroy(activeReviveBuffEffect.gameObject, activeReviveBuffEffect.main.startLifetime.constantMax + 0.5f);
         activeReviveBuffEffect = null;
 
-        EffectDLog($"[{PlayerName}] 漢気復活の攻撃力上昇エフェクト終了");
+        EffectDLog($"[{PlayerName}] ���C�����̍U���͏㏸�G�t�F�N�g�I��");
     }
 
-    // ★デバッグ用の強制復活処理（F4キー・対象はenableF4DebugKeyで選択）
-    //   連打数や制限時間を無視して、通常の復活成功時と同じ処理を即座に実行する。
+    // ���f�o�b�O�p�̋������������iF4�L�[�E�Ώۂ�enableF4DebugKey�őI���j
+    //   �A�Ő��␧�����Ԃ𖳎����āA�ʏ�̕����������Ɠ��������𑦍��Ɏ��s����B
     void ForceRebornDebug()
     {
-        //最大HPのrebornHpRatio割合まで回復（通常の復活成功時と同じ割合）
+        //�ő�HP��rebornHpRatio�����܂ŉ񕜁i�ʏ�̕����������Ɠ��������j
         ForceRevive(Mathf.RoundToInt(maxHP * rebornHpRatio), "F4");
     }
 
-    // ★追加：デバッグキー共通の強制復活処理。
-    //   指定したHPまで回復させつつ、根性復活成功時と同じ状態リセット・カメラ演出・UI更新を行う。
-    //   hp: 復活後のHP　debugKeyName: ログ表示用のキー名（例："F4","F8"）
+    // ���ǉ��F�f�o�b�O�L�[���ʂ̋������������B
+    //   �w�肵��HP�܂ŉ񕜂����A���������������Ɠ�����ԃ��Z�b�g�E�J�������o�EUI�X�V���s���B
+    //   hp: �������HP�@debugKeyName: ���O�\���p�̃L�[���i��F"F4","F8"�j
     void ForceRevive(int hp, string debugKeyName)
     {
         HP = hp;
@@ -4245,87 +4294,87 @@ public class Player : MonoBehaviour
         currentState = PlayerState.Idle;
         Player_status = Status.Live;
 
-        //UIにHPを反映させるように指示
+        //UI��HP�𔽉f������悤�Ɏw��
         if (gameMNG != null) gameMNG.Player_ReduceHP(HP, PlayerName);
         if (gameMNG != null) gameMNG.SettestStatus(PlayerName, Status.Live);
 
         if (fightingCamera != null)
         {
             fightingCamera.SetRebornLevel(fightingCamera.rebornMaxLevel);
-            StartRebornStandUpCamera(); // 同時ダウン後はカメラ演出なし／それ以外は正面の引きを映す
+            StartRebornStandUpCamera(); // �����_�E����̓J�������o�Ȃ��^����ȊO�͐��ʂ̈������f��
         }
-        rebornCamStarted = false; //次回のダウンに備えてリセット
-        OnDownRevive(); // ★追加：復活アニメーション
+        rebornCamStarted = false; //����̃_�E���ɔ����ă��Z�b�g
+        OnDownRevive(); // ���ǉ��F�����A�j���[�V����
 
-        Debug.Log($"[{PlayerName}] [デバッグ]{debugKeyName}キーにより強制復活しました（HP={HP}）");
+        Debug.Log($"[{PlayerName}] [�f�o�b�O]{debugKeyName}�L�[�ɂ�苭���������܂����iHP={HP}�j");
     }
 
     //-----------------------------------------------------
-    // 衝突・トリガー
+    // �ՓˁE�g���K�[
     //-----------------------------------------------------
 
-    // 物理的な衝突が発生した時に呼ばれる。地面との接触判定（着地）に使用
+    // �����I�ȏՓ˂������������ɌĂ΂��B�n�ʂƂ̐ڐG����i���n�j�Ɏg�p
     void OnCollisionEnter(Collision other)
     {
         if (other.gameObject.CompareTag("Ground"))
         {
-            // ★追加：着地アニメーション用に、「空中にいた(Jumpflag=false)状態からの着地か」を先に控えておく。
-            //   開始時にスポーンして床に触れただけ等、空中にいなかった場合はフラグを立てないため。
+            // ���ǉ��F���n�A�j���[�V�����p�ɁA�u�󒆂ɂ���(Jumpflag=false)��Ԃ���̒��n���v���ɍT���Ă����B
+            //   �J�n���ɃX�|�[�����ď��ɐG�ꂽ�������A�󒆂ɂ��Ȃ������ꍇ�̓t���O�𗧂ĂȂ����߁B
             bool wasAirborne = !Jumpflag;
 
             Jumpflag = true;
 
-            // ★追加：投げで放物線状に吹き飛ばされている最中に地面へ着地したら、Thrown状態を終えて復帰する
-            //   （この場合の着地アニメーションは、LandFromThrow内の"Thrown-land"が担当するので"Land"は立てない）
+            // ���ǉ��F�����ŕ�������ɐ�����΂���Ă���Œ��ɒn�ʂ֒��n������AThrown��Ԃ��I���ĕ��A����
+            //   �i���̏ꍇ�̒��n�A�j���[�V�����́ALandFromThrow����"Thrown-land"���S������̂�"Land"�͗��ĂȂ��j
             if (currentState == PlayerState.Thrown)
             {
                 LandFromThrow();
             }
-            // ★追加：ジャンプ・ノックバック等で空中にいた状態から地面に着地したら、
-            //   着地アニメーションを再生したいフラグ（Trigger "Land"）を立てる。
-            //   ダウン中／死亡中は倒れたポーズを崩さないよう対象外にする。
+            // ���ǉ��F�W�����v�E�m�b�N�o�b�N���ŋ󒆂ɂ�����Ԃ���n�ʂɒ��n������A
+            //   ���n�A�j���[�V�������Đ��������t���O�iTrigger "Land"�j�𗧂Ă�B
+            //   �_�E�����^���S���͓|�ꂽ�|�[�Y������Ȃ��悤�ΏۊO�ɂ���B
             else if (wasAirborne && animator != null
                      && currentState != PlayerState.KnockedDown && currentState != PlayerState.Dead)
             {
-                animator.SetTrigger("Land"); // ★要Animator追加：Triggerパラメータ"Land"
-                DLog($"[{PlayerName}] 着地：Landフラグを立てました");
+                animator.SetTrigger("Land"); // ���vAnimator�ǉ��FTrigger�p�����[�^"Land"
+                DLog($"[{PlayerName}] ���n�FLand�t���O�𗧂Ă܂���");
             }
         }
     }
 
-    // トリガー判定の当たり判定に何かが接触した時に呼ばれる。敵の攻撃を受けた時の処理を行う
+    // �g���K�[����̓����蔻��ɉ������ڐG�������ɌĂ΂��B�G�̍U�����󂯂����̏������s��
     //
-    // ★修正済み：この処理は「相手の攻撃用ヒットボックスが自分に触れた場合」だけに
-    //   限定する。以前は「相手プレイヤーのタグを持つ何か」に触れただけで反応していたため、
-    //   自分の攻撃ヒットボックスが相手の体に当たった瞬間、攻撃側の自分にもこの
-    //   イベントが飛んできて、誤って自分自身にダメージが入っていた。
+    // ���C���ς݁F���̏����́u����̍U���p�q�b�g�{�b�N�X�������ɐG�ꂽ�ꍇ�v������
+    //   ���肷��B�ȑO�́u����v���C���[�̃^�O���������v�ɐG�ꂽ�����Ŕ������Ă������߁A
+    //   �����̍U���q�b�g�{�b�N�X������̑̂ɓ��������u�ԁA�U�����̎����ɂ�����
+    //   �C�x���g�����ł��āA����Ď������g�Ƀ_���[�W�������Ă����B
     void OnTriggerEnter(Collider collision)
     {
-        //地面に当たっている場合は無視
+        //�n�ʂɓ������Ă���ꍇ�͖���
         if (collision.gameObject.CompareTag("Ground")) return;
 
-        // ★リザルト画面モード：攻撃は見た目だけで、被弾・ダメージ・掴みの判定は行わない
+        // �����U���g��ʃ��[�h�F�U���͌����ڂ����ŁA��e�E�_���[�W�E�݂͂̔���͍s��Ȃ�
         if (isResultMode) return;
 
-        // すでに倒れている場合は無視
-        // ★変更：以前は「自分のタグ(PLayerTagName)と同じタグのオブジェクトは無視」も行っていたが、削除した。
-        //   自分自身のヒットボックスの除外は、この後の「相手(enemyPlayer/enemy)の攻撃用ヒットボックスか？」の
-        //   参照比較で既に確実に行われているため不要。むしろ、GameInputManagerからプレハブで生成すると、
-        //   同じキャラを選んだ場合などに1P/2Pのタグが同じになり、相手の攻撃まで無視して
-        //   「当たり判定が消える」原因になっていた。
+        // ���łɓ|��Ă���ꍇ�͖���
+        // ���ύX�F�ȑO�́u�����̃^�O(PLayerTagName)�Ɠ����^�O�̃I�u�W�F�N�g�͖����v���s���Ă������A�폜�����B
+        //   �������g�̃q�b�g�{�b�N�X�̏��O�́A���̌�́u����(enemyPlayer/enemy)�̍U���p�q�b�g�{�b�N�X���H�v��
+        //   �Q�Ɣ�r�Ŋ��Ɋm���ɍs���Ă��邽�ߕs�v�B�ނ���AGameInputManager����v���n�u�Ő�������ƁA
+        //   �����L������I�񂾏ꍇ�Ȃǂ�1P/2P�̃^�O�������ɂȂ�A����̍U���܂Ŗ�������
+        //   �u�����蔻�肪������v�����ɂȂ��Ă����B
         if (HP <= 0) return;
 
-        // ★追加：必殺技(waza)発動中は無敵。相手の攻撃用当たり判定が触れても一切反応しない
-        //  （ダメージ・ヒットストップ・ガード演出等、何も発生させない）。
+        // ���ǉ��F�K�E�Z(waza)�������͖��G�B����̍U���p�����蔻�肪�G��Ă���ؔ������Ȃ�
+        //  �i�_���[�W�E�q�b�g�X�g�b�v�E�K�[�h���o���A�������������Ȃ��j�B
         if (currentState == PlayerState.Special) return;
 
-        // ★変更：相手の攻撃判定かどうかは、触れたコライダーの「持ち主」を親からたどって直接取得する。
-        //   タグやInspectorのenemyPlayer/enemy参照には一切依存しない。
-        //   「相手のアタックボックス（攻撃用コライダー）が自分の体に触れた」時だけ被弾として扱う。
+        // ���ύX�F����̍U�����肩�ǂ����́A�G�ꂽ�R���C�_�[�́u������v��e���炽�ǂ��Ē��ڎ擾����B
+        //   �^�O��Inspector��enemyPlayer/enemy�Q�Ƃɂ͈�؈ˑ����Ȃ��B
+        //   �u����̃A�^�b�N�{�b�N�X�i�U���p�R���C�_�[�j�������̑̂ɐG�ꂽ�v��������e�Ƃ��Ĉ����B
         Player attackerPlayer = collision.GetComponentInParent<Player>();
         Enemy attackerEnemy = attackerPlayer == null ? collision.GetComponentInParent<Enemy>() : null;
 
-        // 自分自身の攻撃判定が自分の体に触れただけの場合は除外する（attackerPlayer == this）
+        // �������g�̍U�����肪�����̑̂ɐG�ꂽ�����̏ꍇ�͏��O����iattackerPlayer == this�j
         bool isEnemyPlayerAttack = attackerPlayer != null && attackerPlayer != this
             && attackerPlayer.AttackHitboxes != null
             && System.Array.Exists(attackerPlayer.AttackHitboxes, hb => hb == collision);
@@ -4334,81 +4383,81 @@ public class Player : MonoBehaviour
             && attackerEnemy.AttackHitboxes != null
             && System.Array.Exists(attackerEnemy.AttackHitboxes, hb => hb == collision);
 
-        // 相手のアタックボックスでなければ無視（相手の体に自分の攻撃が当たった、攻撃側視点のイベント等）
+        // ����̃A�^�b�N�{�b�N�X�łȂ���Ζ����i����̑̂Ɏ����̍U�������������A�U�������_�̃C�x���g���j
         if (!isEnemyPlayerAttack && !isEnemyAttack)
         {
             return;
         }
 
-        // ★追加：相手が投げ動作中に、その左手・左前腕の当たり判定が自分の体に触れた場合は、
-        //   ダメージを与える通常の被弾ではなく「掴みの接触」として相手側に通知する（ダメージ・ヒットストップ等は発生させない）。
-        //   掴めない状態（ジャンプ中等）だった場合も、通知先で無視されるだけで、ここでは被弾扱いにしない。
+        // ���ǉ��F���肪�������쒆�ɁA���̍���E���O�r�̓����蔻�肪�����̑̂ɐG�ꂽ�ꍇ�́A
+        //   �_���[�W��^����ʏ�̔�e�ł͂Ȃ��u�݂͂̐ڐG�v�Ƃ��đ��葤�ɒʒm����i�_���[�W�E�q�b�g�X�g�b�v���͔��������Ȃ��j�B
+        //   �͂߂Ȃ���ԁi�W�����v�����j�������ꍇ���A�ʒm��Ŗ�������邾���ŁA�����ł͔�e�����ɂ��Ȃ��B
         if (isEnemyPlayerAttack && attackerPlayer.IsGrabHitbox(collision))
         {
             attackerPlayer.OnGrabHitboxContact(this);
             return;
         }
 
-        // ★追加：多段ヒット防止／許可の判定。
-        //   同じ攻撃（1回のパンチ・キック等）に対して、今回の接触を有効なヒットとして扱ってよいかを
-        //   攻撃側（相手）のInspector設定（多段ヒット設定）に基づいて問い合わせる。
-        //   falseが返った場合は、既に規定回数ヒット済みなのでこの接触は完全に無視する（ダメージ・演出も一切発生させない）。
+        // ���ǉ��F���i�q�b�g�h�~�^���̔���B
+        //   �����U���i1��̃p���`�E�L�b�N���j�ɑ΂��āA����̐ڐG��L���ȃq�b�g�Ƃ��Ĉ����Ă悢����
+        //   �U�����i����j��Inspector�ݒ�i���i�q�b�g�ݒ�j�Ɋ�Â��Ė₢���킹��B
+        //   false���Ԃ����ꍇ�́A���ɋK��񐔃q�b�g�ς݂Ȃ̂ł��̐ڐG�͊��S�ɖ�������i�_���[�W�E���o����ؔ��������Ȃ��j�B
         if (isEnemyPlayerAttack)
         {
             if (!attackerPlayer.TryRegisterHit()) return;
         }
         else if (isEnemyAttack)
         {
-            // ※CPU(Enemy)側は現状、多段ヒット制御に未対応です。
-            //   Enemy.csにも同様のTryRegisterHit()を実装すればCPU戦にも適用できます。
+            // ��CPU(Enemy)���͌���A���i�q�b�g����ɖ��Ή��ł��B
+            //   Enemy.cs�ɂ����l��TryRegisterHit()�����������CPU��ɂ��K�p�ł��܂��B
         }
 
-        //今回被弾させてきた相手の攻撃力を取得（対人戦かCPU戦かで参照先を切り替える）
+        //�����e�����Ă�������̍U���͂��擾�i�ΐl�킩CPU�킩�ŎQ�Ɛ��؂�ւ���j
         int attackerAtk = isEnemyPlayerAttack ? attackerPlayer.atk : attackerEnemy.atk;
 
-        int attackerAtkBase = attackerAtk; // F10表示用：ペナルティ倍率を掛ける前の値
+        int attackerAtkBase = attackerAtk; // F10�\���p�F�y�i���e�B�{�����|����O�̒l
 
-        // ★追加：ガード失敗直後の一定時間は、受けるダメージが増える（ダウン判定・ガード時の半減などにもこの値が使われる）
+        // ���ǉ��F�K�[�h���s����̈�莞�Ԃ́A�󂯂�_���[�W��������i�_�E������E�K�[�h���̔����Ȃǂɂ����̒l���g����j
         if (guardFailDamageTimer > 0)
         {
             attackerAtk = Mathf.RoundToInt(attackerAtk * Mathf.Max(guardFailDamageMultiplier, 0f));
         }
 
-        //ここまで来たら「敵の攻撃用ヒットボックスが自分の体に当たった」＝正真正銘の被弾
+        //�����܂ŗ�����u�G�̍U���p�q�b�g�{�b�N�X�������̑̂ɓ��������v�����^�����̔�e
         if (isGuarding)
         {
-            // 仁王立ち（ガード）中に被弾した場合の処理
-            // ★変更：ガード成功で、次に自分が与える技のダメージ倍率を上げる（guardSuccessNextAttackMultiplier倍）。
-            //   （次の自分の攻撃が当たるまで持続。倍率はInspectorの「ガード成功時の攻撃力上昇設定」で調整可能）
-            guardBlockedThisGuard = true; // 受け止めたので、この仁王立ちはガード失敗にならない
-            DLog("漢!!");
-            se.PlayOneShot(MenBlock_se);       // ガード成功の効果音を再生
-            HP -= attackerAtk / 2;                // ガード中はダメージを半減させる
-            RecordDamage(attackerAtk / 2, attackerAtkBase / 2, "ガード(半減)"); // F10表示用
+            // �m�������i�K�[�h�j���ɔ�e�����ꍇ�̏���
+            // ���ύX�F�K�[�h�����ŁA���Ɏ������^����Z�̃_���[�W�{�����グ��iguardSuccessNextAttackMultiplier�{�j�B
+            //   �i���̎����̍U����������܂Ŏ����B�{����Inspector�́u�K�[�h�������̍U���͏㏸�ݒ�v�Œ����\�j
+            guardBlockedThisGuard = true; // �󂯎~�߂��̂ŁA���̐m�������̓K�[�h���s�ɂȂ�Ȃ�
+            DLog("��!!");
+            se.PlayOneShot(MenBlock_se);       // �K�[�h�����̌��ʉ����Đ�
+            HP -= attackerAtk / 2;                // �K�[�h���̓_���[�W�𔼌�������
+            RecordDamage(attackerAtk / 2, attackerAtkBase / 2, "�K�[�h(����)"); // F10�\���p
 
-            // ガードに成功したので、自分の漢気ゲージを増やす
+            // �K�[�h�ɐ��������̂ŁA�����̊��C�Q�[�W�𑝂₷
             AddKankiGauge(gaugeGainOnGuard);
 
-            // 攻撃力上昇中であることを示すエフェクトを出し続ける（次に自分の攻撃が当たるまで）
-            // ★変更：技を出す前に続けてガードに成功した場合は、倍率を掛け算で重ねていく（倍々）。
+            // �U���͏㏸���ł��邱�Ƃ������G�t�F�N�g���o��������i���Ɏ����̍U����������܂Łj
+            // ���ύX�F�Z���o���O�ɑ����ăK�[�h�ɐ��������ꍇ�́A�{�����|���Z�ŏd�˂Ă����i�{�X�j�B
             float stepMultiplier = Mathf.Max(1f, guardSuccessNextAttackMultiplier);
             guardBuffMultiplier = isGuardBuffed ? guardBuffMultiplier * stepMultiplier : stepMultiplier;
             if (guardSuccessMaxMultiplier > 0f) guardBuffMultiplier = Mathf.Min(guardBuffMultiplier, guardSuccessMaxMultiplier);
             isGuardBuffed = true;
-            UpdateAtkByGauge(); // 倍率を反映して攻撃力を再計算する
-            DLog($"[{PlayerName}] ガード成功：次の技のダメージ倍率×{guardBuffMultiplier:F2}（攻撃力={atk}）");
+            UpdateAtkByGauge(); // �{���𔽉f���čU���͂��Čv�Z����
+            DLog($"[{PlayerName}] �K�[�h�����F���̋Z�̃_���[�W�{���~{guardBuffMultiplier:F2}�i�U����={atk}�j");
             StartGuardBuffEffect();
 
-            // ★追加：仁王立ち成功アニメーション（Animatorの"Guard-success"トリガー）を再生する。
-            //   ヒットストップ中はanimator.speedが0になり遷移しないが、トリガーは消費されるまで残るので、
-            //   ヒットストップが終わった瞬間に再生が始まる。
+            // ���ǉ��F�m�����������A�j���[�V�����iAnimator��"Guard-success"�g���K�[�j���Đ�����B
+            //   �q�b�g�X�g�b�v����animator.speed��0�ɂȂ�J�ڂ��Ȃ����A�g���K�[�͏�����܂Ŏc��̂ŁA
+            //   �q�b�g�X�g�b�v���I������u�ԂɍĐ����n�܂�B
             if (hasGuardSuccessParam && animator != null)
             {
                 animator.SetTrigger(GuardSuccessParam);
             }
 
-            // ガード成功時のヒットストップ（少しだけ動けなくする）。
-            // ガードのポーズを崩したくないのでHeadHitアニメーションは再生しない。
+            // �K�[�h�������̃q�b�g�X�g�b�v�i�������������Ȃ�����j�B
+            // �K�[�h�̃|�[�Y����������Ȃ��̂�HeadHit�A�j���[�V�����͍Đ����Ȃ��B
             StartHitStop(guardHitStopFrames, false);
 
             guardComboCount++;
@@ -4417,15 +4466,15 @@ public class Player : MonoBehaviour
                 fightingCamera.OnGuardImpact(transform, guardComboCount);
             }
 
-            // ガード成功の擬音演出（攻撃者→自分の方向を基準に、空白地帯へ表示）
+            // �K�[�h�����̋[�����o�i�U���ҁ������̕�������ɁA�󔒒n�т֕\���j
             Transform guardAttackerTf = isEnemyPlayerAttack ? attackerPlayer.transform : attackerEnemy.transform;
             if (HitEffectSpawner.Instance != null && guardHitEffectData != null)
             {
-                HitEffectSpawner.Instance.SpawnBehindFacing(guardHitEffectData, transform.position, transform.forward); // 向きと反対側の斜め上へ
-                EffectDLog($"[{PlayerName}] ガード成功擬音エフェクト発生 pos={transform.position}");
+                HitEffectSpawner.Instance.SpawnBehindFacing(guardHitEffectData, transform.position, transform.forward); // �����Ɣ��Α��̎΂ߏ��
+                EffectDLog($"[{PlayerName}] �K�[�h�����[���G�t�F�N�g���� pos={transform.position}");
             }
 
-            // ガード成功専用エフェクト（インスペクターで設定したパーティクルを生成）
+            // �K�[�h������p�G�t�F�N�g�i�C���X�y�N�^�[�Őݒ肵���p�[�e�B�N���𐶐��j
             if (enableGuardSuccessEffect && guardSuccessEffectPrefab != null)
             {
                 ParticleSystem guardSuccessEffect = Instantiate(
@@ -4434,26 +4483,26 @@ public class Player : MonoBehaviour
                     Quaternion.Euler(-90f, 0f, 0f));
                 guardSuccessEffect.Play();
                 Destroy(guardSuccessEffect.gameObject, guardSuccessEffectLifetime);
-                EffectDLog($"[{PlayerName}] ガード成功パーティクル発生 pos={guardSuccessEffect.transform.position}");
-                DLog($"[{PlayerName}] ガード成功エフェクトを再生");
+                EffectDLog($"[{PlayerName}] �K�[�h�����p�[�e�B�N������ pos={guardSuccessEffect.transform.position}");
+                DLog($"[{PlayerName}] �K�[�h�����G�t�F�N�g���Đ�");
             }
 
-            // ガードされてもヒットはヒット（空振りではない）なので攻撃側に通知
+            // �K�[�h����Ă��q�b�g�̓q�b�g�i��U��ł͂Ȃ��j�Ȃ̂ōU�����ɒʒm
             if (isEnemyPlayerAttack) attackerPlayer.NotifyAttackLanded();
             else if (attackerEnemy != null) attackerEnemy.NotifyAttackLanded();
 
-            // ★追加：ガード成功で、攻撃してきた相手を guardSuccessStunFrames フレームだけスタン（行動不能）にする。
-            //   ※NotifyAttackLanded()の後に呼ぶこと（命中によるクールダウン切替の後で、やられ状態へ上書きするため）。
-            //   ※CPU(Enemy)が攻撃者の場合は未対応（Enemy.cs側にApplyGuardedStun()相当が必要）。
+            // ���ǉ��F�K�[�h�����ŁA�U�����Ă�������� guardSuccessStunFrames �t���[�������X�^���i�s���s�\�j�ɂ���B
+            //   ��NotifyAttackLanded()�̌�ɌĂԂ��Ɓi�����ɂ��N�[���_�E���ؑւ̌�ŁA�����Ԃ֏㏑�����邽�߁j�B
+            //   ��CPU(Enemy)���U���҂̏ꍇ�͖��Ή��iEnemy.cs����ApplyGuardedStun()�������K�v�j�B
             if (isEnemyPlayerAttack) attackerPlayer.ApplyGuardedStun(guardSuccessStunFrames);
         }
         else
         {
-            // ガードしていない状態で被弾した場合の処理
+            // �K�[�h���Ă��Ȃ���ԂŔ�e�����ꍇ�̏���
             guardComboCount = 0;
-            // ★変更：被弾アニメーションはここでは再生せず「予約」し、ヒットストップが終わった瞬間に1回だけ再生する
-            //   （即座にTriggerを立てたうえでHeadHitも再生し直していたため、二重に再生されていた）。
-            //   "Hit-front" = 前から攻撃された（相手が自分の正面にいる）／"Hit-back" = 後ろから攻撃された（相手が背後にいる）。
+            // ���ύX�F��e�A�j���[�V�����͂����ł͍Đ������u�\��v���A�q�b�g�X�g�b�v���I������u�Ԃ�1�񂾂��Đ�����
+            //   �i������Trigger�𗧂Ă�������HeadHit���Đ��������Ă������߁A��d�ɍĐ�����Ă����j�B
+            //   "Hit-front" = �O����U�����ꂽ�i���肪�����̐��ʂɂ���j�^"Hit-back" = ��납��U�����ꂽ�i���肪�w��ɂ���j�B
             if (!playHeadHitStateDirectly)
             {
                 Transform hitAttackerTf = isEnemyPlayerAttack ? attackerPlayer.transform : (attackerEnemy != null ? attackerEnemy.transform : null);
@@ -4462,9 +4511,9 @@ public class Player : MonoBehaviour
                 RequestHitAnimation(hasHitDir, hitFromFront);
             }
 
-            // 通常被弾時のヒットストップ（少しだけ動けなくする）。
-            // ★変更：対人戦では、攻撃者の「攻撃ごとの設定」のヒットストップ時間を使う。
-            //   CPU(Enemy)の攻撃、または攻撃種別が取れない場合は、従来のhitStopFramesにフォールバックする。
+            // �ʏ��e���̃q�b�g�X�g�b�v�i�������������Ȃ�����j�B
+            // ���ύX�F�ΐl��ł́A�U���҂́u�U�����Ƃ̐ݒ�v�̃q�b�g�X�g�b�v���Ԃ��g���B
+            //   CPU(Enemy)�̍U���A�܂��͍U����ʂ����Ȃ��ꍇ�́A�]����hitStopFrames�Ƀt�H�[���o�b�N����B
             int appliedHitStop = hitStopFrames;
             if (isEnemyPlayerAttack)
             {
@@ -4474,15 +4523,15 @@ public class Player : MonoBehaviour
             StartHitStop(appliedHitStop);
             if (hitStopTimer <= 0)
             {
-                // ヒットストップが無い設定の時は、そのまま今再生する（トリガーOFFならHeadHitを直接再生）
+                // �q�b�g�X�g�b�v�������ݒ�̎��́A���̂܂܍��Đ�����i�g���K�[OFF�Ȃ�HeadHit�𒼐ڍĐ��j
                 if (playHeadHitStateDirectly) PlayHeadHitDirect();
                 else FirePendingHitAnimation();
             }
 
-            // ★追加：ノックバック。攻撃者（相手Player）の技ごとの設定に従って、
-            //   攻撃者から離れる方向（Z軸）＋上方向へ飛ばす。
-            //   ※CPU(Enemy)の攻撃は未対応（Enemy.cs側にも同様のGetCurrentKnockbackSetting()が必要）。
-            //   ※この一撃でHPが0になる場合は、ダウン処理と干渉しないようノックバックしない。
+            // ���ǉ��F�m�b�N�o�b�N�B�U���ҁi����Player�j�̋Z���Ƃ̐ݒ�ɏ]���āA
+            //   �U���҂��痣�������iZ���j�{������֔�΂��B
+            //   ��CPU(Enemy)�̍U���͖��Ή��iEnemy.cs���ɂ����l��GetCurrentKnockbackSetting()���K�v�j�B
+            //   �����̈ꌂ��HP��0�ɂȂ�ꍇ�́A�_�E�������Ɗ����Ȃ��悤�m�b�N�o�b�N���Ȃ��B
             if (isEnemyPlayerAttack && HP - attackerAtk > 0)
             {
                 KnockbackSetting knockback = attackerPlayer.GetCurrentKnockbackSetting();
@@ -4493,8 +4542,8 @@ public class Player : MonoBehaviour
                 }
             }
 
-            // ★追加：やられ状態（行動不能）。攻撃者の技ごとの「やられ状態の時間」だけ動けなくする。
-            //   ※CPU(Enemy)の攻撃は未対応（Enemy.csにGetCurrentStunFrames()相当が必要）。
+            // ���ǉ��F�����ԁi�s���s�\�j�B�U���҂̋Z���Ƃ́u�����Ԃ̎��ԁv���������Ȃ�����B
+            //   ��CPU(Enemy)�̍U���͖��Ή��iEnemy.cs��GetCurrentStunFrames()�������K�v�j�B
             if (isEnemyPlayerAttack)
             {
                 ApplyStun(attackerPlayer.GetCurrentStunFrames(), HP - attackerAtk <= 0);
@@ -4504,67 +4553,67 @@ public class Player : MonoBehaviour
             ParticleSystem hitParticle = Instantiate(Hit_particle, hitPoint, Quaternion.Euler(-90f, 0f, 0f));
             hitParticle.Play();
             Destroy(hitParticle.gameObject, 1.0f);
-            EffectDLog($"[{PlayerName}] 被弾パーティクル発生 pos={hitPoint}");
+            EffectDLog($"[{PlayerName}] ��e�p�[�e�B�N������ pos={hitPoint}");
 
-            // 「ドカン」「ドドン」等の擬音演出。
-            // 攻撃者に今の攻撃タイプ(パンチ/キック)を問い合わせて、対応する擬音データを選ぶ。
-            // 角度・距離はHitEffectData側（Inspector）で調整する。
+            // �u�h�J���v�u�h�h���v���̋[�����o�B
+            // �U���҂ɍ��̍U���^�C�v(�p���`/�L�b�N)��₢���킹�āA�Ή�����[���f�[�^��I�ԁB
+            // �p�x�E������HitEffectData���iInspector�j�Œ�������B
             Transform attackerTf = isEnemyPlayerAttack ? attackerPlayer.transform : attackerEnemy.transform;
             HitEffectData selectedHitEffect = null;
 
             if (isEnemyPlayerAttack)
             {
-                // 対人戦：相手Playerの現在の攻撃タイプに応じたHitEffectDataを取得
+                // �ΐl��F����Player�̌��݂̍U���^�C�v�ɉ�����HitEffectData���擾
                 selectedHitEffect = attackerPlayer.GetHitEffectDataFor(attackerPlayer.CurrentAttackType);
-                attackerPlayer.NotifyAttackLanded(); // 空振りではなく命中したことを攻撃側へ通知
+                attackerPlayer.NotifyAttackLanded(); // ��U��ł͂Ȃ������������Ƃ��U�����֒ʒm
             }
             else if (attackerEnemy != null)
             {
-                // 対CPU戦：Enemy側の現在の攻撃タイプに応じたHitEffectDataを取得
+                // ��CPU��FEnemy���̌��݂̍U���^�C�v�ɉ�����HitEffectData���擾
                 selectedHitEffect = attackerEnemy.GetHitEffectDataFor(attackerEnemy.CurrentAttackType);
-                attackerEnemy.NotifyAttackLanded(); // 空振りではなく命中したことを攻撃側へ通知
+                attackerEnemy.NotifyAttackLanded(); // ��U��ł͂Ȃ������������Ƃ��U�����֒ʒm
             }
 
             if (HitEffectSpawner.Instance != null && selectedHitEffect != null)
             {
                 Transform effectFacingTf = hitEffectFacingBasis == HitEffectFacingBasis.Attacker ? attackerTf : transform;
-                HitEffectSpawner.Instance.SpawnBehindFacing(selectedHitEffect, hitPoint, effectFacingTf.forward); // 向きと反対側の斜め上へ
-                EffectDLog($"[{PlayerName}] 被弾擬音エフェクト発生 pos={hitPoint}");
+                HitEffectSpawner.Instance.SpawnBehindFacing(selectedHitEffect, hitPoint, effectFacingTf.forward); // �����Ɣ��Α��̎΂ߏ��
+                EffectDLog($"[{PlayerName}] ��e�[���G�t�F�N�g���� pos={hitPoint}");
             }
 
             HP -= attackerAtk;
-            RecordDamage(attackerAtk, attackerAtkBase, "通常被弾"); // F10表示用
+            RecordDamage(attackerAtk, attackerAtkBase, "�ʏ��e"); // F10�\���p
         }
 
-        //UIにHPを減らすように指示
+        //UI��HP�����炷�悤�Ɏw��
         if (gameMNG != null)
         {
             gameMNG.Player_ReduceHP(HP, PlayerName);
         }
         else
         {
-            Debug.LogError("gameMNGがnullのためHP表示を更新できません。ManagerObjectの配置を確認してください。");
+            Debug.LogError("gameMNG��null�̂���HP�\�����X�V�ł��܂���BManagerObject�̔z�u���m�F���Ă��������B");
         }
 
-        //攻撃力を初期値に戻す（一度使ったらリセット）
-        // ★修正：以前は "= 10" で固定値に戻しており、攻撃の種類ごとの攻撃力や
-        //   漢気ゲージによる補正まで消えてしまっていた。ここではガード上昇分だけを
-        //   取り消し、ゲージ補正込みの本来の攻撃力に戻す。
+        //�U���͂������l�ɖ߂��i��x�g�����烊�Z�b�g�j
+        // ���C���F�ȑO�� "= 10" �ŌŒ�l�ɖ߂��Ă���A�U���̎�ނ��Ƃ̍U���͂�
+        //   ���C�Q�[�W�ɂ��␳�܂ŏ����Ă��܂��Ă����B�����ł̓K�[�h�㏸��������
+        //   �������A�Q�[�W�␳���݂̖{���̍U���͂ɖ߂��B
         if (isEnemyPlayerAttack) attackerPlayer.ResetAtkAfterHit();
-        else if (attackerEnemy != null) attackerEnemy.atk = 10; // ※Enemy側は未対応。同様の仕組みが必要なら要相談。
+        else if (attackerEnemy != null) attackerEnemy.atk = 10; // ��Enemy���͖��Ή��B���l�̎d�g�݂��K�v�Ȃ�v���k�B
 
         if (HP < 0) HP = 0;
 
-        //デバッグログ：誰からどれだけダメージを受けてHPがいくつになったか
+        //�f�o�b�O���O�F�N����ǂꂾ���_���[�W���󂯂�HP�������ɂȂ�����
         string attackerName = isEnemyPlayerAttack ? attackerPlayer.PlayerName : "Enemy(CPU)";
-        DLog($"[{PlayerName}] {attackerName}から被弾。ダメージ={attackerAtk}{(isGuarding ? "(ガード半減)" : "")} / 残りHP={HP}");
+        DLog($"[{PlayerName}] {attackerName}�����e�B�_���[�W={attackerAtk}{(isGuarding ? "(�K�[�h����)" : "")} / �c��HP={HP}");
     }
 
     //-----------------------------------------------------
-    // 当たり判定ユーティリティ
+    // �����蔻�胆�[�e�B���e�B
     //-----------------------------------------------------
 
-    // 全身の攻撃用当たり判定コライダーを一括でOFFにする
+    // �S�g�̍U���p�����蔻��R���C�_�[���ꊇ��OFF�ɂ���
     void DisableAllHitboxes()
     {
         foreach (var hitbox in allHitboxes)
@@ -4574,106 +4623,106 @@ public class Player : MonoBehaviour
     }
 
     //-----------------------------------------------------
-    // 外部から呼ばれるダメージ処理
+    // �O������Ă΂��_���[�W����
     //-----------------------------------------------------
-    // 外部（敵など）から呼び出される、プレイヤーがダメージを受けるための公開メソッド
-    // n: 受けるダメージ量
+    // �O���i�G�Ȃǁj����Ăяo�����A�v���C���[���_���[�W���󂯂邽�߂̌��J���\�b�h
+    // n: �󂯂�_���[�W��
     public void damege(int n)
     {
         HP -= n;
-        RecordDamage(n, n, "damege()（投げ等）"); // F10表示用
+        RecordDamage(n, n, "damege()�i�������j"); // F10�\���p
         if (HP < 0) HP = 0;
 
-        //デバッグログ：ダメージ量と残りHP
-        DLog($"[{PlayerName}] damege()呼び出し。ダメージ={n} / 残りHP={HP}");
+        //�f�o�b�O���O�F�_���[�W�ʂƎc��HP
+        DLog($"[{PlayerName}] damege()�Ăяo���B�_���[�W={n} / �c��HP={HP}");
 
-        // ★元コードのまま維持。"Enemy_ReduceHP"という名前だが実際にはプレイヤー自身のHPを渡している。
-        //   GameMNG側の実装次第では意図通りかもしれないが、要確認。
+        // �����R�[�h�̂܂܈ێ��B"Enemy_ReduceHP"�Ƃ������O�������ۂɂ̓v���C���[���g��HP��n���Ă���B
+        //   GameMNG���̎�������ł͈Ӑ}�ʂ肩������Ȃ����A�v�m�F�B
         if (gameMNG != null)
         {
             gameMNG.Player_ReduceHP(HP, PlayerName);
             gameMNG.Enemy_ReduceHP(HP);
-            //※開発中
-            //相手のプレイヤーの型を取得してその型のに適したUIの表示を変更する予定。
+            //���J����
+            //����̃v���C���[�̌^���擾���Ă��̌^�̂ɓK����UI�̕\����ύX����\��B
             //gameMNG.Player_ReduceHP(HP, Enemyplayer);
         }
         else
         {
-            Debug.LogError("gameMNGがnullのためHP表示を更新できません。ManagerObjectの配置を確認してください。");
+            Debug.LogError("gameMNG��null�̂���HP�\�����X�V�ł��܂���BManagerObject�̔z�u���m�F���Ă��������B");
         }
     }
 
     //==============================================
-    // ---- 漢気ゲージ操作 ----
+    // ---- ���C�Q�[�W���� ----
     //==============================================
-    // ★増減のタイミングまとめ：
-    //   増加：NotifyAttackLanded()（攻撃命中時） / OnTriggerEnterのガード成功時
-    //   減少：ApplyGaugeLossIfRetreating()（相手から離れる方向へ移動中、1秒あたり） / 必殺技発動時
+    // �������̃^�C�~���O�܂Ƃ߁F
+    //   �����FNotifyAttackLanded()�i�U���������j / OnTriggerEnter�̃K�[�h������
+    //   �����FApplyGaugeLossIfRetreating()�i���肩�痣�������ֈړ����A1�b������j / �K�E�Z������
 
-    //漢気ゲージを増やす(上限は1本分の合計値でクランプ)
+    //���C�Q�[�W�𑝂₷(�����1�{���̍��v�l�ŃN�����v)
     public void AddKankiGauge(float amount)
     {
         float max = kankiGaugePerBar * kankiGaugeBarCount;
         float before = kankiGauge;
 
-        // ★追加：ガード失敗後の一定時間は、漢気ゲージの増加量を下げる（増加のみ。guardFailGaugeGainRate=0.5なら半減）
+        // ���ǉ��F�K�[�h���s��̈�莞�Ԃ́A���C�Q�[�W�̑����ʂ�������i�����̂݁BguardFailGaugeGainRate=0.5�Ȃ甼���j
         if (amount > 0f && guardFailGaugeTimer > 0) amount *= guardFailGaugeGainRate;
 
         kankiGauge = Mathf.Clamp(kankiGauge + amount, 0f, max);
         UpdateAtkByGauge();
 
-        GaugeDLog($"[{PlayerName}] 漢気ゲージ増加：+{amount:F1}（{before:F1} → {kankiGauge:F1} / 上限{max:F1}）");
+        GaugeDLog($"[{PlayerName}] ���C�Q�[�W�����F+{amount:F1}�i{before:F1} �� {kankiGauge:F1} / ���{max:F1}�j");
 
-        //ゲージUIを更新（このPlayerインスタンス自身のゲージ表示を更新する）
+        //�Q�[�WUI���X�V�i����Player�C���X�^���X���g�̃Q�[�W�\�����X�V����j
         if (gameMNG != null)
         {
             gameMNG.Player_UpdateKankiGauge();
         }
         else
         {
-            GaugeDLog($"[{PlayerName}] gameMNGがnullのため漢気ゲージUIを更新できません。");
+            GaugeDLog($"[{PlayerName}] gameMNG��null�̂��ߊ��C�Q�[�WUI���X�V�ł��܂���B");
         }
     }
 
-    //漢気ゲージを減らす(0未満にはならない)
+    //���C�Q�[�W�����炷(0�����ɂ͂Ȃ�Ȃ�)
     public void ReduceKankiGauge(float amount)
     {
         float before = kankiGauge;
         kankiGauge = Mathf.Clamp(kankiGauge - amount, 0f, kankiGaugePerBar * kankiGaugeBarCount);
         UpdateAtkByGauge();
 
-        GaugeDLog($"[{PlayerName}] 漢気ゲージ減少：-{amount:F1}（{before:F1} → {kankiGauge:F1}）");
+        GaugeDLog($"[{PlayerName}] ���C�Q�[�W�����F-{amount:F1}�i{before:F1} �� {kankiGauge:F1}�j");
 
-        //ゲージUIを更新（このPlayerインスタンス自身のゲージ表示を更新する）
-        // ★修正：以前はEnemy(CPU)用のUI更新メソッドを誤って呼んでおり、
-        //   Player(P1/P2)の減少がゲージUIに反映されていなかった。
+        //�Q�[�WUI���X�V�i����Player�C���X�^���X���g�̃Q�[�W�\�����X�V����j
+        // ���C���F�ȑO��Enemy(CPU)�p��UI�X�V���\�b�h������ČĂ�ł���A
+        //   Player(P1/P2)�̌������Q�[�WUI�ɔ��f����Ă��Ȃ������B
         if (gameMNG != null)
         {
             gameMNG.Player_UpdateKankiGauge();
         }
         else
         {
-            GaugeDLog($"[{PlayerName}] gameMNGがnullのため漢気ゲージUIを更新できません。");
+            GaugeDLog($"[{PlayerName}] gameMNG��null�̂��ߊ��C�Q�[�WUI���X�V�ł��܂���B");
         }
     }
 
-    //ゲージの満タン本数に応じて攻撃力を再計算する
+    //�Q�[�W�̖��^���{���ɉ����čU���͂��Čv�Z����
     private void UpdateAtkByGauge()
     {
         int filledBars = Mathf.FloorToInt(kankiGauge / kankiGaugePerBar);
-        // ★追加：漢気復活による攻撃力上昇中は倍率を掛ける（1未満にはならない）。
-        //   ここに組み込むことで、攻撃のたびにatkが再計算されても上昇が消えない。
+        // ���ǉ��F���C�����ɂ��U���͏㏸���͔{�����|����i1�����ɂ͂Ȃ�Ȃ��j�B
+        //   �����ɑg�ݍ��ނ��ƂŁA�U���̂��т�atk���Čv�Z����Ă��㏸�������Ȃ��B
         float reviveMultiplier = isReviveBuffed ? Mathf.Max(1f, reviveAtkMultiplier) : 1f;
-        // ★追加：ガード成功中（次の攻撃が当たるまで）は、次に与える技のダメージ倍率を掛ける（1未満にはならない）
+        // ���ǉ��F�K�[�h�������i���̍U����������܂Łj�́A���ɗ^����Z�̃_���[�W�{�����|����i1�����ɂ͂Ȃ�Ȃ��j
         float guardMultiplier = isGuardBuffed ? Mathf.Max(1f, guardBuffMultiplier) : 1f;
         atk = Mathf.RoundToInt(baseAtk * (1f + atkPowerPerBar * filledBars) * reviveMultiplier * guardMultiplier);
 
-        // ★追加：ゲージ量が変わるたびに、充填中エフェクトのON/OFFを判定し直す
+        // ���ǉ��F�Q�[�W�ʂ��ς�邽�тɁA�[�U���G�t�F�N�g��ON/OFF�𔻒肵����
         UpdateKankiChargeEffect(filledBars >= 1);
     }
 
-    // ★追加：充填中エフェクトが何かの拍子に止まっていたら再生し直す（毎フレームUpdateから呼ぶ）。
-    //   ゲージが1本以上ある間は出し続けるための保険。
+    // ���ǉ��F�[�U���G�t�F�N�g�������̔��q�Ɏ~�܂��Ă�����Đ��������i���t���[��Update����Ăԁj�B
+    //   �Q�[�W��1�{�ȏ゠��Ԃ͏o�������邽�߂̕ی��B
     private void MaintainKankiChargeEffect()
     {
         if (!enableKankiChargeEffect) return;
@@ -4681,7 +4730,8 @@ public class Player : MonoBehaviour
         bool hasBar = Mathf.FloorToInt(kankiGauge / kankiGaugePerBar) >= 1;
         if (!hasBar) return;
 
-        // 生成されていない（破棄された等）場合は作り直し、止まっている場合は再生し直す
+        // ��������Ă��Ȃ��i�j�����ꂽ���j�ꍇ�͍�蒼���A�~�܂��Ă���ꍇ�͍Đ�������
+        //�㕔���̃G�t�F�N�g
         if (activeKankiChargeEffect == null || !activeKankiChargeEffect.gameObject.activeInHierarchy)
         {
             activeKankiChargeEffect = null;
@@ -4690,20 +4740,31 @@ public class Player : MonoBehaviour
         else if (!activeKankiChargeEffect.isPlaying)
         {
             activeKankiChargeEffect.Play();
-            EffectDLog($"[{PlayerName}] 漢気ゲージ充填中エフェクトが停止していたため再生し直し");
+            EffectDLog($"[{PlayerName}] ���C�Q�[�W�[�U���G�t�F�N�g����~���Ă������ߍĐ�������");
+        }
+        //�������̃G�t�F�N�g
+        if (activeKankiChargeEffect_Ground == null || !activeKankiChargeEffect_Ground.gameObject.activeInHierarchy)
+        {
+            activeKankiChargeEffect_Ground = null;
+            UpdateKankiChargeEffect(true);
+        }
+        else if (!activeKankiChargeEffect_Ground.isPlaying)
+        {
+            activeKankiChargeEffect_Ground.Play();
+            EffectDLog($"[{PlayerName}] ���C�Q�[�W�[�U���G�t�F�N�g����~���Ă������ߍĐ�������");
         }
     }
 
-    // ★追加：漢気ゲージ充填中エフェクトの開始／停止を切り替える。
-    //   hasBar = 1本以上たまっているか。状態が変わった時だけ生成・停止する（多重生成しない）。
+    // ���ǉ��F���C�Q�[�W�[�U���G�t�F�N�g�̊J�n�^��~��؂�ւ���B
+    //   hasBar = 1�{�ȏソ�܂��Ă��邩�B��Ԃ��ς���������������E��~����i���d�������Ȃ��j�B
     private void UpdateKankiChargeEffect(bool hasBar)
     {
         if (hasBar && enableKankiChargeEffect)
         {
             if (kankiChargeEffectPrefab == null)
             {
-                // ★Prefab未設定だと何も出ないため、原因に気づけるよう警告を出す（常時出力）
-                Debug.LogWarning($"[{PlayerName}] kankiChargeEffectPrefabが未設定のため、漢気ゲージ充填中エフェクトを出せません。Inspectorで設定してください。", this);
+                // ��Prefab���ݒ肾�Ɖ����o�Ȃ����߁A�����ɋC�Â���悤�x�����o���i�펞�o�́j
+                Debug.LogWarning($"[{PlayerName}] kankiChargeEffectPrefab�����ݒ�̂��߁A���C�Q�[�W�[�U���G�t�F�N�g���o���܂���BInspector�Őݒ肵�Ă��������B", this);
                 return;
             }
 
@@ -4716,12 +4777,19 @@ public class Player : MonoBehaviour
             activeKankiChargeEffect = Instantiate(
                 kankiChargeEffectPrefab,
                 transform.position + kankiChargeEffectOffset,
-                Quaternion.Euler(90f, 0f, 0f),
-                transform); // プレイヤーに追従させるため子オブジェクトにする
+                Quaternion.Euler(-90f, 0f, 0f),
+                transform); // �v���C���[�ɒǏ]�����邽�ߎq�I�u�W�F�N�g�ɂ���
             activeKankiChargeEffect.transform.localPosition = kankiChargeEffectOffset;
 
-            // ★Prefab側の設定に関係なく、ゲージが1本以上ある間は出し続けるようループを強制する。
-            //   （Loop OFF・Stop Action=Destroy/Disableだと1回だけで終わってしまうため）
+            activeKankiChargeEffect_Ground = Instantiate(
+                kankiChargeEffectPrefab_Ground,
+                transform.position + kankiChargeEffectOffset,
+                Quaternion.Euler(90f, 0f, 0f)); // �v���C���[�ɒǏ]�����邽�ߎq�I�u�W�F�N�g�ɂ���
+            activeKankiChargeEffect_Ground.transform.position = new Vector3(transform.position.x, 0.25f, transform.position.z );
+
+            // ��Prefab���̐ݒ�Ɋ֌W�Ȃ��A�Q�[�W��1�{�ȏ゠��Ԃ͏o��������悤���[�v����������B
+            //   �iLoop OFF�EStop Action=Destroy/Disable����1�񂾂��ŏI����Ă��܂����߁j
+            //�G�t�F�N�g�㕔��
             foreach (var ps in activeKankiChargeEffect.GetComponentsInChildren<ParticleSystem>(true))
             {
                 var main = ps.main;
@@ -4729,34 +4797,49 @@ public class Player : MonoBehaviour
                 main.stopAction = ParticleSystemStopAction.None;
                 if (kankiChargeEffectFollowLocal) main.simulationSpace = ParticleSystemSimulationSpace.Local;
             }
-
+            //�G�t�F�N�g������
+            foreach (var ps in activeKankiChargeEffect_Ground.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                var main = ps.main;
+                main.loop = true;
+                main.stopAction = ParticleSystemStopAction.None;
+                if (kankiChargeEffectFollowLocal) main.simulationSpace = ParticleSystemSimulationSpace.Local;
+            }
+           
             activeKankiChargeEffect.Play();
+            activeKankiChargeEffect_Ground.Play();
 
-            EffectDLog($"[{PlayerName}] 漢気ゲージ充填中エフェクト開始 pos={activeKankiChargeEffect.transform.position} / ゲージ={kankiGauge:F1}");
+
+
+            EffectDLog($"[{PlayerName}] ���C�Q�[�W�[�U���G�t�F�N�g�J�n pos={activeKankiChargeEffect.transform.position} / �Q�[�W={kankiGauge:F1}");
         }
         else
         {
             if (activeKankiChargeEffect == null) return;
 
-            // 新規発生だけ止め、出ている分は自然にフェードアウトさせる
+            // �V�K���������~�߁A�o�Ă��镪�͎��R�Ƀt�F�[�h�A�E�g������
             activeKankiChargeEffect.Stop(true, ParticleSystemStopBehavior.StopEmitting);
             Destroy(activeKankiChargeEffect.gameObject, activeKankiChargeEffect.main.startLifetime.constantMax + 0.5f);
             activeKankiChargeEffect = null;
 
-            EffectDLog($"[{PlayerName}] 漢気ゲージ充填中エフェクト終了 / ゲージ={kankiGauge:F1}");
+            activeKankiChargeEffect_Ground.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            Destroy(activeKankiChargeEffect_Ground.gameObject, activeKankiChargeEffect_Ground.main.startLifetime.constantMax + 0.5f);
+            activeKankiChargeEffect = null;
+
+            EffectDLog($"[{PlayerName}] ���C�Q�[�W�[�U���G�t�F�N�g�I�� / �Q�[�W={kankiGauge:F1}");
         }
     }
 
-    // ★追加：ガード成功による一時的な攻撃力上昇分をクリアし、
-    //   漢気ゲージ補正だけを反映した本来の攻撃力に戻す。
-    //   自分の攻撃が相手に命中した直後（被弾側のOnTriggerEnterから）呼び出される想定。
+    // ���ǉ��F�K�[�h�����ɂ��ꎞ�I�ȍU���͏㏸�����N���A���A
+    //   ���C�Q�[�W�␳�����𔽉f�����{���̍U���͂ɖ߂��B
+    //   �����̍U��������ɖ�����������i��e����OnTriggerEnter����j�Ăяo�����z��B
     public void ResetAtkAfterHit()
     {
         UpdateAtkByGauge();
     }
 
-    //UI(Sliderなど)から参照するための、指定した本数目のゲージの充填率(0〜1)を返す
-    //barIndex: 0 = 1本目, 1 = 2本目
+    //UI(Slider�Ȃ�)����Q�Ƃ��邽�߂́A�w�肵���{���ڂ̃Q�[�W�̏[�U��(0?1)��Ԃ�
+    //barIndex: 0 = 1�{��, 1 = 2�{��
     public float GetGaugeFillRatio(int barIndex)
     {
         float barStart = barIndex * kankiGaugePerBar;
@@ -4764,7 +4847,7 @@ public class Player : MonoBehaviour
         return filled / kankiGaugePerBar;
     }
 
-    //現在のゲージ合計値(生の値)を取得したい場合用
+    //���݂̃Q�[�W���v�l(���̒l)���擾�������ꍇ�p
     public float GetKankiGauge()
     {
         return kankiGauge;
