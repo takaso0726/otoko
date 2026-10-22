@@ -1126,10 +1126,10 @@ MonoBehaviour:
     anchor: {fileID: 1826866024}
     selectableBy: 0
     portraitPrefab: {fileID: 6336644418830442420, guid: 8e33293c4f330b940bc7c55ee7dce3f3, type: 3}
-    portraitOffsetP1: {x: 3.4, y: 3, z: 2}
-    portraitOffsetP2: {x: 3.4, y: 3, z: -2}
-    portraitRotationP1: {x: 0, y: 0, z: 0}
-    portraitRotationP2: {x: 0, y: 180, z: 0}
+    portraitOffsetP1: {x: -0.8, y: -0.7, z: 0.3}
+    portraitOffsetP2: {x: -0.8, y: -0.7, z: -0.3}
+    portraitRotationP1: {x: 0, y: -30, z: 0}
+    portraitRotationP2: {x: 0, y: 140, z: 0}
     portraitScaleMultiplier: 1
     nameImage: {fileID: 21300000, guid: 6c11f61f6fa31294b97445ad79a53490, type: 3}
   - characterName: MACHO
@@ -1138,7 +1138,7 @@ MonoBehaviour:
     portraitPrefab: {fileID: 6091258825155012558, guid: 7d5289afc3bb301478feba81684481dc, type: 3}
     portraitOffsetP1: {x: 0, y: -2.8, z: 0}
     portraitOffsetP2: {x: 0, y: -2.8, z: 0}
-    portraitRotationP1: {x: 0, y: -180, z: 0}
+    portraitRotationP1: {x: 0, y: 0, z: 0}
     portraitRotationP2: {x: 0, y: 180, z: 0}
     portraitScaleMultiplier: 1
     nameImage: {fileID: 21300000, guid: 8e43d1fdcd29fd341a9e85b774cd56bb, type: 3}
