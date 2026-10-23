@@ -1763,6 +1763,16 @@ MonoBehaviour:
   MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
+  throwSe: {fileID: 8300000, guid: de46853a9acbfae4aa241ed3545b3035, type: 3}
+  jumpSe: {fileID: 8300000, guid: 2fe169cc90cbd814a95b1d13edc85a4b, type: 3}
+  punchSe: {fileID: 8300000, guid: 81e4b74fd63a95341bf549ef4843a0f3, type: 3}
+  flyingKickSe: {fileID: 8300000, guid: 7b2b1225850ba654fbfc1d6d1860981d, type: 3}
+  kickSe: {fileID: 8300000, guid: 7b2b1225850ba654fbfc1d6d1860981d, type: 3}
+  upKickSe: {fileID: 8300000, guid: b5078d7ec23a0a540bdb9f64a851f441, type: 3}
+  downKickSe: {fileID: 8300000, guid: 89ca68a0d355e7e4ab853f080abcba7e, type: 3}
+  missSe: {fileID: 8300000, guid: e7ab6d3d37fc8ff44ac29131740ff34d, type: 3}
+  missSeJudgeFrames: 0
+  actionSeVolume: 0.6
   punchHitEffectData: {fileID: 11400000, guid: 8772ce0eb28849c4abaede33a1153937, type: 2}
   kickHitEffectData: {fileID: 11400000, guid: d4c9d40f25fe1244796e06fbb64cc7fc, type: 2}
   guardHitEffectData: {fileID: 11400000, guid: 0efc11a881f5de141897cb73e3f94d51, type: 2}
@@ -1774,6 +1784,7 @@ MonoBehaviour:
   guardHitStopFrames: 3
   freezeAnimatorDuringHitStop: 1
   playHeadHitStateDirectly: 1
+  enableHeadHitboxOnAttack: 0
   punchAtk: 10
   punchMissFrames: 15
   punchHitFrames: 15
@@ -1844,7 +1855,7 @@ MonoBehaviour:
   specialRequiredGauge: 100
   specialGaugeCost: 100
   specialFrames: 180
-  specialSe: {fileID: 0}
+  specialSe: {fileID: 8300000, guid: 936ceddae1cbdf54da033375ff45f276, type: 3}
   specialEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
   specialEffectOffset: {x: 0, y: 0, z: 0}
   specialEffectLifetime: 2.45

@@ -416,6 +416,33 @@ public class Player : MonoBehaviour
     public ParticleSystem Men_particle;      // 仁王立ち用のパーティクル
     public ParticleSystem Hit_particle;      // ヒット時用のパーティクル
 
+    //=====================================================
+    // ★追加：行動SE。パンチ・キック・投げは、まず空振りかどうかを判定し、空振りならmissSeだけ／そうでなければその行動のSEを鳴らす。ジャンプは判定せずそのまま鳴らす。
+    //   Inspectorに、MP3等のAudioClipをドラッグ＆ドロップして設定する。未設定の技は鳴らさない。
+    //   再生には、このGameObjectに AudioSource コンポーネントが必要。
+    //=====================================================
+    [Header("行動SE（パンチ・キック等。MP3のAudioClipを割り当て）")]
+    [Tooltip("投げで相手を掴めた時のSE。掴めなかった時はMiss Seが鳴る。")]
+    [SerializeField] AudioClip throwSe;
+    [Tooltip("ジャンプした時のSE")]
+    [SerializeField] AudioClip jumpSe;
+    [Tooltip("パンチが空振りでなかった（命中した）時のSE。空振りの時はMiss Seが鳴る。")]
+    [SerializeField] AudioClip punchSe;
+    [Tooltip("空中攻撃（飛び蹴り）が空振りでなかった（命中した）時のSE。")]
+    [SerializeField] AudioClip flyingKickSe;
+    [Tooltip("通常キックが空振りでなかった（命中した）時のSE。")]
+    [SerializeField] AudioClip kickSe;
+    [Tooltip("上キックが空振りでなかった（命中した）時のSE。")]
+    [SerializeField] AudioClip upKickSe;
+    [Tooltip("下キックが空振りでなかった（命中した）時のSE。")]
+    [SerializeField] AudioClip downKickSe;
+    [Tooltip("攻撃（パンチ・キック・上キック・下キック）が当たらなかった時、または投げで相手を掴めなかった時のSE。空振りの時は、この音だけを鳴らす。")]
+    [SerializeField] AudioClip missSe;
+    [Tooltip("空振りと判定するまでの、攻撃開始からのフレーム数（60F=1秒）。この時間が経っても未命中ならmissSeを鳴らす。\n0＝攻撃モーションが終わった時に鳴らす。\n※空振りと確定した後に命中しても、その攻撃の技SEは鳴らない。")]
+    [SerializeField] int missSeJudgeFrames = 0;
+    [Tooltip("行動SEの音量（0～1）")]
+    [SerializeField, Range(0f, 1f)] float actionSeVolume = 1f;
+
     [Header("擬音演出（ドカン・ドドン等）")]
     public HitEffectData punchHitEffectData;   // パンチ（空中攻撃含む）被弾時に出す擬音の設定
     public HitEffectData kickHitEffectData;    // キック（通常/上/下すべて共通）被弾時に出す擬音の設定
@@ -899,6 +926,11 @@ public class Player : MonoBehaviour
 
     // 現在の攻撃で、既に何回ヒットが確定したか。EnterPunch/EnterKick等、新しい攻撃の開始時に0へリセットする。
     private int hitCountThisAttack = 0;
+    private AudioClip pendingAttackSe;            // ★追加：今の攻撃で「空振りでなければ鳴らす」技のSE（命中が確定した瞬間に鳴らす。空振りなら破棄）
+    private bool throwGrabbedThisThrow = false;  // ★追加：今の投げ動作で相手を掴めたか（掴めなかった＝空振り）
+    private bool wasInThrowForMissSe = false;    // ★追加：前フレームで投げ動作の最中だったか
+    private bool wasInAttackForMissSe = false; // ★追加：前フレームで攻撃（パンチ/キック系）の最中だったか（攻撃が途中で中断された時の空振りSE判定用）
+    private bool missSePlayedThisAttack = false; // ★追加：今の攻撃で空振りSEを鳴らし済みか（二重再生防止）
 
     // 必殺技が最後にヒットを確定したフレーム（CurrentFrame）。specialHitCooldownFramesの間隔判定に使用する。
     // 新しい攻撃の開始時（ResetMultiHitCount）に十分過去の値へリセットし、前回の攻撃のクールタイムを引きずらないようにする。
@@ -909,6 +941,8 @@ public class Player : MonoBehaviour
     {
         hitCountThisAttack = 0;
         lastSpecialHitFrame = -999999;
+        missSePlayedThisAttack = false;
+        pendingAttackSe = null; // 新しい攻撃の開始時に、前の攻撃の保留SEを破棄する
     }
 
     // 攻撃の種類（AttackType）に応じた多段ヒット設定を返す。
@@ -1028,6 +1062,10 @@ public class Player : MonoBehaviour
     // ★追加：被弾した相手側から「あなたの攻撃、当たりましたよ」と通知してもらうための公開メソッド。
     public void NotifyAttackLanded()
     {
+        // ★追加：空振りではなかった（命中した）ので、保留していた技のSEを鳴らす。空振りが確定済みなら鳴らさない。
+        if (pendingAttackSe != null && !missSePlayedThisAttack) PlayActionSe(pendingAttackSe);
+        pendingAttackSe = null;
+
         // ★追加：この攻撃で最初の命中だった場合、クールダウンを「空振り時」から「命中時」の長さへ切り替える。
         //   （必殺技や投げなど、CurrentAttackTypeがNoneの状態では対象外）
         if (!attackLandedThisAttack && CurrentAttackType != AttackType.None)
@@ -1800,6 +1838,7 @@ public class Player : MonoBehaviour
     //   Updateの最後ではなくLateUpdateで行うことで、物理演算(FixedUpdate)による移動分も確実に制限できる。
     void LateUpdate()
     {
+        CheckMissSeOnAttackEnd(); // ★追加：攻撃が当たらないまま終わった／中断された時の空振りSE
         SyncGuardAnimation(); // ★追加：仁王立ち（Guard状態）の間だけ、仁王立ちアニメーションを再生する
 
         // ★リザルト画面モード：向きの自動変更・押しのけ・位置クランプを行わず、配置した位置のまま動かさない
@@ -3067,6 +3106,7 @@ public class Player : MonoBehaviour
 
         animator.ResetTrigger("Land"); // ★追加：前回の着地フラグが未消費で残っていた場合に、次の着地で誤再生しないよう消す
         animator.SetTrigger("Jump");
+        PlayActionSe(jumpSe);
         rb.AddForce(force);
         Jumpflag = false; // 空中に出たので再度ジャンプできないようにする
     }
@@ -3074,6 +3114,54 @@ public class Player : MonoBehaviour
     //-----------------------------------------------------
     // 拘束のある状態（攻撃・ガード・投げ）への遷移
     //-----------------------------------------------------
+
+    // ★追加：行動SEを1回再生する共通処理。clip未設定なら何もしない。
+    //   PlayOneShotなので、連打しても前の音を途切れさせずに重ねて鳴らせる。
+    void PlayActionSe(AudioClip clip)
+    {
+        if (clip == null) return;
+        if (se == null)
+        {
+            Debug.LogWarning($"[{PlayerName}] AudioSourceコンポーネントが無いため、SEを再生できません。このGameObjectにAudioSourceを追加してください。", this);
+            return;
+        }
+        se.PlayOneShot(clip, actionSeVolume);
+    }
+
+    // ★追加：攻撃開始時に、その技のSEを「保留」する。まず空振りかどうかを判定し、空振りでなければ（命中したら）NotifyAttackLandedで鳴らす。
+    //   リザルト画面は命中判定を行わないので、保留せずその場で鳴らす。
+    void SetAttackSe(AudioClip clip)
+    {
+        if (isResultMode) { PlayActionSe(clip); return; }
+        pendingAttackSe = clip;
+    }
+
+    // ★追加：空振りSEを鳴らす共通処理。1回の攻撃につき1回だけ鳴る。その技のSEは鳴らさない。リザルト画面（攻撃が当たらない仕様）では鳴らさない。
+    void PlayMissSe()
+    {
+        if (isResultMode || missSePlayedThisAttack) return;
+        missSePlayedThisAttack = true;
+        DLog($"[{PlayerName}] 空振り判定：{CurrentAttackType} / 空振りSE={(missSe != null ? missSe.name : "未設定")}");
+        pendingAttackSe = null; // ★空振りが確定したので、その技のSEは鳴らさない（空振りSEだけを鳴らす）
+        PlayActionSe(missSe);
+    }
+
+    // ★追加：攻撃（パンチ/キック/上キック/下キック）の状態から抜けた瞬間に、一度も命中していなければ空振りSEを鳴らす。
+    //   時間切れでの終了だけでなく、被弾・やられ状態・掴まれ・ダウン等で攻撃が途中で中断された場合も確実に拾うため、
+    //   Updateの途中returnの影響を受けないLateUpdateから毎フレーム呼ぶ。
+    void CheckMissSeOnAttackEnd()
+    {
+        bool inThrow = currentState == PlayerState.Throw;
+        bool inAction = CurrentAttackType != AttackType.None || inThrow;
+        if (wasInAttackForMissSe && !inAction)
+        {
+            // 直前まで投げ動作なら「掴めたか」、攻撃なら「命中したか」で空振りを判定する
+            bool landed = wasInThrowForMissSe ? throwGrabbedThisThrow : attackLandedThisAttack;
+            if (!landed) PlayMissSe();
+        }
+        wasInAttackForMissSe = inAction;
+        wasInThrowForMissSe = inThrow;
+    }
 
     // パンチ（弱攻撃）処理。地上か空中かでアニメーションと当たり判定を切り替える
     void EnterPunch()
@@ -3100,12 +3188,14 @@ public class Player : MonoBehaviour
         {
             //弱攻撃(パンチ)
             animator.SetTrigger("Punch");
+            SetAttackSe(punchSe);
             RightHand.enabled = true;
         }
         else
         {
             //空中攻撃
             animator.SetTrigger("Flying-kick");
+            SetAttackSe(flyingKickSe);
             LeftFoot.enabled = true;
             LeftLeg.enabled = true;
             RightFoot.enabled = true;
@@ -3135,6 +3225,7 @@ public class Player : MonoBehaviour
             stateTimer = downKickMissFrames;
             currentAttackMissFrames = downKickMissFrames;
             animator.SetTrigger("DownKick");
+            SetAttackSe(downKickSe);
             RightFoot.enabled = true;
             RightLeg.enabled = true;
 
@@ -3148,6 +3239,7 @@ public class Player : MonoBehaviour
             stateTimer = upKickMissFrames;
             currentAttackMissFrames = upKickMissFrames;
             animator.SetTrigger("UpKick");
+            SetAttackSe(upKickSe);
             DLog($"[{PlayerName}] UpKick発動：Triggerを立てました（moveInput.y={moveInput.y:F2}）");
             DebugUpKickAnimator(); // ★デバッグ：Animatorが実際にどのステートへ遷移したかを確認する
             RightFoot.enabled = true;
@@ -3163,6 +3255,7 @@ public class Player : MonoBehaviour
             stateTimer = kickMissFrames;
             currentAttackMissFrames = kickMissFrames;
             animator.SetTrigger("Kick");
+            SetAttackSe(kickSe);
             RightFoot.enabled = true;
             RightUpLeg.enabled = true;
             RightLeg.enabled = true;
@@ -3281,6 +3374,9 @@ public class Player : MonoBehaviour
 
         currentState = PlayerState.Throw;
         stateTimer = throwFrames;
+        throwGrabbedThisThrow = false;   // ★追加：まだ掴めていない（掴めないまま終われば空振り）
+        missSePlayedThisAttack = false;
+        pendingAttackSe = null;
         animator.SetTrigger("Throw-start"); // 掴み（ホールド）モーション。飛ばす瞬間は別トリガー"Throw-release"を使う
         grabbedTarget = null;
 
@@ -3314,6 +3410,8 @@ public class Player : MonoBehaviour
         if (!canThrow || target == null || !target.CanBeGrabbed()) return;
 
         DLog($"[{PlayerName}] 掴み成立（手が接触）：{target.PlayerName}");
+        throwGrabbedThisThrow = true;
+        PlayActionSe(throwSe); // ★追加：空振りではなく掴めたので、投げのSEを鳴らす
         throwReaching = false;
         canThrow = false;                      // 一度成立したら再度多重に発動しないようにする
         grabbedTarget = target;
@@ -3816,12 +3914,22 @@ public class Player : MonoBehaviour
         }
 
         stateTimer -= frameStep;
+
+        // ★追加：空振りSE（攻撃開始からmissSeJudgeFramesフレーム経っても未命中なら鳴らす。0なら下の攻撃終了時に鳴らす）
+        if (missSeJudgeFrames > 0 && !missSePlayedThisAttack && !attackLandedThisAttack
+            && CurrentAttackType != AttackType.None
+            && currentAttackMissFrames - stateTimer >= missSeJudgeFrames)
+        {
+            PlayMissSe();
+        }
+
         if (stateTimer > 0) return;
 
         // 攻撃系の状態（パンチ/キック/上キック/下キック）が、
         // 一度も命中通知(NotifyAttackLanded)を受けないまま終了したら「空振り」とみなす
         if (CurrentAttackType != AttackType.None && !attackLandedThisAttack)
         {
+            PlayMissSe(); // ★追加：空振りSE
             if (HitEffectSpawner.Instance != null && missHitEffectData != null)
             {
                 //出す位置の調整
@@ -3831,6 +3939,9 @@ public class Player : MonoBehaviour
                 EffectDLog($"[{PlayerName}] 空振り擬音エフェクト発生 pos={transkunn}");
             }
         }
+
+        // ★追加：相手を一度も掴めないまま投げ動作が終わったら空振り
+        if (currentState == PlayerState.Throw && !throwGrabbedThisThrow) PlayMissSe();
 
         // ★追加：掴み拘束が時間切れになった＝相手が脱出できなかった場合、ここで実際に投げ飛ばす
         if (currentState == PlayerState.Throw)
