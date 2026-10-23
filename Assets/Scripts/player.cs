@@ -488,6 +488,10 @@ public class Player : MonoBehaviour
         public float upSpeed = 0f;
     }
 
+    [Header("ヤンキー用：頭（P-Head）の当たり判定設定")]
+    [Tooltip("ON：パンチ・キック（空中攻撃／上キック／下キック含む）を出している間、P-Headの当たり判定もONにする。ヤンキーのみONにしてください。\nOFF：従来どおり（P-Headは攻撃判定に使わない）。")]
+    [SerializeField] bool enableHeadHitboxOnAttack = false;
+
     [Header("パンチ（空中攻撃含む）")]
     [Tooltip("① パンチの攻撃力（ダメージ量）")]
     [SerializeField] int punchAtk = 10;
@@ -3106,6 +3110,9 @@ public class Player : MonoBehaviour
             LeftLeg.enabled = true;
             RightFoot.enabled = true;
         }
+
+        // ★追加：ヤンキー用。パンチ（空中攻撃含む）の際にP-Headの当たり判定もONにする
+        EnableHeadHitboxForAttack();
     }
 
     // キック処理。スティックの上下入力で通常／上／下キックに分岐する
@@ -3164,6 +3171,18 @@ public class Player : MonoBehaviour
             baseAtk = GetAttackPower(AttackType.Kick);
             UpdateAtkByGauge();
         }
+
+        // ★追加：ヤンキー用。キック（通常／上／下）の際にP-Headの当たり判定もONにする
+        EnableHeadHitboxForAttack();
+    }
+
+    // ★追加：ヤンキー用。enableHeadHitboxOnAttackがONの時だけ、P-Headの当たり判定をONにする。
+    //   OFFにするのは既存のDisableAllHitboxes()（allHitboxesにHeadが含まれる）が担当するため、ここではONにするだけ。
+    void EnableHeadHitboxForAttack()
+    {
+        if (!enableHeadHitboxOnAttack) return;
+        if (Head == null) return; // P-Headが見つからない場合はStart()でエラーログが出ている
+        Head.enabled = true;
     }
 
     // ★デバッグ：UpKickのTriggerを立てた後、Animatorが実際に何を再生しているかをログに出す。

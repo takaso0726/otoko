@@ -28,7 +28,7 @@
                     "name": "Punch",
                     "type": "Button",
                     "id": "baae7c7e-98da-49f2-8702-13c5178f7c9b",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false

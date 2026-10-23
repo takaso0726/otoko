@@ -279,12 +279,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2603809734799396450}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.6543455, y: 0.000028520177, z: 0.000033176315, w: 0.7561958}
-  m_LocalPosition: {x: 0.003940597, y: 0.10305017, z: 0.039476506}
+  m_LocalRotation: {x: 0.6543456, y: 0.000028520173, z: 0.000033176337, w: 0.7561957}
+  m_LocalPosition: {x: 0.0039421855, y: -0.04047151, z: -0.14483681}
   m_LocalScale: {x: 0.14999999, y: 0.30000004, z: 0.15000002}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 5555685829789401787}
+  m_Father: {fileID: 982216523576678067}
   m_LocalEulerAnglesHint: {x: 85.59, y: 0, z: 0}
 --- !u!136 &2616544537315758225
 CapsuleCollider:
@@ -1484,8 +1484,8 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6245420579371356287, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
       insertIndex: 0
       addedObject: {fileID: 270862090571430391}
-    - targetCorrespondingSourceObject: {fileID: 4433736421436952064, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
-      insertIndex: 0
+    - targetCorrespondingSourceObject: {fileID: -198297325268084216, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 2714226650599693063}
     - targetCorrespondingSourceObject: {fileID: -1060898660593129330, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
       insertIndex: 0
@@ -1526,6 +1526,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -523103517749296521, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
   m_PrefabInstance: {fileID: 8114933592203906235}
   m_PrefabAsset: {fileID: 0}
+--- !u!4 &982216523576678067 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -198297325268084216, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
+  m_PrefabInstance: {fileID: 8114933592203906235}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1389401962981231877 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -2029385507006791234, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
@@ -1549,11 +1554,6 @@ Transform:
 --- !u!4 &3535303445131780839 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4724806918063369820, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
-  m_PrefabInstance: {fileID: 8114933592203906235}
-  m_PrefabAsset: {fileID: 0}
---- !u!4 &5555685829789401787 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 4433736421436952064, guid: f5d9840f1c2686f498cce270c2ab36e9, type: 3}
   m_PrefabInstance: {fileID: 8114933592203906235}
   m_PrefabAsset: {fileID: 0}
 --- !u!4 &6038874264891920028 stripped
@@ -1691,19 +1691,20 @@ MonoBehaviour:
   guardHitStopFrames: 3
   freezeAnimatorDuringHitStop: 1
   playHeadHitStateDirectly: 1
+  enableHeadHitboxOnAttack: 0
   punchAtk: 10
-  punchMissFrames: 30
-  punchHitFrames: 30
-  punchStunFrames: 18
+  punchMissFrames: 15
+  punchHitFrames: 15
+  punchStunFrames: 9
   punchHitStopFrames: 5
   punchKnockback:
     horizontalSpeed: 2.5
     upSpeed: 0
-  kickAtk: 30
-  kickMissFrames: 36
-  kickHitFrames: 36
-  kickStunFrames: 24
-  kickHitStopFrames: 5
+  kickAtk: 60
+  kickMissFrames: 18
+  kickHitFrames: 18
+  kickStunFrames: 12
+  kickHitStopFrames: 2
   kickKnockback:
     horizontalSpeed: 3.5
     upSpeed: 0
@@ -1744,6 +1745,7 @@ MonoBehaviour:
   atkPowerPerBar: 0.25
   enableKankiChargeEffect: 1
   kankiChargeEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
+  kankiChargeEffectPrefab_Ground: {fileID: 0}
   kankiChargeEffectOffset: {x: 0, y: 0, z: 0}
   kankiChargeEffectFollowLocal: 1
   enableKankiRevive: 1
@@ -1751,9 +1753,11 @@ MonoBehaviour:
   reviveAtkMultiplier: 1.5
   reviveAtkBuffFrames: 600
   kankiReviveEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
+  kankiReviveEffectPrefab_Ground: {fileID: 0}
   kankiReviveEffectOffset: {x: 0, y: 0, z: 0}
   kankiReviveEffectLifetime: 3
   reviveBuffEffectPrefab: {fileID: 4071785266033440036, guid: 3e8e5f6985c3f4c419ef9c6176185b7f, type: 3}
+  reviveBuffEffectPrefab_Ground: {fileID: 0}
   reviveBuffEffectOffset: {x: 0, y: 0, z: 0}
   specialRequiredGauge: 100
   specialGaugeCost: 100
@@ -2000,7 +2004,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62899f850307741f2a39c98a8b639597, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.PlayerInput
-  m_Actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  m_Actions: {fileID: -944628639613478452, guid: 89d9b6bbf4a1ae745b414d4dc9b3d149, type: 3}
   m_NotificationBehavior: 0
   m_UIInputModule: {fileID: 0}
   m_DeviceLostEvent:
