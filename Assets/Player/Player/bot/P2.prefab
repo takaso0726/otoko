@@ -1760,6 +1760,8 @@ MonoBehaviour:
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   throwSe: {fileID: 8300000, guid: de46853a9acbfae4aa241ed3545b3035, type: 3}
   jumpSe: {fileID: 8300000, guid: 2fe169cc90cbd814a95b1d13edc85a4b, type: 3}
+  throwLaunchSe: {fileID: 8300000, guid: 70a95877bb48f7a499dbd6d9e096d58e, type: 3}
+  landSe: {fileID: 8300000, guid: 579c6f92e9d242d41bf209a1d043d331, type: 3}
   punchSe: {fileID: 8300000, guid: 81e4b74fd63a95341bf549ef4843a0f3, type: 3}
   flyingKickSe: {fileID: 8300000, guid: 7b2b1225850ba654fbfc1d6d1860981d, type: 3}
   kickSe: {fileID: 8300000, guid: 7b2b1225850ba654fbfc1d6d1860981d, type: 3}

@@ -417,7 +417,8 @@ public class Player : MonoBehaviour
     public ParticleSystem Hit_particle;      // ヒット時用のパーティクル
 
     //=====================================================
-    // ★追加：行動SE。パンチ・キック・投げは、まず空振りかどうかを判定し、空振りならmissSeだけ／そうでなければその行動のSEを鳴らす。ジャンプは判定せずそのまま鳴らす。
+    // ★追加：行動SE。パンチ・キック・投げは、まず空振りかどうかを判定し、空振りならmissSeだけ／そうでなければその行動のSEを鳴らす。
+    //   ジャンプ・ジャンプ着地・投げ飛ばし（投げ成立）は空振り判定をせず、そのまま鳴らす。
     //   Inspectorに、MP3等のAudioClipをドラッグ＆ドロップして設定する。未設定の技は鳴らさない。
     //   再生には、このGameObjectに AudioSource コンポーネントが必要。
     //=====================================================
@@ -426,6 +427,10 @@ public class Player : MonoBehaviour
     [SerializeField] AudioClip throwSe;
     [Tooltip("ジャンプした時のSE")]
     [SerializeField] AudioClip jumpSe;
+    [Tooltip("投げが成立し、相手を投げ飛ばした瞬間のSE（掴めた瞬間のThrow Seとは別）")]
+    [SerializeField] AudioClip throwLaunchSe;
+    [Tooltip("ジャンプして地面に着地した時のSE（ジャンプ以外で空中に出た時の着地では鳴らない）")]
+    [SerializeField] AudioClip landSe;
     [Tooltip("パンチが空振りでなかった（命中した）時のSE。空振りの時はMiss Seが鳴る。")]
     [SerializeField] AudioClip punchSe;
     [Tooltip("空中攻撃（飛び蹴り）が空振りでなかった（命中した）時のSE。")]
@@ -928,6 +933,7 @@ public class Player : MonoBehaviour
     private int hitCountThisAttack = 0;
     private AudioClip pendingAttackSe;            // ★追加：今の攻撃で「空振りでなければ鳴らす」技のSE（命中が確定した瞬間に鳴らす。空振りなら破棄）
     private bool throwGrabbedThisThrow = false;  // ★追加：今の投げ動作で相手を掴めたか（掴めなかった＝空振り）
+    private bool jumpLandSeArmed = false;        // ★追加：ジャンプで空中に出た後、まだ着地SEを鳴らしていないか
     private bool wasInThrowForMissSe = false;    // ★追加：前フレームで投げ動作の最中だったか
     private bool wasInAttackForMissSe = false; // ★追加：前フレームで攻撃（パンチ/キック系）の最中だったか（攻撃が途中で中断された時の空振りSE判定用）
     private bool missSePlayedThisAttack = false; // ★追加：今の攻撃で空振りSEを鳴らし済みか（二重再生防止）
@@ -3107,6 +3113,7 @@ public class Player : MonoBehaviour
         animator.ResetTrigger("Land"); // ★追加：前回の着地フラグが未消費で残っていた場合に、次の着地で誤再生しないよう消す
         animator.SetTrigger("Jump");
         PlayActionSe(jumpSe);
+        jumpLandSeArmed = true; // ★追加：次に着地した時に着地SEを鳴らす
         rb.AddForce(force);
         Jumpflag = false; // 空中に出たので再度ジャンプできないようにする
     }
@@ -3589,6 +3596,7 @@ public class Player : MonoBehaviour
         }
 
         DLog($"[{PlayerName}] 投げ成立！{grabbedTarget.PlayerName}を投げ飛ばす");
+        PlayActionSe(throwLaunchSe); // ★追加：相手を投げ飛ばした瞬間のSE
 
         ResumeGrabHoldAnimation();            // ★追加：止めていた掴みモーションを再開してからトリガーを上げる
         animator.SetTrigger("Throw-release"); // 投げ成立時だけ上げる「投げ飛ばす」モーション用トリガー
@@ -4452,6 +4460,10 @@ public class Player : MonoBehaviour
             //   開始時にスポーンして床に触れただけ等、空中にいなかった場合はフラグを立てないため。
             bool wasAirborne = !Jumpflag;
 
+            // ★追加：ジャンプして着地した時だけ着地SEを鳴らす（ノックバック・投げ等で空中に出た場合は鳴らさない）。
+            bool playLandSe = wasAirborne && jumpLandSeArmed;
+            jumpLandSeArmed = false;
+
             Jumpflag = true;
 
             // ★追加：投げで放物線状に吹き飛ばされている最中に地面へ着地したら、Thrown状態を終えて復帰する
@@ -4467,6 +4479,7 @@ public class Player : MonoBehaviour
                      && currentState != PlayerState.KnockedDown && currentState != PlayerState.Dead)
             {
                 animator.SetTrigger("Land"); // ★要Animator追加：Triggerパラメータ"Land"
+                if (playLandSe) PlayActionSe(landSe); // ★追加：ジャンプ着地SE
                 DLog($"[{PlayerName}] 着地：Landフラグを立てました");
             }
         }
