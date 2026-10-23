@@ -68,6 +68,9 @@ public class CharacterSelectController : MonoBehaviour
         [Tooltip("このキャラを選べるプレイヤー。例: 「Player1」というキャラは Player1Only、「Player2」は Player2Only にすると、それぞれ1P・2Pだけが選べる")]
         public SelectablePlayer selectableBy = SelectablePlayer.Both;
 
+        [Tooltip("「同じキャラ」とみなすグループ名。同じ名前（空以外）を設定したキャラ同士は、1Pと2Pが別々に選んでも同キャラ扱いになる。例: 「Player1」と「Player2」の両方に \"Player\" と入れる。空なら通常どおり同じ項目を選んだ時だけ同キャラ")]
+        public string sameCharacterGroup;
+
         [Header("ドアップ表示")]
         [Tooltip("カーソルを合わせた時に表示するドアップ用プレハブ（1P・2P共通）。各プレイヤーの portraitRoot の子として生成される。Image/アニメーション/Spine等、中身は自由")]
         public GameObject portraitPrefab;
@@ -122,6 +125,12 @@ public class CharacterSelectController : MonoBehaviour
     [SerializeField] PlayerSelector player2;
     [SerializeField] float cursorMoveSpeed = 12f;
 
+    [Header("同じキャラを選んだ時のREADY")]
+    [Tooltip("1Pと2Pが同じキャラを決定した時だけ表示する専用READYマーク（Inspectorで非アクティブにしておく）。表示中は1P用・2P用のREADYマークは両方消える")]
+    [SerializeField] GameObject sameCharacterReadyMark;
+    [Tooltip("同キャラ用READYマークを、キャラのアンカー位置からどれだけずらすか（ScreenSpace-Overlayならピクセル単位）")]
+    [SerializeField] Vector2 sameCharacterReadyMarkOffset;
+
     [Header("SE")]
     [SerializeField] AudioSource se;
     [SerializeField] AudioClip moveSE;      // カーソル移動時
@@ -134,6 +143,7 @@ public class CharacterSelectController : MonoBehaviour
 
     bool isTransitioning;
     bool initialized;
+    bool sameMarkShown; // 同キャラ用READYマークを表示中か
     Coroutine p1CursorRoutine;
     Coroutine p2CursorRoutine;
 
@@ -143,6 +153,7 @@ public class CharacterSelectController : MonoBehaviour
         // isTransitioning や decided が戻らないと、一度両者が決定した後に
         // このオブジェクトが再利用された場合、二度と入力を受け付けなくなる。
         isTransitioning = false;
+        HideSameCharacterReadyMark();
 
         if (player1 != null)
         {
@@ -206,6 +217,7 @@ public class CharacterSelectController : MonoBehaviour
 
         SetReadyMarkActive(player1, false);
         SetReadyMarkActive(player2, false);
+        HideSameCharacterReadyMark();
         SetCursorVisible(player1, true);
         SetCursorVisible(player2, true);
         UpdateSelectionDisplay(player1, 1);
@@ -247,6 +259,9 @@ public class CharacterSelectController : MonoBehaviour
 
         HandlePlayer(player1, ReadP1Direction(), ReadP1Decide(), ReadP1Cancel(), ref p1CursorRoutine, 1);
         HandlePlayer(player2, ReadP2Direction(), ReadP2Decide(), ReadP2Cancel(), ref p2CursorRoutine, 2);
+
+        // 決定／キャンセルの結果に応じて、通常のREADYマークと同キャラ用READYマークを切り替える
+        RefreshReadyMarks();
 
         // 両者が決定していたら遷移演出へ
         if (player1.decided && player2.decided)
@@ -370,6 +385,79 @@ public class CharacterSelectController : MonoBehaviour
 
         // 他のUI（キャラアイコンなど）の裏に隠れないよう、同じ親の中で最前面へ持ってくる
         p.readyMark.transform.SetAsLastSibling();
+    }
+
+    // 現在の決定状況から、どのREADYマークを出すかを毎回決め直す。
+    //  ・1P・2Pが両方決定済み かつ 同じキャラ → 同キャラ用READYマークだけ表示（1P用・2P用は消す）
+    //  ・それ以外 → 決定済みのプレイヤーの通常READYマークだけ表示（同キャラ用は消す）
+    // 状態から毎回判定する作り（キャンセルで片方が選び直した場合も自動で元に戻る）。
+    void RefreshReadyMarks()
+    {
+        bool sameCharacterReady =
+            player1.decided && player2.decided &&
+            IsSameCharacter(player1.currentIndex, player2.currentIndex);
+
+        // 専用マークが未設定なら、従来どおり1P・2Pのマークをそのまま出す
+        if (sameCharacterReady && sameCharacterReadyMark != null)
+        {
+            SetReadyMarkActive(player1, false);
+            SetReadyMarkActive(player2, false);
+
+            if (!sameMarkShown)
+            {
+                PlaceSameCharacterReadyMark();
+                sameCharacterReadyMark.SetActive(true);
+                sameMarkShown = true;
+            }
+        }
+        else
+        {
+            HideSameCharacterReadyMark();
+            SetReadyMarkActive(player1, player1.decided);
+            SetReadyMarkActive(player2, player2.decided);
+        }
+    }
+
+    // 2つのキャラ項目を「同じキャラ」とみなすか。
+    // 同じ項目、または sameCharacterGroup が同じ（空以外）なら true。
+    bool IsSameCharacter(int indexA, int indexB)
+    {
+        if (indexA == indexB) return true;
+        if (characters == null) return false;
+        if (indexA < 0 || indexA >= characters.Length) return false;
+        if (indexB < 0 || indexB >= characters.Length) return false;
+
+        string groupA = characters[indexA].sameCharacterGroup;
+        string groupB = characters[indexB].sameCharacterGroup;
+        return !string.IsNullOrEmpty(groupA) && groupA == groupB;
+    }
+
+    void PlaceSameCharacterReadyMark()
+    {
+        if (characters == null) return;
+        if (player1.currentIndex < 0 || player1.currentIndex >= characters.Length) return;
+        if (player2.currentIndex < 0 || player2.currentIndex >= characters.Length) return;
+
+        var anchor1 = characters[player1.currentIndex].anchor;
+        var anchor2 = characters[player2.currentIndex].anchor;
+        if (anchor1 == null && anchor2 == null) return;
+
+        // 同じ項目なら位置はそのまま、別項目（Player1とPlayer2など）なら2つの中間に置く
+        Vector3 pos = anchor1 == null ? anchor2.position
+                    : anchor2 == null ? anchor1.position
+                    : (anchor1.position + anchor2.position) * 0.5f;
+
+        sameCharacterReadyMark.transform.position = pos + (Vector3)sameCharacterReadyMarkOffset;
+        sameCharacterReadyMark.transform.SetAsLastSibling(); // 他のUIの裏に隠れないよう最前面へ
+    }
+
+    void HideSameCharacterReadyMark()
+    {
+        sameMarkShown = false;
+        if (sameCharacterReadyMark != null)
+        {
+            sameCharacterReadyMark.SetActive(false);
+        }
     }
 
     // 決定時はカーソルを隠してREADYマークだけを見せ、選び直し時はカーソルを再表示する
