@@ -880,8 +880,8 @@ MonoBehaviour:
   glowMinAlpha: 0.4
   glowMaxAlpha: 1
   se: {fileID: 970440765}
-  moveSE: {fileID: 8300000, guid: 43301a7900b4a194185c4ebf8caac99b, type: 3}
-  decideSE: {fileID: 8300000, guid: 3a2df26007a98a94d98eb89c9f9835a5, type: 3}
+  moveSE: {fileID: 8300000, guid: 2fc70cfe42e586e4680986a24fdbabd2, type: 3}
+  decideSE: {fileID: 8300000, guid: 43301a7900b4a194185c4ebf8caac99b, type: 3}
   idleShowcase: {fileID: 0}
   quitPopup: {fileID: 0}
 --- !u!212 &1160619188
