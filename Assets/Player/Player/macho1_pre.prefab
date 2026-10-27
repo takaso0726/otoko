@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 7679660695332262858}
   - component: {fileID: 7384799604865576732}
   - component: {fileID: 3928462235861624783}
-  m_Layer: 10
+  m_Layer: 12
   m_Name: P-RightFoot-Ground
   m_TagString: P1Attack
   m_Icon: {fileID: 0}
@@ -656,7 +656,7 @@ GameObject:
   - component: {fileID: 6410912079631024262}
   - component: {fileID: 3658188962459428434}
   - component: {fileID: 2689625331338116321}
-  m_Layer: 10
+  m_Layer: 12
   m_Name: P-LeftFoot-Ground
   m_TagString: P1Attack
   m_Icon: {fileID: 0}
@@ -1792,12 +1792,12 @@ MonoBehaviour:
   minMoveAnimSpeed: 0.4
   maxMoveAnimSpeed: 1.4
   minMoveSpeedRatio: 0.4
-  minPosition: {x: -10, y: -10, z: -10}
+  minPosition: {x: -10, y: 0.12, z: -10}
   maxPosition: {x: 10, y: 10, z: 10}
-  force: {x: 0, y: 0, z: 0}
+  force: {x: 0, y: 500, z: 0}
   Jumpflag: 1
-  HP: 100
-  maxHP: 100
+  HP: 1000
+  maxHP: 1000
   atk: 10
   Player_status: 0
   guardFrames: 30
