@@ -1591,6 +1591,20 @@ MonoBehaviour:
   enableThrowStartPlay: 0
   throwReleaseRecoveryFrames: 20
   throwInputStartDelayFrames: 10
+  throwHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 0
+    rightUpLeg: 0
+    rightLeg: 0
+    rightFoot: 0
+    leftArm: 0
+    leftForeArm: 1
+    leftHand: 1
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
   guardSuccessNextAttackMultiplier: 1.5
   guardSuccessMaxMultiplier: 0
   guardFailGaugeGainRate: 0.5
@@ -1610,6 +1624,18 @@ MonoBehaviour:
   MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
+  throwSe: {fileID: 0}
+  jumpSe: {fileID: 0}
+  throwLaunchSe: {fileID: 0}
+  landSe: {fileID: 0}
+  punchSe: {fileID: 0}
+  flyingKickSe: {fileID: 0}
+  kickSe: {fileID: 0}
+  upKickSe: {fileID: 0}
+  downKickSe: {fileID: 0}
+  missSe: {fileID: 0}
+  missSeJudgeFrames: 0
+  actionSeVolume: 1
   punchHitEffectData: {fileID: 11400000, guid: 8772ce0eb28849c4abaede33a1153937, type: 2}
   kickHitEffectData: {fileID: 11400000, guid: d4c9d40f25fe1244796e06fbb64cc7fc, type: 2}
   guardHitEffectData: {fileID: 11400000, guid: 0efc11a881f5de141897cb73e3f94d51, type: 2}
@@ -1630,6 +1656,34 @@ MonoBehaviour:
   punchKnockback:
     horizontalSpeed: 1
     upSpeed: 5
+  punchHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 1
+    rightUpLeg: 0
+    rightLeg: 0
+    rightFoot: 0
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
+  flyingKickHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 0
+    rightUpLeg: 0
+    rightLeg: 0
+    rightFoot: 1
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 1
+    leftFoot: 1
   kickAtk: 60
   kickMissFrames: 18
   kickHitFrames: 18
@@ -1638,6 +1692,20 @@ MonoBehaviour:
   kickKnockback:
     horizontalSpeed: 5
     upSpeed: 5
+  kickHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 0
+    rightUpLeg: 1
+    rightLeg: 1
+    rightFoot: 1
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
   upKickAtk: 80
   upKickMissFrames: 21
   upKickHitFrames: 21
@@ -1646,6 +1714,20 @@ MonoBehaviour:
   upKickKnockback:
     horizontalSpeed: 5
     upSpeed: 10
+  upKickHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 0
+    rightUpLeg: 0
+    rightLeg: 1
+    rightFoot: 1
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
   downKickAtk: 20
   downKickMissFrames: 15
   downKickHitFrames: 15
@@ -1654,12 +1736,40 @@ MonoBehaviour:
   downKickKnockback:
     horizontalSpeed: 5
     upSpeed: 0
+  downKickHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 0
+    rightUpLeg: 0
+    rightLeg: 1
+    rightFoot: 1
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
   specialAtk: 100
   specialHitStopFrames: 5
   specialKnockback:
     horizontalSpeed: 2
     upSpeed: 5
   specialStunFrames: 10
+  specialHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 0
+    rightUpLeg: 0
+    rightLeg: 0
+    rightFoot: 0
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 1
+    leftLeg: 1
+    leftFoot: 1
   enableGuardSuccessEffect: 1
   guardSuccessEffectPrefab: {fileID: 8365365947410503083, guid: 3e810419a41d2184da2046cdec7abe38, type: 3}
   guardSuccessEffectOffset: {x: 0, y: 1.98, z: 0}
@@ -1896,7 +2006,7 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.31
+  m_Radius: 0.64
   m_Height: 1.88
   m_Direction: 1
   m_Center: {x: 0, y: 0.89, z: 0}
