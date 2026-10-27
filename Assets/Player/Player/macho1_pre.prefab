@@ -382,26 +382,26 @@ MonoBehaviour:
   standCenter: {x: 0, y: 1, z: 0}
   crouchHeight: 0.65
   crouchCenter: {x: 0, y: 0.5, z: 0}
-  MenBlock_se: {fileID: 0}
-  Men_particle: {fileID: 0}
-  Hit_particle: {fileID: 0}
-  throwSe: {fileID: 0}
-  jumpSe: {fileID: 0}
-  throwLaunchSe: {fileID: 0}
-  landSe: {fileID: 0}
-  punchSe: {fileID: 0}
-  flyingKickSe: {fileID: 0}
-  kickSe: {fileID: 0}
-  upKickSe: {fileID: 0}
-  downKickSe: {fileID: 0}
-  missSe: {fileID: 0}
+  MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
+  Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
+  Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
+  throwSe: {fileID: 8300000, guid: de46853a9acbfae4aa241ed3545b3035, type: 3}
+  jumpSe: {fileID: 8300000, guid: 2fe169cc90cbd814a95b1d13edc85a4b, type: 3}
+  throwLaunchSe: {fileID: 8300000, guid: 70a95877bb48f7a499dbd6d9e096d58e, type: 3}
+  landSe: {fileID: 8300000, guid: 579c6f92e9d242d41bf209a1d043d331, type: 3}
+  punchSe: {fileID: 8300000, guid: 81e4b74fd63a95341bf549ef4843a0f3, type: 3}
+  flyingKickSe: {fileID: 8300000, guid: 7b2b1225850ba654fbfc1d6d1860981d, type: 3}
+  kickSe: {fileID: 8300000, guid: 7b2b1225850ba654fbfc1d6d1860981d, type: 3}
+  upKickSe: {fileID: 8300000, guid: b5078d7ec23a0a540bdb9f64a851f441, type: 3}
+  downKickSe: {fileID: 8300000, guid: 89ca68a0d355e7e4ab853f080abcba7e, type: 3}
+  missSe: {fileID: 8300000, guid: e7ab6d3d37fc8ff44ac29131740ff34d, type: 3}
   missSeJudgeFrames: 0
   actionSeVolume: 1
-  punchHitEffectData: {fileID: 0}
-  kickHitEffectData: {fileID: 0}
-  guardHitEffectData: {fileID: 0}
-  mashHitEffectData: {fileID: 0}
-  missHitEffectData: {fileID: 0}
+  punchHitEffectData: {fileID: 11400000, guid: 8772ce0eb28849c4abaede33a1153937, type: 2}
+  kickHitEffectData: {fileID: 11400000, guid: d4c9d40f25fe1244796e06fbb64cc7fc, type: 2}
+  guardHitEffectData: {fileID: 11400000, guid: 0efc11a881f5de141897cb73e3f94d51, type: 2}
+  mashHitEffectData: {fileID: 11400000, guid: de286e7f5553bf1418b0df8c98938742, type: 2}
+  missHitEffectData: {fileID: 11400000, guid: 182479a3e4175444d9090102939c91b9, type: 2}
   hitEffectFacingBasis: 0
   enableHitStop: 1
   hitStopFrames: 5
@@ -448,11 +448,11 @@ MonoBehaviour:
     upSpeed: 0
   specialStunFrames: 30
   enableGuardSuccessEffect: 1
-  guardSuccessEffectPrefab: {fileID: 0}
+  guardSuccessEffectPrefab: {fileID: 8365365947410503083, guid: 3e810419a41d2184da2046cdec7abe38, type: 3}
   guardSuccessEffectOffset: {x: 0, y: 1, z: 0}
   guardSuccessEffectLifetime: 1
   enableGuardBuffEffect: 1
-  guardBuffEffectPrefab: {fileID: 0}
+  guardBuffEffectPrefab: {fileID: 3568051733618127096, guid: 2e2455a33c696d74dbe4a1baff6ff255, type: 3}
   guardBuffEffectOffset: {x: 0, y: 1, z: 0}
   kankiGaugePerBar: 100
   kankiGaugeBarCount: 2
@@ -461,7 +461,7 @@ MonoBehaviour:
   gaugeLossOnRetreat: 5
   atkPowerPerBar: 0.25
   enableKankiChargeEffect: 1
-  kankiChargeEffectPrefab: {fileID: 6396199705279390725, guid: 3033e5beaf41edf45b102dad69361753, type: 3}
+  kankiChargeEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
   kankiChargeEffectPrefab_Ground: {fileID: 0}
   kankiChargeEffectOffset: {x: 0, y: 0, z: 0}
   kankiChargeEffectFollowLocal: 1
@@ -469,24 +469,24 @@ MonoBehaviour:
   kankiReviveBarCost: 1
   reviveAtkMultiplier: 1.5
   reviveAtkBuffFrames: 600
-  kankiReviveEffectPrefab: {fileID: 0}
+  kankiReviveEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
   kankiReviveEffectPrefab_Ground: {fileID: 0}
   kankiReviveEffectOffset: {x: 0, y: 1, z: 0}
   kankiReviveEffectLifetime: 2
-  reviveBuffEffectPrefab: {fileID: 0}
+  reviveBuffEffectPrefab: {fileID: 4071785266033440036, guid: 3e8e5f6985c3f4c419ef9c6176185b7f, type: 3}
   reviveBuffEffectPrefab_Ground: {fileID: 0}
   reviveBuffEffectOffset: {x: 0, y: 1, z: 0}
   specialRequiredGauge: 200
   specialGaugeCost: 200
   specialFrames: 180
   specialSe: {fileID: 0}
-  specialEffectPrefab: {fileID: 0}
+  specialEffectPrefab: {fileID: 1101930952765147975, guid: aa7cae11511d77b4caf98876930e23f2, type: 3}
   specialEffectOffset: {x: 0, y: 1, z: 0}
   specialEffectLifetime: 1.5
   enemy: {fileID: 0}
   enemyPlayer: {fileID: 0}
   animator: {fileID: 0}
-  fightingCamera: {fileID: 0}
+  fightingCamera: {fileID: 9096632630280813122, guid: 89c452da849cda84489bc37e8a782689, type: 3}
   downStartTrigger: Down-start
   downBoolParam: Down
   downReviveTrigger: Down-revive
@@ -524,8 +524,8 @@ MonoBehaviour:
   mashRemainingColor: {r: 1, g: 1, b: 1, a: 1}
   mashRemainingYRatio: 0.42
   showMashButtonImage: 1
-  mashButtonNormalImage: {fileID: 0}
-  mashButtonPressedImage: {fileID: 0}
+  mashButtonNormalImage: {fileID: 2800000, guid: 252576c28c75a7f4f99964946c62997e, type: 3}
+  mashButtonPressedImage: {fileID: 2800000, guid: c3a4f25883c8d0549877dde7d3e52035, type: 3}
   mashButtonPressedFrames: 4
   mashButtonReleaseMinFrames: 3
   mashButtonSizeRatio: 0.22

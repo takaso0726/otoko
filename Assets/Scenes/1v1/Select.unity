@@ -1198,9 +1198,9 @@ MonoBehaviour:
     anchor: {fileID: 232355151}
     selectableBy: 0
     sameCharacterGroup: 
-    portraitPrefab: {fileID: 6091258825155012558, guid: 7d5289afc3bb301478feba81684481dc, type: 3}
-    portraitOffsetP1: {x: 0, y: -2.8, z: 0}
-    portraitOffsetP2: {x: 0, y: -2.8, z: 0}
+    portraitPrefab: {fileID: 1123702133609149220, guid: 75e61bd66c94bbb419ce9e58ae5a3124, type: 3}
+    portraitOffsetP1: {x: 0, y: -1.1, z: 0}
+    portraitOffsetP2: {x: 0, y: -1.1, z: 0}
     portraitRotationP1: {x: 0, y: 0, z: 0}
     portraitRotationP2: {x: 0, y: 180, z: 0}
     portraitScaleMultiplier: 1

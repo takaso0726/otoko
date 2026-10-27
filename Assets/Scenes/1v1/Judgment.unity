@@ -443,7 +443,7 @@ MonoBehaviour:
   - characterName: YANGKY
     displayObject: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
   - characterName: MACHO
-    displayObject: {fileID: 6091258825155012558, guid: 23f3f3187d9194847abb1a9217ac0c56, type: 3}
+    displayObject: {fileID: 1123702133609149220, guid: 62980fe514fbfc74ebf72b0b974b4d02, type: 3}
   - characterName: MACHO
     displayObject: {fileID: 7402421456741996747, guid: b7e74d8823895804d9afa4d20b48dddc, type: 3}
   winnerSpawnPoint: {fileID: 865107448}
