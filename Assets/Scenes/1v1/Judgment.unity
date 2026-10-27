@@ -450,7 +450,7 @@ MonoBehaviour:
   fallbackWinnerDisplay: {fileID: 0}
   winnerAppearDelay: 0
   winnerPopDuration: 0
-  winnerAppearSE: {fileID: 8300000, guid: 78215c0163ae6f14e9dbae9023719665, type: 3}
+  winnerAppearSE: {fileID: 8300000, guid: 11b0132746de86c40bd730cafe13af03, type: 3}
   faceCameraOnAppear: 1
   faceTargetCamera: {fileID: 816588688}
   faceCameraYawOffset: 0

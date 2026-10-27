@@ -1681,7 +1681,7 @@ MonoBehaviour:
   PlayerTransform: {fileID: 0}
   EnemyTransform: {fileID: 0}
   cameraController: {fileID: 330585548}
-  BGM: {fileID: 8300000, guid: 78215c0163ae6f14e9dbae9023719665, type: 3}
+  BGM: {fileID: 0}
   gameOverSceneName: GameOver
   gameClearSceneName: GameClear
   inGame1v1ResultSceneName: Judgment
@@ -4592,7 +4592,7 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 8300000, guid: 75acb84104e43b341acddee0ad0a353a, type: 3}
+  m_Resource: {fileID: 8300000, guid: 4890cfa2729718144a28ac1b5945ea5c, type: 3}
   m_PlayOnAwake: 1
   m_Volume: 1
   m_Pitch: 1
