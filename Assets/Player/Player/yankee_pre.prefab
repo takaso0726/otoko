@@ -1860,6 +1860,20 @@ MonoBehaviour:
   enableThrowStartPlay: 0
   throwReleaseRecoveryFrames: 20
   throwInputStartDelayFrames: 10
+  throwHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 0
+    rightUpLeg: 0
+    rightLeg: 0
+    rightFoot: 0
+    leftArm: 0
+    leftForeArm: 1
+    leftHand: 1
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
   guardSuccessNextAttackMultiplier: 1.5
   guardSuccessMaxMultiplier: 0
   guardFailGaugeGainRate: 0.5
@@ -1902,7 +1916,7 @@ MonoBehaviour:
   guardHitStopFrames: 3
   freezeAnimatorDuringHitStop: 1
   playHeadHitStateDirectly: 1
-  enableHeadHitboxOnAttack: 0
+  enableHeadHitboxOnAttack: 1
   punchAtk: 10
   punchMissFrames: 15
   punchHitFrames: 15
@@ -1911,6 +1925,34 @@ MonoBehaviour:
   punchKnockback:
     horizontalSpeed: 2.5
     upSpeed: 0
+  punchHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 1
+    rightUpLeg: 0
+    rightLeg: 0
+    rightFoot: 0
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
+  flyingKickHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 0
+    rightUpLeg: 0
+    rightLeg: 0
+    rightFoot: 1
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 1
+    leftFoot: 1
   kickAtk: 60
   kickMissFrames: 18
   kickHitFrames: 18
@@ -1919,6 +1961,20 @@ MonoBehaviour:
   kickKnockback:
     horizontalSpeed: 3.5
     upSpeed: 0
+  kickHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 0
+    rightUpLeg: 1
+    rightLeg: 1
+    rightFoot: 1
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
   upKickAtk: 40
   upKickMissFrames: 42
   upKickHitFrames: 42
@@ -1927,6 +1983,20 @@ MonoBehaviour:
   upKickKnockback:
     horizontalSpeed: 2
     upSpeed: 5
+  upKickHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 0
+    rightUpLeg: 0
+    rightLeg: 1
+    rightFoot: 1
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
   downKickAtk: 10
   downKickMissFrames: 30
   downKickHitFrames: 30
@@ -1935,12 +2005,40 @@ MonoBehaviour:
   downKickKnockback:
     horizontalSpeed: 3
     upSpeed: 0
+  downKickHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 0
+    rightUpLeg: 0
+    rightLeg: 1
+    rightFoot: 1
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
   specialAtk: 100
   specialHitStopFrames: 5
   specialKnockback:
     horizontalSpeed: 2
     upSpeed: 5
   specialStunFrames: 10
+  specialHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 0
+    rightUpLeg: 0
+    rightLeg: 0
+    rightFoot: 0
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 1
+    leftLeg: 1
+    leftFoot: 1
   enableGuardSuccessEffect: 1
   guardSuccessEffectPrefab: {fileID: 8365365947410503083, guid: 3e810419a41d2184da2046cdec7abe38, type: 3}
   guardSuccessEffectOffset: {x: 0, y: 1.98, z: 0}

@@ -315,6 +315,9 @@ public class Player : MonoBehaviour
              "この間は入力しても投げに移行せず、掴んだ状態を保つ。この間の入力は先行入力としては扱わず、\n" +
              "経過後も入力し続けている（押しっぱなし）場合に投げが決まる。")]
     [SerializeField] int throwInputStartDelayFrames = 10;
+    [Tooltip("★追加：投げ動作の間、当たり判定をONにする部位。ここでONになった部位が相手の体に接触した瞬間に掴みが成立する。\n" +
+             "既定は左手・左前腕。※投げ中にONになるコライダーは、すべて「掴みの接触」として扱われ、ダメージは発生しない。")]
+    [SerializeField] HitboxSetting throwHitbox = new HitboxSetting { leftHand = true, leftForeArm = true };
 
     //=====================================================
     // ★ガード（仁王立ち）成功時の攻撃力上昇設定
@@ -520,8 +523,35 @@ public class Player : MonoBehaviour
         public float upSpeed = 0f;
     }
 
+    //=====================================================
+    // ★追加：技ごとの「当たり判定（どの部位のコライダーをONにするか）」設定
+    //   各技（パンチ／空中攻撃／通常・上・下キック／必殺技／投げ）のInspectorに1つずつ用意してあり、
+    //   チェックを入れた部位のコライダーが、その技を出している間だけONになる（OFFに戻すのは従来どおり技の終了時）。
+    //   既定値は、これまでコード内に固定で書いていた部位と同じ（既存キャラの挙動は変わらない）。
+    //   ※ヤンキー用のP-Head追加は、下のenableHeadHitboxOnAttackで全技にまとめて追加することもできる。
+    //=====================================================
+    [System.Serializable]
+    public class HitboxSetting
+    {
+        [Tooltip("P-Head（頭）")] public bool head;
+        [Tooltip("P-RightArm（右上腕）")] public bool rightArm;
+        [Tooltip("P-RightForeArm（右前腕）")] public bool rightForeArm;
+        [Tooltip("P-RightHand（右手）")] public bool rightHand;
+        [Tooltip("P-RightUpLeg（右もも）")] public bool rightUpLeg;
+        [Tooltip("P-RightLeg（右すね）")] public bool rightLeg;
+        [Tooltip("P-RightFoot（右足）")] public bool rightFoot;
+        [Tooltip("P-LeftArm（左上腕）")] public bool leftArm;
+        [Tooltip("P-LeftForeArm（左前腕）")] public bool leftForeArm;
+        [Tooltip("P-LeftHand（左手）")] public bool leftHand;
+        [Tooltip("P-LeftUpLeg（左もも）")] public bool leftUpLeg;
+        [Tooltip("P-LeftLeg（左すね）")] public bool leftLeg;
+        [Tooltip("P-LeftFoot（左足）")] public bool leftFoot;
+    }
+
     [Header("ヤンキー用：頭（P-Head）の当たり判定設定")]
-    [Tooltip("ON：パンチ・キック（空中攻撃／上キック／下キック含む）を出している間、P-Headの当たり判定もONにする。ヤンキーのみONにしてください。\nOFF：従来どおり（P-Headは攻撃判定に使わない）。")]
+    [Tooltip("ON：下の各技の「当たり判定」設定に関係なく、パンチ（空中攻撃含む）・キック（通常／上／下）・必殺技を出している間、P-Headの当たり判定も必ずONにする。ヤンキーのみONにしてください。\n" +
+             "OFF：各技の「当たり判定」のチェックボックス設定どおり（P-Headは、その技のheadにチェックを入れた時だけONになる）。\n" +
+             "※投げ（掴み）には適用されない。投げでP-Headを使いたい場合は、投げの「当たり判定」のheadにチェックを入れる。")]
     [SerializeField] bool enableHeadHitboxOnAttack = false;
 
     [Header("パンチ（空中攻撃含む）")]
@@ -537,6 +567,10 @@ public class Player : MonoBehaviour
     [SerializeField] int punchHitStopFrames = 5;
     [Tooltip("④ パンチを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting punchKnockback = new KnockbackSetting { horizontalSpeed = 2.5f, upSpeed = 0f };
+    [Tooltip("⑥ パンチ（地上）を出している間、当たり判定をONにする部位。チェックした部位のコライダーが、パンチ中だけONになる。")]
+    [SerializeField] HitboxSetting punchHitbox = new HitboxSetting { rightHand = true };
+    [Tooltip("⑥ 空中攻撃（パンチ入力を空中で出した時のFlying-kick）を出している間、当たり判定をONにする部位。")]
+    [SerializeField] HitboxSetting flyingKickHitbox = new HitboxSetting { leftFoot = true, leftLeg = true, rightFoot = true };
 
 
     [Header("通常キック")]
@@ -552,6 +586,8 @@ public class Player : MonoBehaviour
     [SerializeField] int kickHitStopFrames = 5;
     [Tooltip("④ 通常キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting kickKnockback = new KnockbackSetting { horizontalSpeed = 3.5f, upSpeed = 0f };
+    [Tooltip("⑥ 通常キックを出している間、当たり判定をONにする部位。チェックした部位のコライダーが、キック中だけONになる。")]
+    [SerializeField] HitboxSetting kickHitbox = new HitboxSetting { rightFoot = true, rightUpLeg = true, rightLeg = true };
 
     [Header("上キック")]
     [Tooltip("① 上キックの攻撃力（ダメージ量）")]
@@ -566,6 +602,8 @@ public class Player : MonoBehaviour
     [SerializeField] int upKickHitStopFrames = 5;
     [Tooltip("④ 上キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting upKickKnockback = new KnockbackSetting { horizontalSpeed = 2f, upSpeed = 5f };
+    [Tooltip("⑥ 上キックを出している間、当たり判定をONにする部位。チェックした部位のコライダーが、上キック中だけONになる。")]
+    [SerializeField] HitboxSetting upKickHitbox = new HitboxSetting { rightFoot = true, rightLeg = true };
 
     [Header("下キック")]
     [Tooltip("① 下キックの攻撃力（ダメージ量）")]
@@ -580,6 +618,8 @@ public class Player : MonoBehaviour
     [SerializeField] int downKickHitStopFrames = 5;
     [Tooltip("④ 下キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting downKickKnockback = new KnockbackSetting { horizontalSpeed = 3f, upSpeed = 0f };
+    [Tooltip("⑥ 下キックを出している間、当たり判定をONにする部位。チェックした部位のコライダーが、下キック中だけONになる。")]
+    [SerializeField] HitboxSetting downKickHitbox = new HitboxSetting { rightFoot = true, rightLeg = true };
 
 
     [Header("必殺技（waza）")]
@@ -593,6 +633,8 @@ public class Player : MonoBehaviour
     [SerializeField] KnockbackSetting specialKnockback = new KnockbackSetting { horizontalSpeed = 0f, upSpeed = 0f };
     [Tooltip("⑤ 必殺技を当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
     [SerializeField] int specialStunFrames = 30;
+    [Tooltip("⑥ 必殺技（waza）を出している間、当たり判定をONにする部位。既定は左足（もも・すね・足）の3箇所。")]
+    [SerializeField] HitboxSetting specialHitbox = new HitboxSetting { leftFoot = true, leftUpLeg = true, leftLeg = true };
 
     //=====================================================
     // ★仁王立ち（ガード）成功エフェクト設定
@@ -3196,20 +3238,15 @@ public class Player : MonoBehaviour
             //弱攻撃(パンチ)
             animator.SetTrigger("Punch");
             SetAttackSe(punchSe);
-            RightHand.enabled = true;
+            EnableAttackHitboxes(punchHitbox);
         }
         else
         {
             //空中攻撃
             animator.SetTrigger("Flying-kick");
             SetAttackSe(flyingKickSe);
-            LeftFoot.enabled = true;
-            LeftLeg.enabled = true;
-            RightFoot.enabled = true;
+            EnableAttackHitboxes(flyingKickHitbox);
         }
-
-        // ★追加：ヤンキー用。パンチ（空中攻撃含む）の際にP-Headの当たり判定もONにする
-        EnableHeadHitboxForAttack();
     }
 
     // キック処理。スティックの上下入力で通常／上／下キックに分岐する
@@ -3233,8 +3270,7 @@ public class Player : MonoBehaviour
             currentAttackMissFrames = downKickMissFrames;
             animator.SetTrigger("DownKick");
             SetAttackSe(downKickSe);
-            RightFoot.enabled = true;
-            RightLeg.enabled = true;
+            EnableAttackHitboxes(downKickHitbox);
 
             // 下キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
             baseAtk = GetAttackPower(AttackType.DownKick);
@@ -3249,8 +3285,7 @@ public class Player : MonoBehaviour
             SetAttackSe(upKickSe);
             DLog($"[{PlayerName}] UpKick発動：Triggerを立てました（moveInput.y={moveInput.y:F2}）");
             DebugUpKickAnimator(); // ★デバッグ：Animatorが実際にどのステートへ遷移したかを確認する
-            RightFoot.enabled = true;
-            RightLeg.enabled = true;
+            EnableAttackHitboxes(upKickHitbox);
 
             // 上キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
             baseAtk = GetAttackPower(AttackType.UpKick);
@@ -3263,26 +3298,39 @@ public class Player : MonoBehaviour
             currentAttackMissFrames = kickMissFrames;
             animator.SetTrigger("Kick");
             SetAttackSe(kickSe);
-            RightFoot.enabled = true;
-            RightUpLeg.enabled = true;
-            RightLeg.enabled = true;
+            EnableAttackHitboxes(kickHitbox);
 
             // 通常キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
             baseAtk = GetAttackPower(AttackType.Kick);
             UpdateAtkByGauge();
         }
-
-        // ★追加：ヤンキー用。キック（通常／上／下）の際にP-Headの当たり判定もONにする
-        EnableHeadHitboxForAttack();
     }
 
-    // ★追加：ヤンキー用。enableHeadHitboxOnAttackがONの時だけ、P-Headの当たり判定をONにする。
-    //   OFFにするのは既存のDisableAllHitboxes()（allHitboxesにHeadが含まれる）が担当するため、ここではONにするだけ。
-    void EnableHeadHitboxForAttack()
+    // ★追加：技ごとの「当たり判定」設定（HitboxSetting）に従って、攻撃用コライダーをONにする。
+    //   ONにするだけで、OFFに戻すのは従来どおりDisableAllHitboxes()（技の終了時など）が担当する。
+    //   applyYankeeHead=true（既定）の時は、enableHeadHitboxOnAttack（ヤンキー用）がONならP-Headも必ずONにする。
+    void EnableAttackHitboxes(HitboxSetting setting, bool applyYankeeHead = true)
     {
-        if (!enableHeadHitboxOnAttack) return;
-        if (Head == null) return; // P-Headが見つからない場合はStart()でエラーログが出ている
-        Head.enabled = true;
+        if (setting == null) return;
+        TurnOnHitbox(Head, setting.head || (applyYankeeHead && enableHeadHitboxOnAttack));
+        TurnOnHitbox(RightArm, setting.rightArm);
+        TurnOnHitbox(RightForeArm, setting.rightForeArm);
+        TurnOnHitbox(RightHand, setting.rightHand);
+        TurnOnHitbox(RightUpLeg, setting.rightUpLeg);
+        TurnOnHitbox(RightLeg, setting.rightLeg);
+        TurnOnHitbox(RightFoot, setting.rightFoot);
+        TurnOnHitbox(LeftArm, setting.leftArm);
+        TurnOnHitbox(LeftForeArm, setting.leftForeArm);
+        TurnOnHitbox(LeftHand, setting.leftHand);
+        TurnOnHitbox(LeftUpLeg, setting.leftUpLeg);
+        TurnOnHitbox(LeftLeg, setting.leftLeg);
+        TurnOnHitbox(LeftFoot, setting.leftFoot);
+    }
+
+    // コライダーが取得できていて、onがtrueの時だけONにする（見つからない場合はStart()でエラーログが出ている）
+    static void TurnOnHitbox(CapsuleCollider hitbox, bool on)
+    {
+        if (on && hitbox != null) hitbox.enabled = true;
     }
 
     // ★デバッグ：UpKickのTriggerを立てた後、Animatorが実際に何を再生しているかをログに出す。
@@ -3393,18 +3441,17 @@ public class Player : MonoBehaviour
         //   触れないまま投げ動作(throwFrames)が終われば空振りで、掴めなかった時と同じく何も起きずにIdleへ戻る。
         throwReaching = true;
         grabHoldFrozen = false;
-        if (LeftHand != null) LeftHand.enabled = true;
-        if (LeftForeArm != null) LeftForeArm.enabled = true;
-        DLog($"[{PlayerName}] 投げ開始：左手・左前腕の当たり判定をON（接触した相手を掴む）");
+        EnableAttackHitboxes(throwHitbox, false); // 投げはヤンキー用P-Head一括追加の対象外（throwHitboxのheadで個別に設定）
+        DLog($"[{PlayerName}] 投げ開始：投げの当たり判定設定の部位をON（接触した相手を掴む）");
     }
 
-    // ★追加：今が投げ動作中で、colliderが「掴み用の手の当たり判定（左手／左前腕）」かどうかを返す。
+    // ★追加：今が投げ動作中で、colliderが「掴み用の当たり判定（throwHitboxで選んだ部位。既定は左手／左前腕）」かどうかを返す。
     //   相手側のOnTriggerEnterから、「これは通常の攻撃ヒットではなく掴みの接触だ」と区別するために使う。
     //   ※掴み成立後（throwReachingがfalse）でも、同じ物理フレームに残りの手のイベントが届くことがあるため、
     //     throwReachingは見ずに、投げ状態(Throw)であることだけで判定する（ダメージ処理へ流れないようにするため）。
     public bool IsGrabHitbox(Collider c)
     {
-        return currentState == PlayerState.Throw && (c == LeftHand || c == LeftForeArm);
+        return currentState == PlayerState.Throw && allHitboxes != null && System.Array.Exists(allHitboxes, hb => hb == c);
     }
 
     // ★追加：投げ動作中の手の当たり判定が相手(target)の体に接触した時に、相手側のOnTriggerEnterから呼ばれる。
@@ -3786,9 +3833,7 @@ public class Player : MonoBehaviour
 
         // 左足（3箇所）の攻撃用当たり判定をON。オフに戻す処理はTickBusyState()の
         // 拘束時間終了処理（DisableAllHitboxes）で他の技と共通して行われる。
-        LeftFoot.enabled = true;
-        LeftUpLeg.enabled = true;
-        LeftLeg.enabled = true;
+        EnableAttackHitboxes(specialHitbox);
 
         // 必殺技の攻撃力（Inspector設定値=specialAtk）を基準に、漢気ゲージ補正を反映して攻撃力を確定する
         baseAtk = specialAtk;
