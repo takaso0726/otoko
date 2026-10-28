@@ -1916,6 +1916,13 @@ MonoBehaviour:
   guardHitStopFrames: 3
   freezeAnimatorDuringHitStop: 1
   playHeadHitStateDirectly: 1
+  hitStateLight: HitLight
+  hitStateMedium: HitMedium
+  hitStateHeavy: HitHeavy
+  airHitStateLight: AirHitLight
+  airHitStateMedium: AirHitMedium
+  airHitStateHeavy: AirHitHeavy
+  enemyAttackStrength: 1
   enableHeadHitboxOnAttack: 1
   punchAtk: 10
   punchMissFrames: 15
@@ -1925,6 +1932,8 @@ MonoBehaviour:
   punchKnockback:
     horizontalSpeed: 2.5
     upSpeed: 0
+  punchStrength: 0
+  flyingKickStrength: 1
   punchHitbox:
     head: 0
     rightArm: 0
@@ -1954,13 +1963,14 @@ MonoBehaviour:
     leftLeg: 1
     leftFoot: 1
   kickAtk: 60
-  kickMissFrames: 18
+  kickMissFrames: 111
   kickHitFrames: 18
   kickStunFrames: 12
   kickHitStopFrames: 2
   kickKnockback:
     horizontalSpeed: 3.5
     upSpeed: 0
+  kickStrength: 1
   kickHitbox:
     head: 0
     rightArm: 0
@@ -1983,6 +1993,7 @@ MonoBehaviour:
   upKickKnockback:
     horizontalSpeed: 2
     upSpeed: 5
+  upKickStrength: 2
   upKickHitbox:
     head: 0
     rightArm: 0
@@ -2005,6 +2016,7 @@ MonoBehaviour:
   downKickKnockback:
     horizontalSpeed: 3
     upSpeed: 0
+  downKickStrength: 1
   downKickHitbox:
     head: 0
     rightArm: 0
@@ -2024,6 +2036,7 @@ MonoBehaviour:
   specialKnockback:
     horizontalSpeed: 2
     upSpeed: 5
+  specialStrength: 2
   specialStunFrames: 10
   specialHitbox:
     head: 0
