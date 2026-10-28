@@ -20,6 +20,10 @@ using UnityEngine.UI;
 // これにより「弧を回転させて溜まっているように見せ、180度で透明スプライトを消して
 // 同じ画像を生成し直す」という手動処理を、Unity標準のRadial 360 Fillが
 // 内部シェーダーで自動的に肩代わりしてくれる（弧のpngは1枚で足りる）。
+//
+// 【MaxImageの回転】
+//   MAX中はMaxImageのRectTransformをZ軸回転させ続ける。
+//   回転の中心はPivotなので、Pivotは(0.5, 0.5)にしておくこと。
 //=====================================================
 public class KankiGaugeCircle : MonoBehaviour
 {
@@ -37,6 +41,22 @@ public class KankiGaugeCircle : MonoBehaviour
     [Tooltip("補間速度。大きいほど素早く目標値へ追いつく")]
     [SerializeField] float fillLerpSpeed = 6f;
 
+    [Header("MAX画像の回転")]
+    [Tooltip("MAX時にMaxImageを回転させるか")]
+    [SerializeField] bool rotateMaxImage = true;
+    [Tooltip("回転速度（度/秒）。マイナスで時計回り、プラスで反時計回り。720 = 1秒に2周")]
+    [SerializeField] float maxRotateSpeed = 720f;
+    [Tooltip("ONにすると、ヒットストップ等でTime.timeScaleが0でも回し続ける")]
+    [SerializeField] bool useUnscaledTime = false;
+
+    [Header("MAX画像の表示優先度")]
+    [Tooltip("ONにすると、MaxImageを同じ親の中で一番手前（最後の兄弟）に移動して優先表示する")]
+    [SerializeField] bool maxImageToFront = true;
+    [Tooltip("ONにすると、MaxImageにCanvas(overrideSorting)を付けて描画順を高くする")]
+    [SerializeField] bool overrideMaxSorting = true;
+    [Tooltip("MaxImageのSorting Order。大きいほど手前に描画される")]
+    [SerializeField] int maxSortingOrder = 100;
+
     float targetRatio;   // 外部から指定された目標割合(0〜1)
     float displayRatio;  // 実際に表示に使っている割合(0〜1)。smoothFill時はここが徐々にtargetRatioへ近づく
 
@@ -51,11 +71,19 @@ public class KankiGaugeCircle : MonoBehaviour
 
     void Update()
     {
-        if (!smoothFill) return;
-        if (Mathf.Approximately(displayRatio, targetRatio)) return;
+        // 滑らかに補間（smoothFill時のみ）
+        if (smoothFill && !Mathf.Approximately(displayRatio, targetRatio))
+        {
+            displayRatio = Mathf.MoveTowards(displayRatio, targetRatio, fillLerpSpeed * Time.deltaTime);
+            ApplyRatio(displayRatio);
+        }
 
-        displayRatio = Mathf.MoveTowards(displayRatio, targetRatio, fillLerpSpeed * Time.deltaTime);
-        ApplyRatio(displayRatio);
+        // MAX中はMaxImageを回転させ続ける
+        if (rotateMaxImage && maxImage != null && maxImage.gameObject.activeSelf)
+        {
+            float dt = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+            maxImage.rectTransform.Rotate(0f, 0f, maxRotateSpeed * dt);
+        }
     }
 
     /// <summary>
@@ -79,13 +107,36 @@ public class KankiGaugeCircle : MonoBehaviour
         bool isMax = ratio >= 1f;
 
         // MAX画像は100%の時だけ表示
-        if (maxImage != null) maxImage.gameObject.SetActive(isMax);
+        if (maxImage != null)
+        {
+            bool wasActive = maxImage.gameObject.activeSelf;
+            maxImage.gameObject.SetActive(isMax);
 
-        // ★Frame/Arcは「たまる前から背景として常に表示」し、MAXになった瞬間だけ非表示にしてMaxImageに切り替える。
+            // MAXになった瞬間の処理
+            if (isMax && !wasActive)
+            {
+                // 0度から回し始める
+                maxImage.rectTransform.localRotation = Quaternion.identity;
+
+                // 同じ親の中で一番手前に移動（優先表示）
+                if (maxImageToFront) maxImage.transform.SetAsLastSibling();
+
+                // Canvasのsorting orderを上げて描画順を高くする
+                if (overrideMaxSorting)
+                {
+                    Canvas c = maxImage.GetComponent<Canvas>();
+                    if (c == null) c = maxImage.gameObject.AddComponent<Canvas>();
+                    c.overrideSorting = true;
+                    c.sortingOrder = maxSortingOrder;
+                }
+            }
+        }
+
+        // ★MAXになったらFrameだけ非表示にする。Arcは常に表示したまま（MAX時はfillAmount=1の満タン状態）。
         if (frameImage != null) frameImage.gameObject.SetActive(!isMax);
         if (arcImage != null)
         {
-            arcImage.gameObject.SetActive(!isMax);
+            arcImage.gameObject.SetActive(true);
             arcImage.fillAmount = ratio; // Radial 360が弧の見た目を自動計算してくれる
         }
     }
