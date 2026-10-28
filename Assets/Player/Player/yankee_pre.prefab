@@ -1904,7 +1904,7 @@ MonoBehaviour:
   downKickSe: {fileID: 8300000, guid: 89ca68a0d355e7e4ab853f080abcba7e, type: 3}
   missSe: {fileID: 8300000, guid: e7ab6d3d37fc8ff44ac29131740ff34d, type: 3}
   missSeJudgeFrames: 0
-  actionSeVolume: 0.6
+  actionSeVolume: 1
   punchHitEffectData: {fileID: 11400000, guid: 8772ce0eb28849c4abaede33a1153937, type: 2}
   kickHitEffectData: {fileID: 11400000, guid: d4c9d40f25fe1244796e06fbb64cc7fc, type: 2}
   guardHitEffectData: {fileID: 11400000, guid: 0efc11a881f5de141897cb73e3f94d51, type: 2}

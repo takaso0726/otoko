@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Utilities; // Observable<T>.Call拡張メソッド用
+using UnityEngine.Serialization;
 using UnityEngine.SceneManagement;
 using TMPro;
 
@@ -21,10 +22,6 @@ public class InGame1V1ResultController : MonoBehaviour
     [Header("SE")]
     [Tooltip("効果音を鳴らすAudioSource。未設定の場合は、このオブジェクトに付いているAudioSourceを自動で使う。")]
     [SerializeField] AudioSource se;
-    [Tooltip("ボタンを1回押すごとに鳴る効果音（「ドンッ」）。未設定なら鳴らさない。")]
-    [SerializeField] AudioClip hitSE;      // 1回押すごとに鳴る「ドンッ」
-    [Tooltip("規定回数（Required Hits）連打されて画面が割れる瞬間に鳴る効果音（「バリィィィン！」）。未設定なら鳴らさない。")]
-    [SerializeField] AudioClip crackSE;    // 規定回数連打された時に鳴る「バリィィィン！」
 
     [Header("UI")]
     [Tooltip("「HIT ANY BUTTON」のテキスト。Blink Intervalの間隔で点滅し、画面が割れる演出が始まると非表示になる。")]
@@ -94,8 +91,18 @@ public class InGame1V1ResultController : MonoBehaviour
     [SerializeField] float winnerAppearDelay = 0.3f;
     [Tooltip("勝者キャラが 0 → 元の大きさ まで拡大しながら出現する時間（秒）。0にすると瞬時に表示する。")]
     [SerializeField] float winnerPopDuration = 0.4f;
-    [Tooltip("勝者キャラが出現する時に鳴らすSE。未設定なら鳴らさない。")]
-    [SerializeField] AudioClip winnerAppearSE;
+    [Tooltip("勝者キャラが出現する時に鳴らすBGM。未設定なら鳴らさない。\n" +
+             "SE用のAudioSourceとは別のAudioSource（自動生成）で再生するので、効果音には影響しない。")]
+    [FormerlySerializedAs("winnerAppearSE")] // 旧「Winner Appear SE」に設定済みのクリップを引き継ぐ
+    [SerializeField] AudioClip winnerAppearBGM;
+    [Tooltip("勝者キャラ出現BGMの音量（0〜1）。Play中にInspectorで動かすとリアルタイムに反映される。")]
+    [Range(0f, 1f)]
+    [SerializeField] float winnerBGMVolume = 0.6f;
+    [Tooltip("ONにすると、勝者キャラ出現BGMをループ再生する。OFFなら1回だけ再生して終わる。")]
+    [SerializeField] bool winnerBGMLoop = true;
+    [Tooltip("BGMを鳴らすAudioSource。未設定の場合は、子オブジェクトに自動生成する（SE用AudioSourceとは別物）。\n" +
+             "AudioMixerのBGMグループに繋ぎたい場合は、そのAudioSourceをここに指定する。")]
+    [SerializeField] AudioSource bgmSource;
     [Tooltip("ONにすると、勝者キャラが出現する時にカメラの正面（カメラの方）を向く。シーン内オブジェクト／Prefabどちらにも適用される。")]
     [SerializeField] bool faceCameraOnAppear = true;
     [Tooltip("キャラが向く対象のカメラ。未設定ならCamera.main（MainCameraタグのカメラ）を使う。")]
@@ -177,9 +184,11 @@ public class InGame1V1ResultController : MonoBehaviour
     [Tooltip("メニューが出る時に鳴らすSE。未設定なら鳴らさない。")]
     [SerializeField] AudioClip menuOpenSE;
     [Tooltip("メニューの項目を切り替えた時のSE（「ドンッ」）。未設定なら鳴らさない。")]
-    [SerializeField] AudioClip menuMoveSE;
+    [FormerlySerializedAs("menuMoveSE")] // 旧「Menu Move SE」の設定を引き継ぐ
+    [SerializeField] AudioClip selectSE;
     [Tooltip("メニューの項目を決定した時のSE（「バシィッ」）。未設定なら鳴らさない。鳴り終わるまで待ってから遷移する。")]
-    [SerializeField] AudioClip menuDecideSE;
+    [FormerlySerializedAs("menuDecideSE")] // 旧「Menu Decide SE」の設定を引き継ぐ
+    [SerializeField] AudioClip decideSE;
     [Tooltip("「QUIT」項目を決定した時に出す終了確認ポップアップ（メインメニューと同じもの）。未設定なら確認なしで即終了する。")]
     [SerializeField] QuitConfirmPopup quitPopup;
 
@@ -353,6 +362,49 @@ public class InGame1V1ResultController : MonoBehaviour
         Player.ResultAttackPressed -= OnResultAttackPressed;
         anyButtonListener?.Dispose();
         anyButtonListener = null;
+
+        // 再入場時に前回のBGMが残らないように止める
+        if (bgmSource != null) bgmSource.Stop();
+    }
+
+    // Inspectorで音量を動かした時、Play中なら即座にBGMへ反映する
+    void OnValidate()
+    {
+        if (bgmSource != null) bgmSource.volume = winnerBGMVolume;
+    }
+
+    /// <summary>勝者キャラ出現BGMの音量を変更する（0〜1）。再生中でも即反映。外部（設定画面のスライダー等）からも呼べる。</summary>
+    public void SetWinnerBGMVolume(float volume)
+    {
+        winnerBGMVolume = Mathf.Clamp01(volume);
+        if (bgmSource != null) bgmSource.volume = winnerBGMVolume;
+    }
+
+    // BGM用AudioSourceを用意する。未設定なら子オブジェクトに生成する。
+    // （このオブジェクト自身に足すと、SE用の GetComponent<AudioSource>() が取り違える恐れがあるため子に作る）
+    void EnsureBgmSource()
+    {
+        if (bgmSource == null)
+        {
+            var go = new GameObject("WinnerBGM");
+            go.transform.SetParent(transform, false);
+            bgmSource = go.AddComponent<AudioSource>();
+        }
+        bgmSource.playOnAwake = false;
+        bgmSource.spatialBlend = 0f; // 2D（距離で音量が変わらない）
+    }
+
+    // 勝者キャラ出現BGMを再生する。
+    void PlayWinnerBGM()
+    {
+        if (winnerAppearBGM == null) return;
+
+        EnsureBgmSource();
+        bgmSource.Stop();
+        bgmSource.clip = winnerAppearBGM;
+        bgmSource.loop = winnerBGMLoop;
+        bgmSource.volume = winnerBGMVolume;
+        bgmSource.Play();
     }
 
     // 押されたボタンが、ゲームパッドのAボタン（下ボタン：XboxならA、PlayStationなら×）かどうか
@@ -434,7 +486,6 @@ public class InGame1V1ResultController : MonoBehaviour
         bool allRevealed = hasStages && revealedStageCount >= crackRenderers.Length;
 
         hitCount++;
-        if (se != null && hitSE != null) se.PlayOneShot(hitSE);
 
         if (hasMenu)
         {
@@ -619,7 +670,6 @@ public class InGame1V1ResultController : MonoBehaviour
         HideAllCrackImages();
 
         if (crackEffect != null) crackEffect.SetActive(true);
-        if (se != null && crackSE != null) se.PlayOneShot(crackSE);
 
         SceneManager.LoadScene(nextSceneName);
     }
@@ -782,7 +832,7 @@ public class InGame1V1ResultController : MonoBehaviour
     {
         menuIndex = (menuIndex + dir + menuItems.Length) % menuItems.Length;
 
-        if (se != null && menuMoveSE != null) se.PlayOneShot(menuMoveSE);
+        if (se != null && selectSE != null) se.PlayOneShot(selectSE);
         SetMenuSelectedGlow(menuIndex);
     }
 
@@ -822,7 +872,7 @@ public class InGame1V1ResultController : MonoBehaviour
         var item = menuItems[menuIndex];
         if (item == null || string.IsNullOrEmpty(item.sceneToLoad)) return;
 
-        if (se != null && menuDecideSE != null) se.PlayOneShot(menuDecideSE);
+        if (se != null && decideSE != null) se.PlayOneShot(decideSE);
 
         // ゲーム終了項目は、メインメニューと同じ煽りポップアップを出す
         if (item.sceneToLoad == "QUIT" && quitPopup != null)
@@ -838,7 +888,7 @@ public class InGame1V1ResultController : MonoBehaviour
     // 決定SEが鳴り切る前にシーンが破棄されて音が切れないよう、SEの長さだけ待ってから遷移する。
     IEnumerator LoadMenuSceneAfterSE(string sceneName)
     {
-        float wait = (se != null && menuDecideSE != null) ? menuDecideSE.length : 0f;
+        float wait = (se != null && decideSE != null) ? decideSE.length : 0f;
         if (wait > 0f) yield return new WaitForSeconds(wait);
 
         if (sceneName == "QUIT")
@@ -964,8 +1014,7 @@ public class InGame1V1ResultController : MonoBehaviour
             baseScale = source.transform.localScale;
         }
 
-        if (se == null) se = GetComponent<AudioSource>();
-        if (se != null && winnerAppearSE != null) se.PlayOneShot(winnerAppearSE);
+        PlayWinnerBGM();
 
         Transform tr = target.transform;
 

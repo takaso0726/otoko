@@ -1624,16 +1624,16 @@ MonoBehaviour:
   MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
-  throwSe: {fileID: 0}
-  jumpSe: {fileID: 0}
-  throwLaunchSe: {fileID: 0}
-  landSe: {fileID: 0}
-  punchSe: {fileID: 0}
-  flyingKickSe: {fileID: 0}
-  kickSe: {fileID: 0}
-  upKickSe: {fileID: 0}
-  downKickSe: {fileID: 0}
-  missSe: {fileID: 0}
+  throwSe: {fileID: 8300000, guid: de46853a9acbfae4aa241ed3545b3035, type: 3}
+  jumpSe: {fileID: 8300000, guid: 2fe169cc90cbd814a95b1d13edc85a4b, type: 3}
+  throwLaunchSe: {fileID: 8300000, guid: 70a95877bb48f7a499dbd6d9e096d58e, type: 3}
+  landSe: {fileID: 8300000, guid: 579c6f92e9d242d41bf209a1d043d331, type: 3}
+  punchSe: {fileID: 8300000, guid: 81e4b74fd63a95341bf549ef4843a0f3, type: 3}
+  flyingKickSe: {fileID: 8300000, guid: 7b2b1225850ba654fbfc1d6d1860981d, type: 3}
+  kickSe: {fileID: 8300000, guid: 7b2b1225850ba654fbfc1d6d1860981d, type: 3}
+  upKickSe: {fileID: 8300000, guid: b5078d7ec23a0a540bdb9f64a851f441, type: 3}
+  downKickSe: {fileID: 8300000, guid: 89ca68a0d355e7e4ab853f080abcba7e, type: 3}
+  missSe: {fileID: 8300000, guid: e7ab6d3d37fc8ff44ac29131740ff34d, type: 3}
   missSeJudgeFrames: 0
   actionSeVolume: 1
   punchHitEffectData: {fileID: 11400000, guid: 8772ce0eb28849c4abaede33a1153937, type: 2}

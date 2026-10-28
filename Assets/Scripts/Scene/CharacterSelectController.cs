@@ -137,6 +137,18 @@ public class CharacterSelectController : MonoBehaviour
     [SerializeField] AudioClip decideSE;    // 1人が決定した時
     [SerializeField] AudioClip bothReadySE; // 両者決定＆遷移演出時
 
+    [Header("BGM")]
+    [Tooltip("BGMを再生するAudioSource。SEとは別のAudioSourceを割り当てること（同じものだとPlayOneShotとBGMが干渉する）。未設定ならBGMは何もしない")]
+    [SerializeField] AudioSource bgmSource;
+    [Tooltip("再生するBGMのクリップ。未設定の場合は bgmSource 自身に設定されているクリップを使う")]
+    [SerializeField] AudioClip bgmClip;
+    [Range(0f, 1f)]
+    [SerializeField] float bgmVolume = 1f;
+    [Tooltip("セレクト画面が開いた時に自動でBGMを再生するか")]
+    [SerializeField] bool playBgmOnEnable = true;
+    [Tooltip("ON: 両者決定でシーン遷移する時にBGMを止める／OFF: 鳴らしたまま遷移（次シーン側で扱う）")]
+    [SerializeField] bool stopBgmOnTransition = false;
+
     [Header("遷移設定")]
     [SerializeField] string nextSceneName = "InGame1v1";
     [SerializeField] float transitionDelay = 0.7f;
@@ -154,6 +166,8 @@ public class CharacterSelectController : MonoBehaviour
         // このオブジェクトが再利用された場合、二度と入力を受け付けなくなる。
         isTransitioning = false;
         HideSameCharacterReadyMark();
+
+        if (playBgmOnEnable) PlayBGM();
 
         if (player1 != null)
         {
@@ -644,6 +658,31 @@ public class CharacterSelectController : MonoBehaviour
         }
     }
 
+    // BGMをループ再生する。すでに同じクリップが鳴っている場合は頭出しし直さない
+    void PlayBGM()
+    {
+        if (bgmSource == null) return;
+
+        if (bgmClip != null && bgmSource.clip != bgmClip)
+        {
+            bgmSource.clip = bgmClip;
+        }
+        if (bgmSource.clip == null)
+        {
+            Debug.LogWarning("[CharacterSelectController] BGMのAudioClipが設定されていません（bgmClip もしくは bgmSource のクリップを設定してください）。", this);
+            return;
+        }
+
+        bgmSource.loop = true;
+        bgmSource.volume = bgmVolume;
+        if (!bgmSource.isPlaying) bgmSource.Play();
+    }
+
+    void StopBGM()
+    {
+        if (bgmSource != null && bgmSource.isPlaying) bgmSource.Stop();
+    }
+
     IEnumerator MoveCursorSmooth(RectTransform cursor, Vector3 target)
     {
         while (Vector3.Distance(cursor.position, target) > 0.5f)
@@ -664,6 +703,8 @@ public class CharacterSelectController : MonoBehaviour
         // （配列やコレクションにまとめてから0番目/1番目で振り分ける、といった
         //   実装に変更すると、また入れ替わりバグが再発するので注意）
         SaveSelectionResult();
+
+        if (stopBgmOnTransition) StopBGM();
 
         PlaySE(bothReadySE);
 

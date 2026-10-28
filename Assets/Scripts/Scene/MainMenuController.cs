@@ -29,8 +29,13 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] float glowMinAlpha = 0.4f;   // 明滅の下限（0〜1）
     [SerializeField] float glowMaxAlpha = 1f;     // 明滅の上限（0〜1）
 
+    [Header("BGM")]
+    [SerializeField] AudioSource bgm;                          // BGM用のAudioSource（Loop推奨）
+    [SerializeField, Range(0f, 1f)] float bgmVolume = 0.5f;    // BGM音量（インスペクターでスライダー調整）
+
     [Header("SE")]
     [SerializeField] AudioSource se;
+    [SerializeField, Range(0f, 1f)] float seVolume = 1f;       // SE音量
     [SerializeField] AudioClip moveSE;   // 「ドンッ」項目切り替え時
     [SerializeField] AudioClip decideSE; // 「バシィッ」決定時
 
@@ -54,6 +59,10 @@ public class MainMenuController : MonoBehaviour
 
     void Start()
     {
+        // items が未設定でもBGMは鳴らす（先に処理）。
+        ApplyVolumes();
+        if (bgm != null && !bgm.isPlaying) bgm.Play();
+
         // items が未設定の場合に例外で Update が止まらないよう防御。
         if (items == null || items.Length == 0)
         {
@@ -63,6 +72,41 @@ public class MainMenuController : MonoBehaviour
 
         currentIndex = 0;
         SetSelectedGlow(currentIndex);
+    }
+
+    /// <summary>
+    /// インスペクターの音量設定をAudioSourceに反映する。
+    /// </summary>
+    void ApplyVolumes()
+    {
+        if (bgm != null) bgm.volume = bgmVolume;
+        if (se != null) se.volume = seVolume;
+    }
+
+    /// <summary>
+    /// インスペクターのスライダーを動かしたとき（再生中も含む）に即反映する。
+    /// </summary>
+    void OnValidate()
+    {
+        ApplyVolumes();
+    }
+
+    /// <summary>
+    /// 設定画面のSliderなど（OnValueChanged）から呼べるBGM音量変更用。
+    /// </summary>
+    public void SetBgmVolume(float value)
+    {
+        bgmVolume = Mathf.Clamp01(value);
+        if (bgm != null) bgm.volume = bgmVolume;
+    }
+
+    /// <summary>
+    /// 設定画面のSliderなどから呼べるSE音量変更用。
+    /// </summary>
+    public void SetSeVolume(float value)
+    {
+        seVolume = Mathf.Clamp01(value);
+        if (se != null) se.volume = seVolume;
     }
 
     void Update()

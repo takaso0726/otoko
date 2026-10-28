@@ -389,8 +389,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InGame1V1ResultController
   se: {fileID: 216452529}
-  hitSE: {fileID: 0}
-  crackSE: {fileID: 0}
   hitAnyButtonText: {fileID: 0}
   crackEffect: {fileID: 0}
   crackStageSprites:
@@ -450,7 +448,10 @@ MonoBehaviour:
   fallbackWinnerDisplay: {fileID: 0}
   winnerAppearDelay: 0
   winnerPopDuration: 0
-  winnerAppearSE: {fileID: 8300000, guid: 11b0132746de86c40bd730cafe13af03, type: 3}
+  winnerAppearBGM: {fileID: 8300000, guid: 11b0132746de86c40bd730cafe13af03, type: 3}
+  winnerBGMVolume: 0.2
+  winnerBGMLoop: 1
+  bgmSource: {fileID: 0}
   faceCameraOnAppear: 1
   faceTargetCamera: {fileID: 816588688}
   faceCameraYawOffset: 0
@@ -490,8 +491,8 @@ MonoBehaviour:
   menuGlowMaxAlpha: 1
   menuGlowBackOffset: 0.05
   menuOpenSE: {fileID: 0}
-  menuMoveSE: {fileID: 0}
-  menuDecideSE: {fileID: 0}
+  selectSE: {fileID: 8300000, guid: 2fc70cfe42e586e4680986a24fdbabd2, type: 3}
+  decideSE: {fileID: 8300000, guid: 43301a7900b4a194185c4ebf8caac99b, type: 3}
   quitPopup: {fileID: 0}
   winnerOnlyInput: 1
 --- !u!4 &119570595
