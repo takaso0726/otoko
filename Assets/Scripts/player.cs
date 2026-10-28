@@ -491,6 +491,33 @@ public class Player : MonoBehaviour
     [Tooltip("ON（既定）：被弾Trigger（Hit／Hit-front／Hit-back）は立てず、HeadHitステートを1回だけ直接再生する。\n" +
              "OFF：被弾アニメーションをTrigger（Hit／Hit-front／Hit-back）で、ヒットストップ終了時に1回だけ再生する。")]
     [SerializeField] bool playHeadHitStateDirectly = true;
+
+    //=====================================================
+    // ★追加：やられアニメーション（攻撃の強さ別・地上／空中別）
+    //   playHeadHitStateDirectly=ON（既定）の時、被弾した瞬間（ヒットストップ終了時）に、
+    //   「受けた技の強さ（弱・中・強）」×「地上で受けたか／空中で受けたか」で、下のAnimatorステートを1回だけ再生する。
+    //   ステート名が空、またはAnimatorに存在しない場合は、空中→地上の同じ強さ→従来の"HeadHit"の順にフォールバックする。
+    //=====================================================
+    [Header("やられアニメーション（攻撃の強さ別）")]
+    [Tooltip("地上で【弱】攻撃を受けた時に再生するAnimatorステート名。")]
+    [SerializeField] string hitStateLight = "HitLight";
+    [Tooltip("地上で【中】攻撃を受けた時に再生するAnimatorステート名。")]
+    [SerializeField] string hitStateMedium = "HitMedium";
+    [Tooltip("地上で【強】攻撃を受けた時に再生するAnimatorステート名。")]
+    [SerializeField] string hitStateHeavy = "HitHeavy";
+    [Header("やられアニメーション（空中で受けた時）")]
+    [Tooltip("空中で【弱】攻撃を受けた時に再生するAnimatorステート名。")]
+    [SerializeField] string airHitStateLight = "AirHitLight";
+    [Tooltip("空中で【中】攻撃を受けた時に再生するAnimatorステート名。")]
+    [SerializeField] string airHitStateMedium = "AirHitMedium";
+    [Tooltip("空中で【強】攻撃を受けた時に再生するAnimatorステート名。")]
+    [SerializeField] string airHitStateHeavy = "AirHitHeavy";
+    [Tooltip("CPU(Enemy)の攻撃を受けた時に使う強さ。Enemy.csには強さの設定が無いため、一律でこの強さとして扱う。")]
+    [SerializeField] AttackStrength enemyAttackStrength = AttackStrength.Medium;
+
+    private AttackStrength pendingHitStrength = AttackStrength.Medium; // 再生予約中のやられアニメーションの強さ
+    private bool pendingHitInAir = false;                              // 再生予約中のやられアニメーションが空中版か
+    private bool isFlyingKickAttack = false;                           // 今のパンチ状態が空中攻撃（Flying-kick）か（攻撃側の強さ判定用）
     private bool pendingHitTrigger = false;       // 予約中の被弾Triggerがあるか
     private bool pendingHitHasDirection = false;  // 攻撃者の方向が分かっているか（Hit-front／Hit-backを立てるか）
     private bool pendingHitFromFront = false;     // 攻撃者が自分の前方にいたか
@@ -521,6 +548,19 @@ public class Player : MonoBehaviour
         [Tooltip("相手を上方向へ飛ばす初速。大きいほど高く浮く。0で浮かない。" +
                  "1未満だと実際にはほとんど浮かないので、浮かせたい時は1以上を目安に。")]
         public float upSpeed = 0f;
+    }
+
+    //=====================================================
+    // ★追加：攻撃の強さ（弱・中・強）
+    //   各技のInspectorで1つずつ設定する。被弾した側は、この強さに応じて「やられアニメーション」を切り替える
+    //   （地上で受けた時／空中で受けた時で、それぞれ弱・中・強の別アニメーションを再生する）。
+    //   ※ダメージ・ヒットストップ・ノックバック・やられ時間は従来どおり技ごとの数値で決まる。強さはアニメーション選択専用。
+    //=====================================================
+    public enum AttackStrength
+    {
+        Light,   // 弱
+        Medium,  // 中
+        Heavy,   // 強
     }
 
     //=====================================================
@@ -567,6 +607,10 @@ public class Player : MonoBehaviour
     [SerializeField] int punchHitStopFrames = 5;
     [Tooltip("④ パンチを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting punchKnockback = new KnockbackSetting { horizontalSpeed = 2.5f, upSpeed = 0f };
+    [Tooltip("⑦ パンチ（地上）の強さ（弱・中・強）。この技を当てられた相手は、強さに応じたやられアニメーションを再生する。")]
+    [SerializeField] AttackStrength punchStrength = AttackStrength.Light;
+    [Tooltip("⑦ 空中攻撃（パンチ入力を空中で出した時のFlying-kick）の強さ（弱・中・強）。")]
+    [SerializeField] AttackStrength flyingKickStrength = AttackStrength.Medium;
     [Tooltip("⑥ パンチ（地上）を出している間、当たり判定をONにする部位。チェックした部位のコライダーが、パンチ中だけONになる。")]
     [SerializeField] HitboxSetting punchHitbox = new HitboxSetting { rightHand = true };
     [Tooltip("⑥ 空中攻撃（パンチ入力を空中で出した時のFlying-kick）を出している間、当たり判定をONにする部位。")]
@@ -586,6 +630,8 @@ public class Player : MonoBehaviour
     [SerializeField] int kickHitStopFrames = 5;
     [Tooltip("④ 通常キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting kickKnockback = new KnockbackSetting { horizontalSpeed = 3.5f, upSpeed = 0f };
+    [Tooltip("⑦ 通常キックの強さ（弱・中・強）。この技を当てられた相手は、強さに応じたやられアニメーションを再生する。")]
+    [SerializeField] AttackStrength kickStrength = AttackStrength.Medium;
     [Tooltip("⑥ 通常キックを出している間、当たり判定をONにする部位。チェックした部位のコライダーが、キック中だけONになる。")]
     [SerializeField] HitboxSetting kickHitbox = new HitboxSetting { rightFoot = true, rightUpLeg = true, rightLeg = true };
 
@@ -602,6 +648,8 @@ public class Player : MonoBehaviour
     [SerializeField] int upKickHitStopFrames = 5;
     [Tooltip("④ 上キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting upKickKnockback = new KnockbackSetting { horizontalSpeed = 2f, upSpeed = 5f };
+    [Tooltip("⑦ 上キックの強さ（弱・中・強）。この技を当てられた相手は、強さに応じたやられアニメーションを再生する。")]
+    [SerializeField] AttackStrength upKickStrength = AttackStrength.Heavy;
     [Tooltip("⑥ 上キックを出している間、当たり判定をONにする部位。チェックした部位のコライダーが、上キック中だけONになる。")]
     [SerializeField] HitboxSetting upKickHitbox = new HitboxSetting { rightFoot = true, rightLeg = true };
 
@@ -618,6 +666,8 @@ public class Player : MonoBehaviour
     [SerializeField] int downKickHitStopFrames = 5;
     [Tooltip("④ 下キックを当てた時の、相手のノックバック量")]
     [SerializeField] KnockbackSetting downKickKnockback = new KnockbackSetting { horizontalSpeed = 3f, upSpeed = 0f };
+    [Tooltip("⑦ 下キックの強さ（弱・中・強）。この技を当てられた相手は、強さに応じたやられアニメーションを再生する。")]
+    [SerializeField] AttackStrength downKickStrength = AttackStrength.Medium;
     [Tooltip("⑥ 下キックを出している間、当たり判定をONにする部位。チェックした部位のコライダーが、下キック中だけONになる。")]
     [SerializeField] HitboxSetting downKickHitbox = new HitboxSetting { rightFoot = true, rightLeg = true };
 
@@ -631,6 +681,8 @@ public class Player : MonoBehaviour
     [SerializeField] int specialHitStopFrames = 5;
     [Tooltip("④ 必殺技を当てた時の、相手のノックバック量。多段ヒットするため、既定は0（飛ばさない）。")]
     [SerializeField] KnockbackSetting specialKnockback = new KnockbackSetting { horizontalSpeed = 0f, upSpeed = 0f };
+    [Tooltip("⑦ 必殺技の強さ（弱・中・強）。この技を当てられた相手は、強さに応じたやられアニメーションを再生する。")]
+    [SerializeField] AttackStrength specialStrength = AttackStrength.Heavy;
     [Tooltip("⑤ 必殺技を当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。この間、相手は移動・攻撃・ガード・投げ・ジャンプ等が一切できない。やられ中にさらに攻撃が当たった場合は、残り時間とこの値の長い方に延長される。0だとやられ状態にならない。")]
     [SerializeField] int specialStunFrames = 30;
     [Tooltip("⑥ 必殺技（waza）を出している間、当たり判定をONにする部位。既定は左足（もも・すね・足）の3箇所。")]
@@ -1057,6 +1109,23 @@ public class Player : MonoBehaviour
             case AttackType.UpKick: return upKickStunFrames;
             case AttackType.DownKick: return downKickStunFrames;
             default: return 0;
+        }
+    }
+
+    // ★追加：被弾した相手側（OnTriggerEnter）から、「今出している技の強さ（弱・中・強）」を問い合わせるための公開メソッド。
+    //   必殺技中はspecialStrength、パンチ中の空中攻撃はflyingKickStrength、それ以外はCurrentAttackTypeに応じた値を返す。
+    //   新しい技を追加した場合は、対応するStrengthフィールドを増やし、ここにもケースを追加すること。
+    public AttackStrength GetCurrentHitStrength()
+    {
+        if (currentState == PlayerState.Special) return specialStrength;
+
+        switch (CurrentAttackType)
+        {
+            case AttackType.Punch: return isFlyingKickAttack ? flyingKickStrength : punchStrength;
+            case AttackType.Kick: return kickStrength;
+            case AttackType.UpKick: return upKickStrength;
+            case AttackType.DownKick: return downKickStrength;
+            default: return AttackStrength.Medium;
         }
     }
 
@@ -2390,10 +2459,36 @@ public class Player : MonoBehaviour
 
     // ★追加：Triggerを使わず、HeadHitステートを頭から1回だけ直接再生する。
     //   この一撃でHPが0になった場合は再生しない（直後にダウン開始のアニメーションが再生されるため）。
+    // ★変更：被弾時に予約した「強さ（弱・中・強）」「空中か」に応じたやられステートを再生する。
     void PlayHeadHitDirect()
     {
         if (animator == null || HP <= 0) return;
-        animator.Play("HeadHit", 0, 0.0f);
+        animator.Play(ResolveHitStateName(pendingHitStrength, pendingHitInAir), 0, 0.0f);
+    }
+
+    // ★追加：強さと空中／地上から、再生するやられステート名を決める。
+    //   空中版が未設定／存在しない場合は地上の同じ強さ、それも無ければ従来の"HeadHit"にフォールバックする。
+    string ResolveHitStateName(AttackStrength strength, bool inAir)
+    {
+        string ground, air;
+        switch (strength)
+        {
+            case AttackStrength.Light: ground = hitStateLight; air = airHitStateLight; break;
+            case AttackStrength.Heavy: ground = hitStateHeavy; air = airHitStateHeavy; break;
+            default: ground = hitStateMedium; air = airHitStateMedium; break;
+        }
+
+        if (inAir && HasAnimatorState(air)) return air;
+        if (HasAnimatorState(ground)) return ground;
+
+        DLog($"[{PlayerName}] やられステート（強さ={strength} / 空中={inAir}）がAnimatorに見つからないため、HeadHitを再生します");
+        return "HeadHit";
+    }
+
+    bool HasAnimatorState(string stateName)
+    {
+        return animator != null && !string.IsNullOrEmpty(stateName)
+            && animator.HasState(0, Animator.StringToHash(stateName));
     }
 
     // framesフレームの間だけ、そのフレームから入力・状態更新を止めて「少しだけ動けない」状態にする。
@@ -3236,6 +3331,7 @@ public class Player : MonoBehaviour
         if (Jumpflag)
         {
             //弱攻撃(パンチ)
+            isFlyingKickAttack = false;
             animator.SetTrigger("Punch");
             SetAttackSe(punchSe);
             EnableAttackHitboxes(punchHitbox);
@@ -3243,6 +3339,7 @@ public class Player : MonoBehaviour
         else
         {
             //空中攻撃
+            isFlyingKickAttack = true;
             animator.SetTrigger("Flying-kick");
             SetAttackSe(flyingKickSe);
             EnableAttackHitboxes(flyingKickHitbox);
@@ -4698,6 +4795,13 @@ public class Player : MonoBehaviour
                 bool hitFromFront = hasHitDir && IsOpponentInFront(hitAttackerTf);
                 RequestHitAnimation(hasHitDir, hitFromFront);
             }
+
+            // ★追加：やられアニメーションの選択用に、受けた技の強さ（弱・中・強）と、空中で受けたか（Jumpflag=false）を予約する。
+            //   実際の再生はヒットストップ終了時（ヒットストップ無しならこのすぐ下）に1回だけ行う。
+            //   ※ノックバックで浮く前（被弾した瞬間）の状態で判定する。
+            pendingHitStrength = isEnemyPlayerAttack ? attackerPlayer.GetCurrentHitStrength() : enemyAttackStrength;
+            pendingHitInAir = !Jumpflag;
+            DLog($"[{PlayerName}] 被弾：強さ={pendingHitStrength} / {(pendingHitInAir ? "空中" : "地上")}で受けた");
 
             // 通常被弾時のヒットストップ（少しだけ動けなくする）。
             // ★変更：対人戦では、攻撃者の「攻撃ごとの設定」のヒットストップ時間を使う。
