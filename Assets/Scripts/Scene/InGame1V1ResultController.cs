@@ -141,6 +141,12 @@ public class InGame1V1ResultController : MonoBehaviour
         public Transform icon;
         [Tooltip("このアイコンを表示する位置を決める空オブジェクト。未設定なら、Iconをシーンに置いた位置のまま表示する。\n※UI（Canvas内）のアイコンなら、同じCanvas内に置いたRectTransformを指定すること。")]
         public Transform iconAnchor;
+        [Tooltip("【アイコン本体の位置調整】Icon Anchor（未設定ならアイコンの元の位置）からのずれ（アイコンの親のローカル座標。UIならピクセル単位）。\n"
+                 + "X=右＋／左－、Y=上＋／下－、Z=奥行き。光るアウトラインも同じ分だけ追従する。")]
+        public Vector3 iconOffset = Vector3.zero;
+        [Tooltip("【アイコン本体の大きさ調整】アイコンの元の大きさに掛ける倍率。1=そのまま、1.2=少し大きく。\n"
+                 + "光るアウトラインもこの倍率に合わせて拡大縮小される（光る側だけの微調整は Glow Scale）。")]
+        public float iconScale = 1f;
         [Tooltip("遷移先のシーン名。Build Settingsに登録されている必要がある。ゲーム終了の項目は \"QUIT\" にする。")]
         public string sceneToLoad;
         [Tooltip("選択中に光らせる、アイコンの外側に重ねて配置したアウトライン用オブジェクト（Imageなど）。\n"
@@ -149,7 +155,7 @@ public class InGame1V1ResultController : MonoBehaviour
         [Tooltip("【光る側の位置調整】普通のアイコンと同じ座標からのずれ（光るアイコンの親のローカル座標。UIならピクセル単位）。\n"
                  + "X=右＋／左－、Y=上＋／下－、Z=奥行き。全て0なら同じ座標（Menu Glow Back Offsetの分だけ奥）。")]
         public Vector3 glowOffset = Vector3.zero;
-        [Tooltip("【光る側の大きさ調整】光るアイコンの元の大きさに掛ける倍率。1=そのまま、1.2=少し大きく。")]
+        [Tooltip("【光る側の大きさ調整】光るアイコンの元の大きさに掛ける倍率。1=そのまま、1.2=少し大きく。\n※Icon Scaleとは掛け合わされる（アイコンを大きくすると光る側も自動で大きくなる）。")]
         public float glowScale = 1f;
 
         // Prefabを指定した場合に、メニューが出る時に生成した実体（実行時のみ。Inspectorには出ない）
@@ -211,6 +217,11 @@ public class InGame1V1ResultController : MonoBehaviour
     Coroutine menuGlowRoutine;
     // 光るアイコンの元の大きさ（メニューを開き直しても倍率が重ならないように保存しておく）
     readonly System.Collections.Generic.Dictionary<Transform, Vector3> glowBaseScales =
+        new System.Collections.Generic.Dictionary<Transform, Vector3>();
+    // アイコン本体の元の位置・大きさ（メニューを開き直しても調整が重ならないように保存しておく）
+    readonly System.Collections.Generic.Dictionary<Transform, Vector3> iconBaseLocalPositions =
+        new System.Collections.Generic.Dictionary<Transform, Vector3>();
+    readonly System.Collections.Generic.Dictionary<Transform, Vector3> iconBaseScales =
         new System.Collections.Generic.Dictionary<Transform, Vector3>();
     System.IDisposable anyButtonListener;
     Coroutine blinkRoutine;
@@ -750,8 +761,20 @@ public class InGame1V1ResultController : MonoBehaviour
             Transform icon = item != null ? item.Icon : null;
             if (icon == null) continue;
 
+            // 元の位置・大きさを初回だけ保存（調整が開くたびに累積しないように）
+            if (!iconBaseLocalPositions.ContainsKey(icon)) iconBaseLocalPositions[icon] = icon.localPosition;
+            if (!iconBaseScales.ContainsKey(icon)) iconBaseScales[icon] = icon.localScale;
+
+            // 位置：Anchorがあればその位置、無ければ元の位置を基準にして、Icon Offsetを足す
             if (item.iconAnchor != null)
                 icon.position = item.iconAnchor.position;
+            else
+                icon.localPosition = iconBaseLocalPositions[icon];
+            icon.localPosition += item.iconOffset;
+
+            // 大きさ：元の大きさ × Icon Scale
+            float iconMul = item.iconScale > 0f ? item.iconScale : 1f;
+            icon.localScale = iconBaseScales[icon] * iconMul;
 
             GameObject glow = item.Glow;
             if (glow != null)
@@ -773,7 +796,7 @@ public class InGame1V1ResultController : MonoBehaviour
                     glowBaseScales[glowTr] = baseScale;
                 }
                 float scaleMul = item.glowScale > 0f ? item.glowScale : 1f;
-                glowTr.localScale = baseScale * scaleMul;
+                glowTr.localScale = baseScale * scaleMul * iconMul; // アイコンの拡大縮小に追従
 
                 // 同じ親の下なら、描画順もアイコンの1つ後ろ（＝アイコンが手前）にする
                 if (glowTr.parent == icon.parent && glowTr != icon)
