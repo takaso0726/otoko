@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using UnityEngine;
@@ -96,6 +97,42 @@ public class GameMNG : MonoBehaviour
     public AudioClip BGM;           // ゲーム中に流すBGM
 
     //=======================================================================
+    // ゲーム開始演出
+    //   流れ：「漢の戦い」の文字 → ドラの音 → 「始め！」の声 → 「始め」の文字（大きく）＋ゲーム開始
+    //   演出が終わるまで、プレイヤー（Player）とCPU（Enemy）は動けない。
+    //   ※文字はCanvas上のText／TextMeshPro／Imageなど何でもよい（GameObjectをそのままアサインする）。
+    //   ※CPU(Enemy)を止めるには、Enemy.csのUpdate先頭に「if (Player.IsActionFrozen) return;」を入れること。
+    //=======================================================================
+    [Header("ゲーム開始演出")]
+    [Tooltip("ONの間、ゲーム開始時に開始演出を流し、終わるまでプレイヤーを動けなくする。OFFなら従来どおり即開始。")]
+    [SerializeField] bool playStartIntro = true;
+    [Tooltip("最初に表示する「漢の戦い」の文字のGameObject。")]
+    [SerializeField] GameObject introTitleObject;
+    [Tooltip("「漢の戦い」を表示してから、ドラを鳴らすまでの時間（秒）。")]
+    [SerializeField] float introTitleSeconds = 1.5f;
+    [Tooltip("ドラのような音。再生が終わるまで待ってから次へ進む。")]
+    [SerializeField] AudioClip introGongSe;
+    [Tooltip("ドラの音が未設定の時に待つ秒数。")]
+    [SerializeField] float introGongFallbackSeconds = 1f;
+    [Tooltip("人の声「始め！」。再生が終わるまで待ってから次へ進む。")]
+    [SerializeField] AudioClip introVoiceStartSe;
+    [Tooltip("声が未設定の時に待つ秒数。")]
+    [SerializeField] float introVoiceFallbackSeconds = 1f;
+    [Tooltip("大きく表示する「始め」の文字のGameObject。表示された瞬間にゲーム開始（操作可能）になる。")]
+    [SerializeField] GameObject introStartTextObject;
+    [Tooltip("「始め」の文字を出し続ける時間（秒）。操作はこの間も可能。")]
+    [SerializeField] float introStartTextSeconds = 1f;
+    [Tooltip("「始め」が出る瞬間の拡大倍率（1以下で拡大演出なし）。この倍率から元の大きさへ縮む。")]
+    [SerializeField] float introStartTextPopScale = 2f;
+    [Tooltip("上の拡大演出にかける時間（秒）。")]
+    [SerializeField] float introStartTextPopSeconds = 0.25f;
+    [Tooltip("ONの間、BGMは開始演出が終わってから流す。※このオブジェクトのAudioSourceの「Play On Awake」はOFFにしておくこと。")]
+    [SerializeField] bool startBgmAfterIntro = true;
+
+    // 開始演出の再生中か（外部から見たい場合用）
+    public bool IsIntroPlaying { get; private set; }
+
+    //=======================================================================
     // シーン遷移先
     //=======================================================================
     [Header("シーン遷移先（Inspectorで変更可）")]
@@ -119,6 +156,14 @@ public class GameMNG : MonoBehaviour
     //-----------------------------------------------------------------------
     void Start()
     {
+        // ★追加：開始演出がある場合は、最初のUpdateより前にプレイヤーを止め、演出用の文字を隠しておく
+        if (playStartIntro)
+        {
+            Player.SetIntroLock(true);
+            if (introTitleObject != null) introTitleObject.SetActive(false);
+            if (introStartTextObject != null) introStartTextObject.SetActive(false);
+        }
+
         // 現在アクティブなシーンの名前を取得
         currentScene = SceneManager.GetActiveScene().name;
         Debug.Log("現在のシーン名: " + currentScene);
@@ -166,9 +211,90 @@ public class GameMNG : MonoBehaviour
             if (BGM != null) BGM_Lv1.clip = BGM;
             BGM_Lv1.loop = true;
 
-            // BGM再生
-            BGM_Lv1.Play();
+            // BGM再生（開始演出がある場合は、演出が終わってから流す）
+            if (!(playStartIntro && startBgmAfterIntro)) BGM_Lv1.Play();
         }
+
+        // ★追加：ゲーム開始演出
+        if (playStartIntro) StartCoroutine(PlayStartIntro());
+    }
+
+    // ★追加：シーン破棄時に停止状態が残らないようにする（演出中にシーン遷移しても次のシーンで動けるように）
+    void OnDestroy()
+    {
+        Player.SetIntroLock(false);
+    }
+
+    //-----------------------------------------------------------------------
+    // ゲーム開始演出
+    //-----------------------------------------------------------------------
+    IEnumerator PlayStartIntro()
+    {
+        IsIntroPlaying = true;
+        Player.SetIntroLock(true);
+
+        // 1. 「漢の戦い」
+        if (introTitleObject != null) introTitleObject.SetActive(true);
+        yield return new WaitForSeconds(introTitleSeconds);
+
+        // 2. ドラの音（鳴り終わるまで待つ）
+        yield return PlayIntroSe(introGongSe, introGongFallbackSeconds);
+
+        // 3. 人の声「始め！」（鳴り終わるまで待つ）
+        yield return PlayIntroSe(introVoiceStartSe, introVoiceFallbackSeconds);
+
+        // 4. 「始め」の文字を大きく出して、ゲーム開始（ここからプレイヤーが動ける）
+        if (introTitleObject != null) introTitleObject.SetActive(false);
+        if (introStartTextObject != null)
+        {
+            introStartTextObject.SetActive(true);
+            StartCoroutine(PopStartText(introStartTextObject.transform));
+        }
+        Player.SetIntroLock(false);
+        IsIntroPlaying = false;
+        if (startBgmAfterIntro && BGM_Lv1 != null) BGM_Lv1.Play();
+
+        // 5. 「始め」の文字を少しの間だけ出して消す
+        yield return new WaitForSeconds(introStartTextSeconds);
+        if (introStartTextObject != null) introStartTextObject.SetActive(false);
+    }
+
+    // 効果音を1回鳴らし、鳴り終わるまで待つ。未設定ならfallbackSeconds待つ。
+    IEnumerator PlayIntroSe(AudioClip clip, float fallbackSeconds)
+    {
+        float wait = fallbackSeconds;
+        if (clip != null)
+        {
+            wait = clip.length;
+            if (BGM_Lv1 != null)
+            {
+                BGM_Lv1.PlayOneShot(clip);
+            }
+            else
+            {
+                Vector3 pos = Camera.main != null ? Camera.main.transform.position : Vector3.zero;
+                AudioSource.PlayClipAtPoint(clip, pos);
+            }
+        }
+        yield return new WaitForSeconds(wait);
+    }
+
+    // 「始め」の文字を、大きい状態から元の大きさへ素早く縮めて「ドン」と出す
+    IEnumerator PopStartText(Transform tf)
+    {
+        if (tf == null || introStartTextPopScale <= 1f || introStartTextPopSeconds <= 0f) yield break;
+
+        Vector3 baseScale = tf.localScale;
+        float t = 0f;
+        while (t < introStartTextPopSeconds)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.Clamp01(t / introStartTextPopSeconds);
+            float ease = 1f - (1f - k) * (1f - k); // 最初が速く、最後がゆっくり
+            tf.localScale = Vector3.Lerp(baseScale * introStartTextPopScale, baseScale, ease);
+            yield return null;
+        }
+        tf.localScale = baseScale;
     }
 
     //-----------------------------------------------------------------------

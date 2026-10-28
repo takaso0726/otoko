@@ -1632,6 +1632,7 @@ public class Player : MonoBehaviour
         frameStep = 0;
         CurrentFrame = 0;
         rebornFreezeEndFrame = 0;
+        IsIntroLocked = false;
     }
 
     //=====================================================
@@ -1643,6 +1644,18 @@ public class Player : MonoBehaviour
     //=====================================================
     static int rebornFreezeEndFrame;
     public static bool IsRebornFreezing => CurrentFrame < rebornFreezeEndFrame;
+
+    //=====================================================
+    // ★追加：ゲーム開始演出中の全員停止
+    //   GameMNGの開始演出（「漢の戦い」→ドラ→「始め！」→「始め」）が終わるまで、全Playerの操作・状態更新を止める。
+    //   staticなので、後から生成されたキャラ（GameInputManager等）にも効く。GameMNGが SetIntroLock(true/false) で切り替える。
+    //   CPU(Enemy)側はEnemy.csのUpdate先頭で Player.IsActionFrozen を見て、trueの間は何もせず return すること。
+    //=====================================================
+    public static bool IsIntroLocked { get; private set; }
+    public static void SetIntroLock(bool locked) { IsIntroLocked = locked; }
+
+    // 復活演出中、または開始演出中（＝全員が動けない間）
+    public static bool IsActionFrozen => IsRebornFreezing || IsIntroLocked;
 
     // Updateの先頭で呼ぶ。同じ描画フレーム内で2人目以降のPlayerが呼んでも二重には進まない。
     static void AdvanceFrameClock()
@@ -1859,7 +1872,8 @@ public class Player : MonoBehaviour
         // ★追加：復活後の停止中は、自分・相手ともに入力・状態更新を一切行わない。
         //   ただしダウン中（HP0）のプレイヤーは止めない。同時ダウン中に片方だけ復活しても、
         //   もう一方の復活の制限時間（rebornTimer）と連打は止めずに進める。
-        if (IsRebornFreezing && !(HP <= 0 && !isResultMode))
+        //   ★追加：ゲーム開始演出中（IsIntroLocked）も同じ扱いで、操作・状態更新を一切行わない。
+        if (IsActionFrozen && !(HP <= 0 && !isResultMode))
         {
             ClearInputIntents();
             return;
