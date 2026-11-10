@@ -87,6 +87,10 @@ public class CharacterSelectController : MonoBehaviour
 
         [Header("名前表示（画像）")]
         public Sprite nameImage;      // キャラ名を表す画像（ロゴ・ロゴタイプ等）。選択中にnameImageObjectへ反映する
+
+        [Header("パラメーター表示（五角形チャート）")]
+        [Tooltip("このキャラのパラメーター（ラベル名・値・タイプ名）。Create → Pentagon Chart → Character Parameter で作ったアセットを割り当てる。カーソルを合わせた時に、そのプレイヤー用の位置（PlayerSelector.parameterAnchor）へ五角形チャートとして表示される。未設定のキャラは、チャートが非表示になる")]
+        public CharacterParameterData parameterData;
     }
 
     [System.Serializable]
@@ -109,6 +113,16 @@ public class CharacterSelectController : MonoBehaviour
         public Image nameImageObject;  // 選択中キャラの名前画像表示用（未設定なら何もしない）
         public int startIndex;         // このプレイヤーの初期カーソル位置（characters配列のインデックス）
 
+        [Header("パラメーター表示（五角形チャート）")]
+        [Tooltip("このプレイヤーのパラメーターを出現させる場所。Canvas内に空のUI（RectTransform）を置いて、出したい位置に合わせてここへ割り当てる。このプレイヤーがどのキャラにカーソルを合わせても、常にこの場所に出る。1Pと2Pで必ず別々の場所を指定すること（同じだと重なる）。未設定ならパラメーターは表示されない")]
+        public RectTransform parameterAnchor;
+        [Tooltip("このプレイヤーのパラメーターのラベル（Power, Stamina など）の文字色。1P=青、2P=赤が初期値。ここを変えれば色を変えられる")]
+        public Color parameterLabelColor = Color.white;
+
+        // このプレイヤー用に生成した五角形チャート。毎回Instantiate/Destroyせず、位置と中身を切り替えて再利用する
+        [System.NonSerialized] public PentagonChart parameterChartInstance;
+        [System.NonSerialized] public GameObject parameterChartRoot; // 生成したプレハブのルート（表示・非表示の切り替え用）
+
         [HideInInspector] public int currentIndex;   // characters配列内でのカーソル位置（グローバルインデックス）
         [HideInInspector] public bool decided;
 
@@ -121,9 +135,15 @@ public class CharacterSelectController : MonoBehaviour
     [SerializeField] CharacterEntry[] characters;
 
     [Header("プレイヤー")]
-    [SerializeField] PlayerSelector player1;
-    [SerializeField] PlayerSelector player2;
+    [SerializeField] PlayerSelector player1 = new PlayerSelector { parameterLabelColor = new Color(0.2f, 0.5f, 1f) };   // 1P: 青
+    [SerializeField] PlayerSelector player2 = new PlayerSelector { parameterLabelColor = new Color(1f, 0.25f, 0.25f) };  // 2P: 赤
     [SerializeField] float cursorMoveSpeed = 12f;
+
+    [Header("パラメーター表示（五角形チャート）")]
+    [Tooltip("パラメーター表示に使うチャートのプレハブ。プレハブの中に PentagonChart（と PentagonChartGraphic）が含まれていればよく、ルートに付いていても子に付いていてもOK。1Pと2Pそれぞれの Parameter Anchor の位置に、このプレハブから別々のチャートが生成される。中身（ラベル名・値・タイプ名）は、各キャラの Parameter Data で切り替わる")]
+    [SerializeField] GameObject parameterChartPrefab;
+    [Tooltip("ONにすると、カーソルが動くたびに「どのプレイヤーが・どのキャラに・どのParameter Dataで」チャートを更新したかをConsoleに出す。パラメーターが切り替わらない時の原因調べ用（確認できたらOFFにする）")]
+    [SerializeField] bool parameterDebugLog = false;
 
     [Header("同じキャラを選んだ時のREADY")]
     [Tooltip("1Pと2Pが同じキャラを決定した時だけ表示する専用READYマーク（Inspectorで非アクティブにしておく）。表示中は1P用・2P用のREADYマークは両方消える")]
@@ -158,6 +178,18 @@ public class CharacterSelectController : MonoBehaviour
     bool sameMarkShown; // 同キャラ用READYマークを表示中か
     Coroutine p1CursorRoutine;
     Coroutine p2CursorRoutine;
+
+    void Awake()
+    {
+        // Parameter Chart Prefab に、Hierarchy（シーン上）にあるオブジェクトを直接割り当てている場合、
+        // それは「コピー元」でしかないので、元のチャート（とそのラベル）が画面に残って、
+        // 生成したチャートと重ならないように非表示にする。
+        // （Projectのプレハブアセットを割り当てている場合は何もしない）
+        if (parameterChartPrefab != null && parameterChartPrefab.scene.IsValid())
+        {
+            parameterChartPrefab.SetActive(false);
+        }
+    }
 
     void OnEnable()
     {
@@ -503,6 +535,66 @@ public class CharacterSelectController : MonoBehaviour
             // nameImage未設定のキャラの場合はImageを非表示にして「空の白い四角」が出ないようにする
             p.nameImageObject.enabled = nameSprite != null;
         }
+
+        UpdateParameterChart(p, entry);
+    }
+
+    // カーソルを合わせたキャラのパラメーターを、そのプレイヤー用の場所（PlayerSelector.parameterAnchor）に表示する。
+    // 出現場所はプレイヤーごとに固定（1Pは常に1P用の場所、2Pは常に2P用の場所）で、キャラによっては変わらない。
+    // チャートはプレイヤーごとに1つだけ生成して使い回し、カーソルが動くたびに中身
+    // （ラベル名・値・タイプ名）だけを新しいキャラのものへ切り替える。
+    // parameterData が未設定のキャラにカーソルが乗った時は、チャートを非表示にする。
+    void UpdateParameterChart(PlayerSelector p, CharacterEntry entry)
+    {
+        if (p == null) return;
+
+        // 設定が足りない時は、黙って何も起きないのではなく警告を出す
+        if (parameterChartPrefab == null || p.parameterAnchor == null)
+        {
+            Debug.LogWarning($"[CharacterSelectController] {p.playerName}: パラメーターを表示できません。" +
+                             $"Parameter Chart Prefab が{(parameterChartPrefab == null ? "【未設定】" : "設定済み")}、" +
+                             $"{p.playerName} の Parameter Anchor が{(p.parameterAnchor == null ? "【未設定】" : "設定済み")}です。", this);
+            return;
+        }
+
+        if (parameterDebugLog)
+        {
+            string info = entry.parameterData == null
+                ? "Parameter Data が未設定（チャートは非表示）"
+                : $"{entry.parameterData.name} / 値: {string.Join(", ", entry.parameterData.values)} / ラベル: {string.Join(", ", entry.parameterData.labelNames)}";
+            Debug.Log($"[CharacterSelectController] {p.playerName}: キャラ[{p.currentIndex}] {entry.characterName} → {info}", this);
+        }
+
+        if (entry.parameterData == null)
+        {
+            if (p.parameterChartRoot != null) p.parameterChartRoot.SetActive(false);
+            return;
+        }
+
+        // 初回だけ生成する（破棄済みなら作り直す）。出現場所の下に置くので、場所を動かせばチャートも付いてくる
+        if (p.parameterChartRoot == null || p.parameterChartInstance == null)
+        {
+            if (p.parameterChartRoot != null) Destroy(p.parameterChartRoot);
+
+            GameObject root = Instantiate(parameterChartPrefab, p.parameterAnchor, false);
+            root.transform.position = p.parameterAnchor.position;
+
+            // PentagonChart は、プレハブのルートでも子でも見つける
+            PentagonChart chart = root.GetComponentInChildren<PentagonChart>(true);
+            if (chart == null)
+            {
+                Debug.LogError("[CharacterSelectController] Parameter Chart Prefab の中に PentagonChart が見つかりません。プレハブに PentagonChart コンポーネントが付いているか確認してください。", this);
+                Destroy(root);
+                return;
+            }
+
+            p.parameterChartRoot = root;
+            p.parameterChartInstance = chart;
+        }
+
+        p.parameterChartRoot.SetActive(true);
+        p.parameterChartInstance.SetLabelColor(p.parameterLabelColor); // プレイヤーごとのラベル色（1P=青、2P=赤）
+        p.parameterChartInstance.Show(entry.parameterData); // 中身（ラベル名・値・タイプ名）を切り替える
     }
 
     // 選択中キャラのドアップ用プレハブを表示する。
