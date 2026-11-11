@@ -27,11 +27,14 @@ public class PentagonChart : MonoBehaviour
     [Tooltip("ラベル用の TextMeshPro(5つ)。\n順番は 上 → 右上 → 右下 → 左下 → 左(上から時計回り)。\n位置は五角形を基準に自動で決まり、チャートが動くと追従する。\nチャートの子でないラベルは、起動時にこのチャート専用のコピーが作られる。")]
     [SerializeField] TMP_Text[] labels = new TMP_Text[N];
 
-    [Tooltip("タイプ名を表示する TextMeshPro(任意)。\nチャートの下や中心など、好きな場所に置いてよい。\n空のままならタイプ名は表示されない。")]
+    [Tooltip("タイプ名を表示する TextMeshPro(任意)。\nチャートの子にしてもしなくてもよい(Type Label Follows がONなら、位置は自動でチャートの真下になる)。\nチャートごとに専用のコピーが使われるので、1Pと2Pで取り合わない。\n空のままならタイプ名は表示されない。")]
     [SerializeField] TMP_Text typeLabel;
 
-    [Tooltip("ONにすると、タイプ名もチャートの位置に追従する。\n起動時の「チャートに対する相対位置」をそのまま保つので、プレハブ内で置いた位置・大きさ関係が維持される。\n(チャートの子にしている場合は、もともと追従するので何もしない)")]
+    [Tooltip("ONにすると、タイプ名をチャートを基準に自動で配置する(初期位置はチャートの真下)。\n1Pと2Pなど、チャートを複数生成しても、それぞれのチャートの位置にタイプ名が付く。位置の調整は下の Type Label Offset で行う。\nOFFだと自動配置せず、プレハブ内に置いた位置のままになる(チャートの子にしておけば追従する)。")]
     [SerializeField] bool typeLabelFollows = true;
+
+    [Tooltip("タイプ名の位置の微調整(ピクセル)。自動配置(ONのとき)の基準位置からのずれ。\nX = 右がプラス、Y = 上がプラス。\n基準位置は、チャートの下側の頂点ラベルより少し下。")]
+    [SerializeField] Vector2 typeLabelOffset = new Vector2(0f, -30f);
 
     // ───────────── ラベル ─────────────
     [Header("ラベル")]
@@ -79,13 +82,8 @@ public class PentagonChart : MonoBehaviour
     bool hasLabelColor;
     bool awoken; // Awake（ラベルの専用化）が済んでいるか。済む前に色を塗ると、共有の元ラベルを塗ってしまうため
 
-    // タイプ名ラベルの「チャート中心からの相対位置」(チャート内側の座標)。起動時に記録して追従に使う
-    Vector2 typeLabelLocalOffset;
-    bool typeOffsetCaptured;
-
     void Awake()
     {
-        CaptureTypeLabelOffset(); // 専用化(コピー)する前の位置関係を記録しておく
         EnsureOwnLabels();
         awoken = true;
     }
@@ -242,9 +240,11 @@ public class PentagonChart : MonoBehaviour
             labels[i].rectTransform.position = ChartPointToWorld(dir * r + adjust);
         }
 
-        if (typeLabelFollows && typeLabel != null && typeOffsetCaptured)
+        // タイプ名: チャートの真下を基準に置く。チャートごとに計算するので、1Pでも2Pでも、それぞれのチャートに付く
+        if (typeLabelFollows && typeLabel != null)
         {
-            typeLabel.rectTransform.position = ChartPointToWorld(typeLabelLocalOffset);
+            Vector2 below = new Vector2(0f, -r); // r = 半径 + ラベルの距離（=下側の頂点ラベルのあたり）
+            typeLabel.rectTransform.position = ChartPointToWorld(below + typeLabelOffset);
         }
     }
 
@@ -253,18 +253,6 @@ public class PentagonChart : MonoBehaviour
     {
         RectTransform g = graphic.rectTransform;
         return g.TransformPoint((Vector3)(g.rect.center + localFromCenter));
-    }
-
-    // 起動時のタイプ名ラベルの位置を「チャートの中心からの相対位置」として記録する
-    void CaptureTypeLabelOffset()
-    {
-        if (typeLabel == null || graphic == null || typeOffsetCaptured) return;
-        if (typeLabel.transform.IsChildOf(graphic.transform)) return; // チャートの子なら、もともと追従する
-
-        RectTransform g = graphic.rectTransform;
-        Vector3 local = g.InverseTransformPoint(typeLabel.rectTransform.position);
-        typeLabelLocalOffset = (Vector2)local - g.rect.center;
-        typeOffsetCaptured = true;
     }
 
     /// <summary>ラベルをいったん透明にする(フェードイン前の状態)。</summary>
