@@ -140,6 +140,56 @@ public class GameMNG : MonoBehaviour
     [SerializeField] string gameClearSceneName = "GameClear";             // InGame（エネミー戦）勝利時
     [SerializeField] string inGame1v1ResultSceneName = "Judgment"; // InGame1v1（対人戦）の勝敗結果画面
 
+    //=======================================================================
+    // ポーズメニュー（InGame1v1のみ）
+    //   コントローラーのオプションボタン（PS系）／メニューボタン（Xbox系）＝InputSystemのstartButtonで開閉する。
+    //   メニュー表示中は、キャラの操作ができなくなり、メニューのカーソル（ボタン選択）だけ動かせる。
+    //   ※シーンのEventSystemに「Input System UI Input Module」が付いていること（スティック／十字キーでの選択に必要）。
+    //=======================================================================
+    // ボタンを押した時にやること
+    public enum PauseButtonAction
+    {
+        Resume,     // 再開（メニューを閉じてゲームに戻る）
+        Retry,      // 現在のシーンをやり直す
+        LoadScene,  // 指定したシーンへ移動する（下のSceneNameに入力）
+        None        // 何もしない（OnClickを自分で設定したい場合）
+    }
+
+    // ポーズメニューのボタン1つ分の設定
+    [Serializable]
+    public class PauseMenuButton
+    {
+        [Tooltip("メニューに出すボタン。")]
+        public Button button;
+        [Tooltip("このボタンを押した時の動作。")]
+        public PauseButtonAction action = PauseButtonAction.Resume;
+        [Tooltip("動作が「LoadScene」の時の移動先シーン名（Build Settingsに登録済みのもの）。")]
+        public string sceneName;
+    }
+
+    [Header("ポーズメニュー（InGame1v1のみ）")]
+    [Tooltip("メニュー全体のGameObject（Canvas内のPanelなど）。ゲーム開始時は自動で非表示になります。")]
+    [SerializeField] GameObject pauseMenuRoot;
+    [Tooltip("ポーズ中に出すボタンの一覧。上から順に並び、最初のボタンに最初にカーソルが合う。押した時の動作は各ボタンのActionで選ぶ。ポーズ中だけ表示され、解除で消える。")]
+    [SerializeField] PauseMenuButton[] pauseMenuButtons;
+    [Tooltip("ONにすると、上の一覧のボタンを上下キー／スティックで上から順に移動できるよう自動でつなぐ（一番下の次は一番上に戻る）。")]
+    [SerializeField] bool autoLinkPauseButtons = true;
+    [Tooltip("（任意）最初にカーソルを合わせるボタン。空なら上の一覧の先頭のボタン。")]
+    [SerializeField] Selectable pauseMenuFirstSelected;
+    [Tooltip("ONの間、メニュー表示中はゲーム全体（Time.timeScale）も止める。OFFならキャラ操作だけ止める。")]
+    [SerializeField] bool pauseTimeScaleWhileMenu = true;
+    [Tooltip("ポーズ中だけ表示したいボタンなど（再開ボタン等）。Pause Menu Rootの子にしていれば空でOK。Rootの外に置いたものがある場合だけ登録する。ポーズ中のみ表示され、ポーズ解除で消える。")]
+    [SerializeField] GameObject[] pauseMenuExtraObjects;
+    [Tooltip("カーソル画像のImage（スプライトはこのImage自身のSourceImageで設定）。ポーズ中だけ表示され、選択中のボタンに追従して動く。Canvas内でボタンより手前（Hierarchyで下）に置くこと。")]
+    [SerializeField] Image pauseCursorImage;
+    [Tooltip("カーソルを、選択中ボタンの中心からどれだけずらして表示するか（画面上のpixel）。例：ボタンの左横に出すなら X=-150 など。")]
+    [SerializeField] Vector2 pauseCursorOffset = new Vector2(-150f, 0f);
+
+    // メニューが開いているか（外部から見たい場合用）
+    public bool IsPauseMenuOpen { get; private set; }
+
+    GameObject lastPauseSelected; // カーソルが最後に合っていたボタン（選択が外れた時の復帰用）
+
     //=========================================
     // 内部処理変数
     //=========================================
@@ -163,6 +213,10 @@ public class GameMNG : MonoBehaviour
             if (introTitleObject != null) introTitleObject.SetActive(false);
             if (introStartTextObject != null) introStartTextObject.SetActive(false);
         }
+
+        // ★追加：ポーズメニューのボタンに動作を割り当て、最初は閉じておく
+        SetupPauseButtons();
+        SetPauseMenuVisible(false);
 
         // 現在アクティブなシーンの名前を取得
         currentScene = SceneManager.GetActiveScene().name;
@@ -223,6 +277,7 @@ public class GameMNG : MonoBehaviour
     void OnDestroy()
     {
         Player.SetIntroLock(false);
+        Time.timeScale = 1f; // ★追加：メニューを開いたままシーンが破棄されても、時間停止を残さない
     }
 
     //-----------------------------------------------------------------------
@@ -318,10 +373,197 @@ public class GameMNG : MonoBehaviour
                 break;
 
             case "InGame1v1":
+                // ★追加：オプション／メニューボタンでポーズメニューを開閉する
+                HandlePauseMenuInput();
+
                 // 1v1はplayer1Status・player2Statusの両方を見て勝敗を判定する
                 CheckGameResult1V1();
                 break;
         }
+    }
+
+    //=======================================================================
+    // ポーズメニュー（InGame1v1用）
+    //=======================================================================
+
+    // いずれかのコントローラーのオプション／メニューボタンが押された瞬間にメニューを開閉する
+    void HandlePauseMenuInput()
+    {
+        bool pressed = false;
+        foreach (var pad in Gamepad.all)
+        {
+            if (pad.startButton.wasPressedThisFrame) { pressed = true; break; }
+        }
+        if (!pressed) return;
+
+        if (IsPauseMenuOpen) ResumeGame();
+        else OpenPauseMenu();
+    }
+
+    void OpenPauseMenu()
+    {
+        if (IsPauseMenuOpen) return;
+        if (IsIntroPlaying) return; // 開始演出中は開かない（演出側のロックと衝突するため）
+
+        // 勝敗が決した後（Dead/Win）は開かない
+        if (player1Status != Player.Status.Live || player2Status != Player.Status.Live) return;
+
+        IsPauseMenuOpen = true;
+        Player.SetIntroLock(true); // キャラの操作を止める
+        if (pauseTimeScaleWhileMenu) Time.timeScale = 0f;
+
+        SetPauseMenuVisible(true);  // メニュー・ボタン・カーソルを表示
+        SelectPauseFirstButton();   // カーソルを最初のボタンへ
+    }
+
+    // 一覧のボタンに、押した時の動作と上下移動のつながりを設定する（Startで1回だけ呼ぶ）
+    void SetupPauseButtons()
+    {
+        if (pauseMenuButtons == null) return;
+
+        var valid = new List<PauseMenuButton>();
+        foreach (var entry in pauseMenuButtons)
+        {
+            if (entry != null && entry.button != null) valid.Add(entry);
+        }
+
+        for (int i = 0; i < valid.Count; i++)
+        {
+            var entry = valid[i];
+            entry.button.onClick.AddListener(() => OnPauseButtonClicked(entry));
+
+            // 上下キー／スティックで、一覧の順番どおりに移動できるようにつなぐ
+            if (autoLinkPauseButtons && valid.Count > 1)
+            {
+                var nav = entry.button.navigation;
+                nav.mode = Navigation.Mode.Explicit;
+                nav.selectOnUp = valid[(i - 1 + valid.Count) % valid.Count].button;
+                nav.selectOnDown = valid[(i + 1) % valid.Count].button;
+                nav.selectOnLeft = null;
+                nav.selectOnRight = null;
+                entry.button.navigation = nav;
+            }
+        }
+    }
+
+    void OnPauseButtonClicked(PauseMenuButton entry)
+    {
+        switch (entry.action)
+        {
+            case PauseButtonAction.Resume:
+                ResumeGame();
+                break;
+
+            case PauseButtonAction.Retry:
+                ResumeGame(); // 時間停止・操作ロックを解いてから読み込む
+                SceneManager.LoadScene(currentScene);
+                break;
+
+            case PauseButtonAction.LoadScene:
+                if (string.IsNullOrEmpty(entry.sceneName))
+                {
+                    Debug.LogWarning("[GameMNG] ポーズメニューのボタンの動作がLoadSceneですが、SceneNameが空です。");
+                    break;
+                }
+                ResumeGame();
+                SceneManager.LoadScene(entry.sceneName);
+                break;
+
+            case PauseButtonAction.None:
+                break;
+        }
+    }
+
+    // カーソルを最初のボタン（pauseMenuFirstSelected、空なら一覧の先頭）に合わせる
+    void SelectPauseFirstButton()
+    {
+        Selectable first = pauseMenuFirstSelected;
+        if (first == null && pauseMenuButtons != null)
+        {
+            foreach (var entry in pauseMenuButtons)
+            {
+                if (entry != null && entry.button != null) { first = entry.button; break; }
+            }
+        }
+
+        var es = UnityEngine.EventSystems.EventSystem.current;
+        if (es != null)
+        {
+            es.SetSelectedGameObject(null);
+            if (first != null) es.SetSelectedGameObject(first.gameObject);
+        }
+        lastPauseSelected = first != null ? first.gameObject : null;
+
+        // 開いた最初のフレームから、カーソルを正しい位置に出す
+        Canvas.ForceUpdateCanvases();
+        UpdatePauseCursor();
+    }
+
+    // ポーズメニューの表示/非表示をまとめて切り替える（メニュー本体・ボタン類・カーソル画像）
+    void SetPauseMenuVisible(bool visible)
+    {
+        if (pauseMenuRoot != null) pauseMenuRoot.SetActive(visible);
+        if (pauseMenuButtons != null)
+        {
+            foreach (var entry in pauseMenuButtons)
+            {
+                if (entry != null && entry.button != null) entry.button.gameObject.SetActive(visible);
+            }
+        }
+        if (pauseMenuExtraObjects != null)
+        {
+            foreach (var go in pauseMenuExtraObjects)
+            {
+                if (go != null) go.SetActive(visible);
+            }
+        }
+        if (pauseCursorImage != null) pauseCursorImage.gameObject.SetActive(visible);
+    }
+
+    // ポーズ中、カーソル画像を選択中のボタンへ追従させる（描画直前に位置を合わせる）
+    void LateUpdate()
+    {
+        if (IsPauseMenuOpen) UpdatePauseCursor();
+    }
+
+    void UpdatePauseCursor()
+    {
+        var es = UnityEngine.EventSystems.EventSystem.current;
+        if (es == null) return;
+
+        // 選択が外れていたら（マウスクリック等）、最後のボタンへ戻す
+        GameObject sel = es.currentSelectedGameObject;
+        if (sel == null && lastPauseSelected != null && lastPauseSelected.activeInHierarchy)
+        {
+            es.SetSelectedGameObject(lastPauseSelected);
+            sel = lastPauseSelected;
+        }
+        if (sel == null) return;
+        lastPauseSelected = sel;
+
+        if (pauseCursorImage == null) return;
+        var target = sel.transform as RectTransform;
+        if (target == null) return;
+
+        // 画面上のpixelのオフセットを、Canvasの拡大率に合わせて換算して配置する
+        Vector3 scale = pauseCursorImage.rectTransform.lossyScale;
+        Vector3 offset = new Vector3(pauseCursorOffset.x * scale.x, pauseCursorOffset.y * scale.y, 0f);
+        pauseCursorImage.rectTransform.position = target.position + offset;
+    }
+
+    // メニューを閉じてゲームを再開する（「再開」ボタンのOnClickにも割り当て可能）
+    public void ResumeGame()
+    {
+        if (!IsPauseMenuOpen) return;
+
+        IsPauseMenuOpen = false;
+        SetPauseMenuVisible(false); // メニュー・ボタン・カーソルを消す
+
+        var es = UnityEngine.EventSystems.EventSystem.current;
+        if (es != null) es.SetSelectedGameObject(null);
+
+        Time.timeScale = 1f;
+        Player.SetIntroLock(false); // キャラの操作を戻す
     }
 
     //=======================================================================

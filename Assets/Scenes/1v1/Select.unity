@@ -2043,6 +2043,9 @@ MonoBehaviour:
   stopBgmOnTransition: 0
   nextSceneName: InGame1v1
   transitionDelay: 1
+  backSceneName: MainMenu
+  backTransitionDelay: 0.2
+  backSE: {fileID: 8300000, guid: 2fc70cfe42e586e4680986a24fdbabd2, type: 3}
 --- !u!1 &1373557350
 GameObject:
   m_ObjectHideFlags: 0

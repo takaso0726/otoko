@@ -173,6 +173,12 @@ public class CharacterSelectController : MonoBehaviour
     [SerializeField] string nextSceneName = "InGame1v1";
     [SerializeField] float transitionDelay = 0.7f;
 
+    [Header("戻る設定（未決定の状態でBボタン）")]
+    [Tooltip("未決定の状態でBボタン(buttonEast)／Escを押した時に遷移するシーン名（例: タイトル、メインメニュー）。空ならBボタンでの遷移はしない。Build Settingsに登録しておくこと")]
+    [SerializeField] string backSceneName = "MainMenu";
+    [SerializeField] float backTransitionDelay = 0.2f;
+    [SerializeField] AudioClip backSE; // 戻る時のSE（未設定なら鳴らさない）
+
     bool isTransitioning;
     bool initialized;
     bool sameMarkShown; // 同キャラ用READYマークを表示中か
@@ -304,7 +310,9 @@ public class CharacterSelectController : MonoBehaviour
         if (characters == null || characters.Length == 0) return;
 
         HandlePlayer(player1, ReadP1Direction(), ReadP1Decide(), ReadP1Cancel(), ref p1CursorRoutine, 1);
+        if (isTransitioning) return; // 1Pの入力で戻る遷移が始まった場合
         HandlePlayer(player2, ReadP2Direction(), ReadP2Decide(), ReadP2Cancel(), ref p2CursorRoutine, 2);
+        if (isTransitioning) return;
 
         // 決定／キャンセルの結果に応じて、通常のREADYマークと同キャラ用READYマークを切り替える
         RefreshReadyMarks();
@@ -327,6 +335,13 @@ public class CharacterSelectController : MonoBehaviour
                 SetReadyMarkActive(p, false);
                 SetCursorVisible(p, true);
             }
+            return;
+        }
+
+        // まだ決定していない状態でBボタン（キャンセル）を押したら前のシーンへ戻る
+        if (cancel && !string.IsNullOrEmpty(backSceneName))
+        {
+            StartCoroutine(BackAndTransition());
             return;
         }
 
@@ -803,6 +818,23 @@ public class CharacterSelectController : MonoBehaviour
         yield return new WaitForSeconds(transitionDelay);
 
         SceneManager.LoadScene(nextSceneName);
+    }
+
+    // 未決定でBボタンが押された時の「戻る」遷移
+    IEnumerator BackAndTransition()
+    {
+        isTransitioning = true;
+
+        // 途中まで選んだ結果が次シーンに残らないようにクリアする
+        CharacterSelectionResult.Clear();
+
+        if (stopBgmOnTransition) StopBGM();
+
+        PlaySE(backSE);
+
+        yield return new WaitForSeconds(backTransitionDelay);
+
+        SceneManager.LoadScene(backSceneName);
     }
 
     // 各プレイヤーが最終的にカーソルを合わせていたキャラクターを、
