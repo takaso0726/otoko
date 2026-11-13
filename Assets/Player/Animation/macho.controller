@@ -1138,7 +1138,7 @@ AnimatorStateTransition:
   m_CanTransitionToSelf: 1
 --- !u!1107 &-2135842953328797546
 AnimatorStateMachine:
-  serializedVersion: 7
+  serializedVersion: 6
   m_ObjectHideFlags: 1
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -1700,7 +1700,7 @@ AnimatorController:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: macho
-  serializedVersion: 6
+  serializedVersion: 5
   m_AnimatorParameters:
   - m_Name: Blend
     m_Type: 1
@@ -1913,7 +1913,6 @@ AnimatorController:
     m_IKPass: 0
     m_SyncedLayerAffectsTiming: 0
     m_Controller: {fileID: 9100000}
-  m_EvaluateTransitionsOnStart: 0
 --- !u!1102 &64376951272807670
 AnimatorState:
   serializedVersion: 6
@@ -3306,7 +3305,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: fae56690b09d5014787293bf5659981d, type: 3}
+  m_Motion: {fileID: 1827226128182048838, guid: 686a10308417b3d4bb5d71e610e1fb10, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -3964,7 +3963,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: 6d6d5db35874e4c46a5486f26abe4473, type: 3}
+  m_Motion: {fileID: 1827226128182048838, guid: 686a10308417b3d4bb5d71e610e1fb10, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 

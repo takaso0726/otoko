@@ -3521,7 +3521,7 @@ public class Player : MonoBehaviour
 
         ParticleSystem newParticle = Instantiate(
             Men_particle,
-            transform.position + Vector3.up,
+            transform.position + Vector3.up/2,
             Quaternion.Euler(-90f, 0f, 0f));
         newParticle.Play();
         Destroy(newParticle.gameObject, 1.0f);
