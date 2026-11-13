@@ -594,7 +594,89 @@ public class Player : MonoBehaviour
              "※投げ（掴み）には適用されない。投げでP-Headを使いたい場合は、投げの「当たり判定」のheadにチェックを入れる。")]
     [SerializeField] bool enableHeadHitboxOnAttack = false;
 
-    [Header("パンチ（空中攻撃含む）")]
+
+     //=====================================================
+     // フレームメーター用：技ごとの発生・持続
+     //=====================================================
+     [System.Serializable]
+     public class AttackTiming
+     {
+          [Tooltip("発生フレーム：技を出してから当たり判定がONになるまで（緑）。0なら出した瞬間からON")]
+          public int startupFrames = 0;
+          [Tooltip("持続フレーム：当たり判定がONの長さ（赤）。0なら技が終わるまでON（従来どおり）")]
+          public int activeFrames = 0;
+     }
+
+     [Header("技ごとの発生・持続（フレームメーター用）")]
+     [SerializeField] AttackTiming punchTiming = new AttackTiming();
+     [SerializeField] AttackTiming flyingKickTiming = new AttackTiming();
+     [SerializeField] AttackTiming kickTiming = new AttackTiming();
+     [SerializeField] AttackTiming upKickTiming = new AttackTiming();
+     [SerializeField] AttackTiming downKickTiming = new AttackTiming();
+     [SerializeField] AttackTiming specialTiming = new AttackTiming();
+
+     enum AttackPhase { None, Startup, Active, Recovery }
+     AttackPhase attackPhase = AttackPhase.None;
+     HitboxSetting pendingHitbox;     // 発生待ちの当たり判定
+     AttackTiming currentTiming;      // 今出している技のタイミング
+     int attackElapsedFrames;         // 技を出してからの経過フレーム（ヒットストップ中は進まない）
+
+     // 技を出した時に呼ぶ（EnableAttackHitboxesの代わり）
+     void BeginAttackTiming(HitboxSetting hitbox, AttackTiming timing)
+     {
+          pendingHitbox = hitbox;
+          currentTiming = timing;
+          attackElapsedFrames = 0;
+          attackPhase = AttackPhase.Startup;
+          if (timing == null || timing.startupFrames <= 0)
+          {
+               EnableAttackHitboxes(hitbox);
+               attackPhase = AttackPhase.Active;
+          }
+     }
+
+     // TickBusyStateの中で毎フレーム呼ぶ
+     void TickAttackTiming()
+     {
+          if (attackPhase == AttackPhase.None) return;
+          attackElapsedFrames += frameStep;
+
+          int startup = currentTiming != null ? currentTiming.startupFrames : 0;
+          int active = currentTiming != null ? currentTiming.activeFrames : 0;
+
+          if (attackPhase == AttackPhase.Startup && attackElapsedFrames >= startup)
+          {
+               EnableAttackHitboxes(pendingHitbox);
+               attackPhase = AttackPhase.Active;
+          }
+          if (attackPhase == AttackPhase.Active && active > 0 && attackElapsedFrames >= startup + active)
+          {
+               DisableAllHitboxes();
+               attackPhase = AttackPhase.Recovery;
+          }
+     }
+
+     // FrameMeterが読む公開プロパティ
+     public bool IsHitStopping => hitStopTimer > 0;
+     public MeterState CurrentMeterState
+     {
+          get
+          {
+               if (currentState == PlayerState.Stunned) return MeterState.Stun;
+               bool attacking = currentState == PlayerState.Punch || currentState == PlayerState.Kick
+                             || currentState == PlayerState.UpKick || currentState == PlayerState.DownKick
+                             || currentState == PlayerState.Special;
+               if (!attacking) return MeterState.Idle;
+               switch (attackPhase)
+               {
+                    case AttackPhase.Startup: return MeterState.Startup;
+                    case AttackPhase.Active: return MeterState.Active;
+                    default: return MeterState.Recovery;
+               }
+          }
+     }
+
+     [Header("パンチ（空中攻撃含む）")]
     [Tooltip("① パンチの攻撃力（ダメージ量）")]
     [SerializeField] int punchAtk = 10;
     [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束フレーム数。60F=1秒）。パンチを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
@@ -3348,16 +3430,16 @@ public class Player : MonoBehaviour
             isFlyingKickAttack = false;
             animator.SetTrigger("Punch");
             SetAttackSe(punchSe);
-            EnableAttackHitboxes(punchHitbox);
-        }
+            BeginAttackTiming(punchHitbox, punchTiming);
+          }
         else
         {
             //空中攻撃
             isFlyingKickAttack = true;
             animator.SetTrigger("Flying-kick");
             SetAttackSe(flyingKickSe);
-            EnableAttackHitboxes(flyingKickHitbox);
-        }
+               BeginAttackTiming(flyingKickHitbox, flyingKickTiming);
+          }
     }
 
     // キック処理。スティックの上下入力で通常／上／下キックに分岐する
@@ -3381,10 +3463,10 @@ public class Player : MonoBehaviour
             currentAttackMissFrames = downKickMissFrames;
             animator.SetTrigger("DownKick");
             SetAttackSe(downKickSe);
-            EnableAttackHitboxes(downKickHitbox);
+            BeginAttackTiming(downKickHitbox, downKickTiming);
 
-            // 下キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
-            baseAtk = GetAttackPower(AttackType.DownKick);
+               // 下キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
+               baseAtk = GetAttackPower(AttackType.DownKick);
             UpdateAtkByGauge();
         }
         else if (moveInput.y > upKickInputThreshold)
@@ -3396,10 +3478,10 @@ public class Player : MonoBehaviour
             SetAttackSe(upKickSe);
             DLog($"[{PlayerName}] UpKick発動：Triggerを立てました（moveInput.y={moveInput.y:F2}）");
             DebugUpKickAnimator(); // ★デバッグ：Animatorが実際にどのステートへ遷移したかを確認する
-            EnableAttackHitboxes(upKickHitbox);
+               BeginAttackTiming(upKickHitbox, upKickTiming);
 
-            // 上キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
-            baseAtk = GetAttackPower(AttackType.UpKick);
+               // 上キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
+               baseAtk = GetAttackPower(AttackType.UpKick);
             UpdateAtkByGauge();
         }
         else
@@ -3409,10 +3491,10 @@ public class Player : MonoBehaviour
             currentAttackMissFrames = kickMissFrames;
             animator.SetTrigger("Kick");
             SetAttackSe(kickSe);
-            EnableAttackHitboxes(kickHitbox);
+               BeginAttackTiming(kickHitbox, kickTiming);
 
-            // 通常キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
-            baseAtk = GetAttackPower(AttackType.Kick);
+               // 通常キックの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映する
+               baseAtk = GetAttackPower(AttackType.Kick);
             UpdateAtkByGauge();
         }
     }
@@ -3944,7 +4026,7 @@ public class Player : MonoBehaviour
 
         // 左足（3箇所）の攻撃用当たり判定をON。オフに戻す処理はTickBusyState()の
         // 拘束時間終了処理（DisableAllHitboxes）で他の技と共通して行われる。
-        EnableAttackHitboxes(specialHitbox);
+        BeginAttackTiming(specialHitbox, specialTiming);
 
         // 必殺技の攻撃力（Inspector設定値=specialAtk）を基準に、漢気ゲージ補正を反映して攻撃力を確定する
         baseAtk = specialAtk;
@@ -4055,8 +4137,10 @@ public class Player : MonoBehaviour
             MoveDuringSpecial();
         }
 
-        // ★追加：掴み成立後、throwStartPlayFramesフレームだけ掴みモーションを再生したら、そのポーズで止める
-        if (currentState == PlayerState.Throw && grabbedTarget != null && !grabHoldFrozen)
+         TickAttackTiming();
+
+          // ★追加：掴み成立後、throwStartPlayFramesフレームだけ掴みモーションを再生したら、そのポーズで止める
+          if (currentState == PlayerState.Throw && grabbedTarget != null && !grabHoldFrozen)
         {
             grabHoldTimer -= frameStep;
             if (grabHoldTimer <= 0)
