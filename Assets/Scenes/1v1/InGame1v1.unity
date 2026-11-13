@@ -264,13 +264,13 @@ MonoBehaviour:
   p1: {fileID: 0}
   p2: {fileID: 0}
   visible: 1
-  maxFrames: 80
-  cellWidth: 12
-  cellHeight: 12
-  cellSpacing: 0
+  maxFrames: 79
+  cellWidth: 10.1
+  cellHeight: 14.6
+  cellSpacing: 0.9
   showCursor: 1
   fontSize: 18
-  yRatio: 0.8
+  yRatio: 0.574
   holdIdleFrames: 30
   texFrame: {fileID: 2800000, guid: 17b5de98eca9ab44f89ef844dd75e33e, type: 3}
   texIdle: {fileID: 2800000, guid: 7e965cbd20d1abe43b443f535d8e45d3, type: 3}
@@ -279,8 +279,8 @@ MonoBehaviour:
   texRecovery: {fileID: 2800000, guid: 7f74f567aab35c74e9ae5ea0bc78687d, type: 3}
   texStun: {fileID: 2800000, guid: da3a65d16ec24104bbd206c5ce6d2553, type: 3}
   texExtra: {fileID: 2800000, guid: 1989bf4011b84014a8efb9fa6b468c93, type: 3}
-  backgroundColor: {r: 0, g: 0, b: 0, a: 0.9}
-  backgroundPadding: 8
+  backgroundColor: {r: 0, g: 0, b: 0, a: 0.5803922}
+  backgroundPadding: 3.84
   showText: 1
 --- !u!4 &72779828
 Transform:
