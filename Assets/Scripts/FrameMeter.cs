@@ -26,9 +26,10 @@ public class FrameMeter : MonoBehaviour
     [Header("表示設定")]
     public bool visible = true;
     public int maxFrames = 80;          // 横に並べるフレーム数
-    public float cellSize = 12f;        // 1フレームのマスの大きさ
-    public float cellGap = 1f;          // マス同士の隙間
-    public float groupGap = 4f;         // 5フレームごとの追加の隙間（数えやすくする）
+    public float cellWidth = 12f;       // 1フレームのマスの幅
+    public float cellHeight = 12f;      // 1フレームのマスの高さ
+    public float cellSpacing = 0f;      // マス同士の隙間（0でぴったりつなげる）
+    public bool showCursor = true;      // 今書き込んでいる位置を示す白い線を出すか
     public int fontSize = 18;
     [Range(0f, 1f)] public float yRatio = 0.80f; // 画面の上から何割の位置に出すか
     [Tooltip("両者が何もしていない状態がこのフレーム数続いたら、次の行動が始まった時に表示をリセットする")]
@@ -42,6 +43,11 @@ public class FrameMeter : MonoBehaviour
     public Texture2D texRecovery;  // 青箱（硬直）
     public Texture2D texStun;      // 黄箱（やられ）
     public Texture2D texExtra;     // 紫箱（今は未使用。用途が決まったら使う）
+    [Header("背景")]
+    public Color backgroundColor = new Color(0f, 0f, 0f, 0.9f); // 一番後ろの板の色（アルファで透明度も変えられる）
+    public float backgroundPadding = 8f;                        // 背景の余白
+
+    [Header("文字")]
     public bool showText = true;   // 「発生/全体/硬直差」の文字を出すか
 
     static readonly Color cIdle     = new Color(0.55f, 0.55f, 0.55f);
@@ -54,6 +60,10 @@ public class FrameMeter : MonoBehaviour
     readonly List<MeterState> log1 = new List<MeterState>();
     readonly List<MeterState> log2 = new List<MeterState>();
     GameMNG gm;
+    // 表示用のリング（最大フレームまで来たら先頭に戻って上書きする）。-1＝まだ何も書かれていないマス
+    int[] disp1, disp2;
+    int head;                           // 次に書き込むマスの番号
+    const int CalcLogLimit = 600;       // 発生/全体/硬直差の計算用ログの上限
     int lastFrame = -1;
     int idleCount;
     GUIStyle style;
@@ -98,13 +108,35 @@ public class FrameMeter : MonoBehaviour
         }
         else
         {
-            if (idleCount > holdIdleFrames) { log1.Clear(); log2.Clear(); } // 新しい攻防が始まったのでリセット
+            if (idleCount > holdIdleFrames) { log1.Clear(); log2.Clear(); ClearDisplay(); } // 新しい攻防が始まったのでリセット
             idleCount = 0;
         }
 
+        // 計算用ログ（発生/全体/硬直差用）
         log1.Add(s1);
         log2.Add(s2);
-        if (log1.Count > maxFrames) { log1.RemoveAt(0); log2.RemoveAt(0); }
+        if (log1.Count > CalcLogLimit) { log1.RemoveAt(0); log2.RemoveAt(0); }
+
+        // 表示用リング：最後のマスまで来たら先頭に戻り、古いフレームを上書きしていく
+        EnsureDisplay();
+        disp1[head] = (int)s1;
+        disp2[head] = (int)s2;
+        head = (head + 1) % maxFrames;
+    }
+
+    void EnsureDisplay()
+    {
+        if (disp1 != null && disp1.Length == maxFrames) return;
+        disp1 = new int[maxFrames];
+        disp2 = new int[maxFrames];
+        ClearDisplay();
+    }
+
+    void ClearDisplay()
+    {
+        if (disp1 == null || disp1.Length != maxFrames) { disp1 = new int[maxFrames]; disp2 = new int[maxFrames]; }
+        for (int i = 0; i < maxFrames; i++) { disp1[i] = -1; disp2[i] = -1; }
+        head = 0;
     }
 
     //------------------------------------------------------
@@ -120,18 +152,19 @@ public class FrameMeter : MonoBehaviour
             style.normal.textColor = Color.white;
         }
 
-        float pitch = cellSize + cellGap;
-        float rowWidth = maxFrames * pitch + (maxFrames / 5) * groupGap;
+        EnsureDisplay();
+        float pitch = cellWidth + cellSpacing;
+        float rowWidth = maxFrames * pitch;
         float textH = fontSize + 8f;
-        float rowH = cellSize + 10f;
-        float pad = 8f;
+        float rowH = cellHeight + 10f;
+        float pad = backgroundPadding;
 
         float x = (Screen.width - rowWidth) * 0.5f;
         float y = Screen.height * yRatio;
         float totalH = textH * 3f + rowH * 2f + pad * 2f;
 
         // 一番後ろの黒い枠
-        DrawRect(new Rect(x - pad, y - pad, rowWidth + pad * 2f, totalH), new Color(0f, 0f, 0f, 0.9f));
+        DrawRect(new Rect(x - pad, y - pad, rowWidth + pad * 2f, totalH), backgroundColor);
 
         // 色の凡例
         DrawLabel(new Rect(x, y, rowWidth, textH),
@@ -142,11 +175,11 @@ public class FrameMeter : MonoBehaviour
         // P1
         DrawLabel(new Rect(x, y, rowWidth, textH), "P1  " + BuildInfo(log1, log2), style);
         y += textH;
-        DrawRow(x, y, log1, pitch);
+        DrawRow(x, y, disp1, pitch);
         y += rowH;
 
         // P2
-        DrawRow(x, y, log2, pitch);
+        DrawRow(x, y, disp2, pitch);
         y += rowH;
         DrawLabel(new Rect(x, y, rowWidth, textH), "P2  " + BuildInfo(log2, log1), style);
     }
@@ -156,19 +189,23 @@ public class FrameMeter : MonoBehaviour
         if (showText) GUI.Label(r, text, st);
     }
 
-    void DrawRow(float x, float y, List<MeterState> log, float pitch)
+    void DrawRow(float x, float y, int[] disp, float pitch)
     {
-        float rowWidth = maxFrames * pitch + (maxFrames / 5) * groupGap;
+        float rowWidth = maxFrames * pitch;
         if (texFrame != null)
-            GUI.DrawTexture(new Rect(x - 4f, y - 4f, rowWidth + 8f, cellSize + 8f), texFrame, ScaleMode.StretchToFill);
+            GUI.DrawTexture(new Rect(x - 4f, y - 4f, rowWidth + 8f, cellHeight + 8f), texFrame, ScaleMode.StretchToFill);
 
         for (int i = 0; i < maxFrames; i++)
         {
-            float cx = x + i * pitch + (i / 5) * groupGap;
-            Rect cell = new Rect(cx, y, cellSize, cellSize);
-            if (i < log.Count) DrawCell(cell, log[i]);
+            float cx = x + i * pitch;
+            Rect cell = new Rect(cx, y, cellWidth, cellHeight);
+            if (disp[i] >= 0) DrawCell(cell, (MeterState)disp[i]);
             else if (texFrame == null) DrawRect(cell, cEmpty); // 黒枠画像がある時は空きマスは黒枠のまま見せる
         }
+
+        // 今どこまで書いたかを示す白い線（次に上書きされるマスの左端）
+        if (showCursor)
+            DrawRect(new Rect(x + head * pitch - 1f, y - 2f, 2f, cellHeight + 4f), Color.white);
     }
 
     void DrawCell(Rect r, MeterState st)

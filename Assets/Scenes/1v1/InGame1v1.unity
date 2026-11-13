@@ -231,6 +231,72 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1135992186320144330, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
   m_PrefabInstance: {fileID: 1339633562}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &72779826
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 72779828}
+  - component: {fileID: 72779827}
+  m_Layer: 0
+  m_Name: FrameMeter
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &72779827
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 72779826}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 726c820ad6c16de46953603986f9a99b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FrameMeter
+  autoAssign: 1
+  p1: {fileID: 0}
+  p2: {fileID: 0}
+  visible: 1
+  maxFrames: 80
+  cellWidth: 12
+  cellHeight: 12
+  cellSpacing: 0
+  showCursor: 1
+  fontSize: 18
+  yRatio: 0.8
+  holdIdleFrames: 30
+  texFrame: {fileID: 2800000, guid: 17b5de98eca9ab44f89ef844dd75e33e, type: 3}
+  texIdle: {fileID: 2800000, guid: 7e965cbd20d1abe43b443f535d8e45d3, type: 3}
+  texStartup: {fileID: 2800000, guid: 0b7ce77fcd3a3984b91a403b8c3cc79a, type: 3}
+  texActive: {fileID: 2800000, guid: 92680364762c24e4ea7fa48b175d916e, type: 3}
+  texRecovery: {fileID: 2800000, guid: 7f74f567aab35c74e9ae5ea0bc78687d, type: 3}
+  texStun: {fileID: 2800000, guid: da3a65d16ec24104bbd206c5ce6d2553, type: 3}
+  texExtra: {fileID: 2800000, guid: 1989bf4011b84014a8efb9fa6b468c93, type: 3}
+  backgroundColor: {r: 0, g: 0, b: 0, a: 0.9}
+  backgroundPadding: 8
+  showText: 1
+--- !u!4 &72779828
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 72779826}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 324.15445, y: 225.87631, z: -81.17666}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &104230640 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 326522464027483504, guid: 9066f156e1936154fa1a0e474b0334a0, type: 3}
@@ -1195,7 +1261,7 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 410087039}
   m_Enabled: 1
-  serializedVersion: 13
+  serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Intensity: 1.51
@@ -1247,7 +1313,7 @@ Light:
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ForceVisible: 0
-  m_ShapeRadius: 0
+  m_ShadowRadius: 0
   m_ShadowAngle: 0
   m_LightUnit: 1
   m_LuxAtDistance: 1
@@ -5918,7 +5984,6 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
-  m_UseReflectionProbes: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
@@ -6961,3 +7026,4 @@ SceneRoots:
   - {fileID: 1195980007}
   - {fileID: 1004795457}
   - {fileID: 556785131}
+  - {fileID: 72779828}
