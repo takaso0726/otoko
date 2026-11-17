@@ -1849,7 +1849,7 @@ MonoBehaviour:
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
   throwSe: {fileID: 8300000, guid: de46853a9acbfae4aa241ed3545b3035, type: 3}
-  jumpSe: {fileID: 8300000, guid: 2fe169cc90cbd814a95b1d13edc85a4b, type: 3}
+  jumpSe: {fileID: 8300000, guid: e7ef3a2c0a885ae478301f82a1a64e38, type: 3}
   throwLaunchSe: {fileID: 8300000, guid: 70a95877bb48f7a499dbd6d9e096d58e, type: 3}
   landSe: {fileID: 8300000, guid: 579c6f92e9d242d41bf209a1d043d331, type: 3}
   punchSe: {fileID: 8300000, guid: 81e4b74fd63a95341bf549ef4843a0f3, type: 3}
@@ -1871,7 +1871,32 @@ MonoBehaviour:
   guardHitStopFrames: 3
   freezeAnimatorDuringHitStop: 1
   playHeadHitStateDirectly: 1
+  hitStateLight: HitLight
+  hitStateMedium: HitMedium
+  hitStateHeavy: HitHeavy
+  airHitStateLight: AirHitLight
+  airHitStateMedium: AirHitMedium
+  airHitStateHeavy: AirHitHeavy
+  enemyAttackStrength: 1
   enableHeadHitboxOnAttack: 0
+  punchTiming:
+    startupFrames: 0
+    activeFrames: 0
+  flyingKickTiming:
+    startupFrames: 0
+    activeFrames: 0
+  kickTiming:
+    startupFrames: 0
+    activeFrames: 0
+  upKickTiming:
+    startupFrames: 0
+    activeFrames: 0
+  downKickTiming:
+    startupFrames: 0
+    activeFrames: 0
+  specialTiming:
+    startupFrames: 0
+    activeFrames: 0
   punchAtk: 10
   punchMissFrames: 30
   punchHitFrames: 30
@@ -1880,6 +1905,8 @@ MonoBehaviour:
   punchKnockback:
     horizontalSpeed: 2.5
     upSpeed: 0
+  punchStrength: 0
+  flyingKickStrength: 1
   punchHitbox:
     head: 0
     rightArm: 0
@@ -1916,6 +1943,7 @@ MonoBehaviour:
   kickKnockback:
     horizontalSpeed: 3.5
     upSpeed: 0
+  kickStrength: 1
   kickHitbox:
     head: 0
     rightArm: 0
@@ -1938,6 +1966,7 @@ MonoBehaviour:
   upKickKnockback:
     horizontalSpeed: 2
     upSpeed: 5
+  upKickStrength: 2
   upKickHitbox:
     head: 0
     rightArm: 0
@@ -1960,6 +1989,7 @@ MonoBehaviour:
   downKickKnockback:
     horizontalSpeed: 3
     upSpeed: 0
+  downKickStrength: 1
   downKickHitbox:
     head: 0
     rightArm: 0
@@ -1979,6 +2009,7 @@ MonoBehaviour:
   specialKnockback:
     horizontalSpeed: 0
     upSpeed: 0
+  specialStrength: 2
   specialStunFrames: 30
   specialHitbox:
     head: 0
