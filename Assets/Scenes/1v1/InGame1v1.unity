@@ -2475,8 +2475,8 @@ MonoBehaviour:
   player1SpawnPoint: {fileID: 1435874237}
   player2SpawnPoint: {fileID: 1195980007}
   fallbackPrefab: {fileID: 0}
-  debugPlayer1Prefab: {fileID: 6758519040437653269, guid: aa90d0cad5f0e2e49a621f84ddd6fc4d, type: 3}
-  debugPlayer2Prefab: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
+  debugPlayer1Prefab: {fileID: 1123702133609149220, guid: 62980fe514fbfc74ebf72b0b974b4d02, type: 3}
+  debugPlayer2Prefab: {fileID: 1123702133609149220, guid: 62980fe514fbfc74ebf72b0b974b4d02, type: 3}
   debugSpawnKey: 102
   gameMNG: {fileID: 0}
   cameraController: {fileID: 0}

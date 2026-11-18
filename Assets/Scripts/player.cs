@@ -165,6 +165,17 @@ public class Player : MonoBehaviour
     [Tooltip("ONにすると、攻撃・投げ・必殺技の最中は向きを変えず、終わってから相手へ向き直す。OFF（既定）なら技の最中でも常に相手を向く。")]
     [SerializeField] bool lockFacingDuringAction = false;
 
+    // ★追加：バックステップ（相手を向いたまま後ろへ下がる）アニメーション設定
+    //   自動向き合いがONの間、キャラは移動方向ではなく相手の方を向き続ける。
+    //   そのため後退中も「前向き歩き」のモーションのまま滑って見えてしまう。
+    //   後退している間だけAnimatorの"MoveBackward"(Bool)をtrueにして、バックステップ用モーションへ切り替える。
+    [Header("バックステップ設定（自動向き合いON時）")]
+    [Tooltip("ONにすると、自動向き合いがONの間、向いている方向と逆へ移動している時にAnimatorの\"MoveBackward\"(Bool)をtrueにする。\n" +
+             "Animator側で Move=true かつ MoveBackward=true の時にバックステップのモーションへ遷移させてください。")]
+    [SerializeField] bool enableBackStepAnimation = true;
+    [Tooltip("バックステップ（自動向き合いON中に、向いている方向と逆へ下がる時）の移動速度の倍率。1＝前進と同じ速さ、0.5＝半分、1.5＝1.5倍。")]
+    [SerializeField, Range(0.1f, 2f)] float backStepSpeedRatio = 1f;
+
     //=====================================================
     // ★追加：リザルト画面モード
     //   ONの間は、攻撃ボタン（パンチ／キック）以外の操作を受け付けず、移動も制限する。
@@ -938,6 +949,8 @@ public class Player : MonoBehaviour
     bool autoFaceSnapped;            // ★追加：最初に相手を認識した時に、補間なしで即座に向き合わせたか
     float autoFaceSign = 1f;         // ★追加：現在向いている（向こうとしている）Z方向。密着中に判定が揺れても、確定するまで変えない
     bool hasMoveBackwardParam;       // ★追加：Animatorに"MoveBackward"(Bool)が存在するか（存在する時だけ値を送る）
+    bool hasIdleFacingRightParam;    // ★追加：Animatorに"IdleFacingRight"(Bool)が存在するか（存在する時だけ値を送る）
+    const string IdleFacingRightParam = "IdleFacingRight"; // ★待機アニメーションを左向き／右向きで分けるためのAnimatorパラメータ名（Bool：true=右向き(+Z)／false=左向き(-Z)）
     bool hasGuardParam;              // ★変更：Animatorに"Guard"(Trigger)が存在するか（存在する時だけトリガーを立てる）
     bool guardAnimApplied;           // ★変更：直前フレームでGuard状態だったか（Guardに入った瞬間だけトリガーを立てるための記録）
     const string GuardParam = "Guard"; // ★仁王立ちアニメーション用のAnimatorパラメータ名（Trigger）
@@ -1379,6 +1392,17 @@ public class Player : MonoBehaviour
                 }
             }
 
+            // ★追加：待機アニメーションの左右分岐用"IdleFacingRight"(Bool)がAnimatorにあるか調べる。
+            //   無い場合はSetBoolを呼ばない（毎フレーム警告が出るのを防ぐ）。
+            foreach (var param in animator.parameters)
+            {
+                if (param.name == IdleFacingRightParam && param.type == AnimatorControllerParameterType.Bool)
+                {
+                    hasIdleFacingRightParam = true;
+                    break;
+                }
+            }
+
             // ★変更：仁王立ち用の"Guard"(Trigger)・ガード成功用の"Guard-success"(Trigger)がAnimatorにあるか調べる。
             //   無ければ警告を1回だけ出し、そのアニメーションの再生は行わない。
             foreach (var param in animator.parameters)
@@ -1758,6 +1782,7 @@ public class Player : MonoBehaviour
     void Update()
     {
         AdvanceFrameClock(); // ★追加：60fps固定の論理フレームを進める（各タイマーはframeStep分だけ減らす）
+        SyncIdleFacingAnimation(); // ★追加：待機アニメーションを左向き／右向きで分けるため、現在の向きをAnimatorへ渡す
 
         // ★追加：復活後の停止が終わったら、非表示にしていた相手を再表示する
         if (hiddenOpponentRenderers.Count > 0 && !IsRebornFreezing) ShowOpponentAfterReborn();
@@ -3081,6 +3106,8 @@ public class Player : MonoBehaviour
         if(PlayerState.Idle == currentState)
         {
             animator.SetBool("Move", false);
+            // ★追加：後退中にスティックを離すとMoveBackwardだけtrueで残り、バックステップが止まらなくなるのを防ぐ
+            if (hasMoveBackwardParam) animator.SetBool("MoveBackward", false);
         }
     }
 
@@ -3116,12 +3143,18 @@ public class Player : MonoBehaviour
         //   moveInput.xの絶対値をそのまま「移動量」として扱い、minMoveAnimSpeed?maxMoveAnimSpeedの範囲へ変換する
         float inputMagnitude = Mathf.Clamp01(Mathf.Abs(moveInput.x));
         float animSpeed = Mathf.Lerp(minMoveAnimSpeed, maxMoveAnimSpeed, inputMagnitude);
+        // ★追加：バックステップ中は再生速度をマイナスにする（スティックを倒すほど絶対値＝マイナス方向が大きくなる）。
+        //   Animator側でバックステップのステートのSpeed Multiplierに"MoveSpeedMultiplier"を指定しておくと、逆再生される。
+        bool isBackStep = ShouldPlayBackStep(worldDirection);
+        if (isBackStep) animSpeed = -animSpeed;
         animator.SetFloat("MoveSpeedMultiplier", animSpeed);
 
         // ★追加：実際の移動速度（moveSpeed）も同じinputMagnitudeを使って可変にする。
         //   入力が閾値ギリギリ（0扱い）でもminMoveSpeedRatio分は必ず動き、最大まで倒すとmoveSpeedそのまま出る。
         float speedRatio = Mathf.Lerp(minMoveSpeedRatio, 1f, inputMagnitude);
         float actualMoveSpeed = moveSpeed * speedRatio;
+        // ★追加：バックステップ中は移動速度にbackStepSpeedRatioを掛ける（アニメーションのON/OFFとは独立）
+        if (IsBackStepMove(worldDirection)) actualMoveSpeed *= backStepSpeedRatio;
 
         currentState = PlayerState.Move;
         // ※Space.Worldを指定し、向きが変わっても常に世界座標の指定方向へ移動するようにする
@@ -3133,7 +3166,8 @@ public class Player : MonoBehaviour
 
         // ★追加：相手から離れる方向（後退）かどうかをAnimatorへ伝える。
         //   相手の方を向いたまま下がるため、Animator側で後退モーションへ分岐させたい場合に使う（任意）。
-        if (hasMoveBackwardParam) animator.SetBool("MoveBackward", IsRetreating(worldDirection));
+        // ★変更：自動向き合いON時は「向いている方向と逆へ動いているか」＝バックステップ判定を送る。
+        if (hasMoveBackwardParam) animator.SetBool("MoveBackward", isBackStep);
 
         // 漢気ゲージ：相手から離れる方向へ移動している間は減らす
         ApplyGaugeLossIfRetreating(worldDirection);
@@ -3275,6 +3309,27 @@ public class Player : MonoBehaviour
         return Mathf.Sign(deltaZ) != Mathf.Sign(worldDirection.z);
     }
 
+    // ★追加：バックステップアニメーションを再生すべきか（＝Animatorの"MoveBackward"へ送る値）を返す。
+    //   ・自動向き合いがOFFの時は、キャラが移動方向を向くので後退モーションは不要（常にfalse）。
+    //   ・ONの時は、実際に向いているZ方向（autoFaceSign）と逆へ動いていればtrue。
+    //     相手の位置ではなく「見た目の向き」で判定するので、CPU戦で反転にヒステリシスがかかっている間も
+    //     見た目と動きが食い違わない。まだ向きが確定していない最初の1回だけ、相手の位置で判定する。
+    bool ShouldPlayBackStep(Vector3 worldDirection)
+    {
+        if (!enableBackStepAnimation) return false;
+        return IsBackStepMove(worldDirection);
+    }
+
+    // ★追加：今の移動がバックステップ（自動向き合いON中に、向いている方向と逆へ動く）かどうか。
+    //   アニメーションのON/OFF（enableBackStepAnimation）には影響されない。移動速度の倍率にも使う。
+    bool IsBackStepMove(Vector3 worldDirection)
+    {
+        if (!enableAutoFacing) return false;
+
+        if (autoFaceSnapped) return Mathf.Sign(worldDirection.z) != autoFaceSign;
+        return IsRetreating(worldDirection);
+    }
+
     // 指定した世界座標方向へプレイヤーの向きを滑らかに回転させる
     void FaceDirection(Vector3 worldDirection)
     {
@@ -3293,6 +3348,16 @@ public class Player : MonoBehaviour
     bool IsFacingRight()
     {
         return transform.forward.z >= 0f;
+    }
+
+    // ★追加：現在の向き（右向き=+Z／左向き=-Z）をAnimatorの"IdleFacingRight"(Bool)へ毎フレーム渡す。
+    //   Animator側で、待機ステートを「右向き待機」「左向き待機」の2つに分けて、このBoolで切り替える。
+    //   待機中だけでなく常に最新の向きを送っておくことで、攻撃・移動などから待機へ戻る時も
+    //   正しい向きの待機アニメーションへ遷移できる。相手を飛び越えて向きが反転した時も自動で切り替わる。
+    void SyncIdleFacingAnimation()
+    {
+        if (!hasIdleFacingRightParam || animator == null) return;
+        animator.SetBool(IdleFacingRightParam, IsFacingRight());
     }
 
     void SyncCrouchVisual(bool isCrouchInput)
