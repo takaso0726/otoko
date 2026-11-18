@@ -31,15 +31,7 @@ public class FrameMeter : MonoBehaviour
     public float cellSpacing = 0f;      // マス同士の隙間（0でぴったりつなげる）
     public bool showCursor = true;      // 今書き込んでいる位置を示す白い線を出すか
     public int fontSize = 18;
-
-    [Header("表示位置")]
-    [Range(0f, 1f)] public float xRatio = 0.5f;  // 横位置：0=左寄せ / 0.5=中央 / 1=右寄せ
-    [Range(0f, 1f)] public float yRatio = 0.80f; // 縦位置：画面の上から何割の位置に出すか
-    [Tooltip("ピクセル単位の微調整（+xで右、+yで下）")]
-    public Vector2 offset = Vector2.zero;
-    [Tooltip("ONなら、背景を含めた全体が画面外にはみ出さないように位置を補正する")]
-    public bool clampToScreen = true;
-
+    [Range(0f, 1f)] public float yRatio = 0.80f; // 画面の上から何割の位置に出すか
     [Tooltip("両者が何もしていない状態がこのフレーム数続いたら、次の行動が始まった時に表示をリセットする")]
     public int holdIdleFrames = 30;
 
@@ -166,22 +158,10 @@ public class FrameMeter : MonoBehaviour
         float textH = fontSize + 8f;
         float rowH = cellHeight + 10f;
         float pad = backgroundPadding;
+
+        float x = (Screen.width - rowWidth) * 0.5f;
+        float y = Screen.height * yRatio;
         float totalH = textH * 3f + rowH * 2f + pad * 2f;
-
-        // 表示位置：xRatio/yRatio（画面に対する割合）＋ offset（ピクセル微調整）
-        float x = (Screen.width - rowWidth) * xRatio + offset.x;
-        float y = Screen.height * yRatio + offset.y;
-
-        // 背景を含めた全体が画面外に出ないように補正
-        if (clampToScreen)
-        {
-            float minX = pad;
-            float maxX = Screen.width - rowWidth - pad;
-            float minY = pad;
-            float maxY = Screen.height - (totalH - pad); // y は背景の上端から pad 下がった位置
-            x = (maxX >= minX) ? Mathf.Clamp(x, minX, maxX) : minX;
-            y = (maxY >= minY) ? Mathf.Clamp(y, minY, maxY) : minY;
-        }
 
         // 一番後ろの黒い枠
         DrawRect(new Rect(x - pad, y - pad, rowWidth + pad * 2f, totalH), backgroundColor);
