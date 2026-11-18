@@ -23,7 +23,10 @@ public class StageSelectController : MonoBehaviour
         public string stageName;      // 表示名
         public RectTransform anchor;  // グリッド上の位置（各ステージサムネイルのUI要素）
         public Sprite thumbnail;      // 一覧上のサムネイル画像
-        public Sprite preview;        // カーソルを合わせた時に表示する大きめのプレビュー画像
+        public Sprite preview;        // （プレハブ未設定時のフォールバック）プレビュー画像
+        public GameObject previewPrefab; // カーソルを合わせた時に出現させるステージのプレハブ
+        [Tooltip("このステージのプレハブを出現させる位置用の空オブジェクト。未設定の場合はプレビューを表示しない（プレハブ未設定時はpreviewImageにフォールバック）。")]
+        public Transform previewSpawnPoint;
         public string sceneName;      // このステージが決定された時に遷移するシーン名（Inspectorで設定）
     }
 
@@ -31,9 +34,14 @@ public class StageSelectController : MonoBehaviour
     [SerializeField] StageEntry[] stages;
 
     [Header("プレイヤー")]
-    [SerializeField] RectTransform cursor;     // 1P用カーソル
+    [Tooltip("1P用カーソルのプレハブ。Start時に1番目のステージのanchorと同じ親の下へ生成される。")]
+    [SerializeField] GameObject cursorPrefab;
+    [Tooltip("カーソルの表示位置の微調整（アンカー上辺の中央からのずれ）。上に離したい時はYをプラスに。")]
+    [SerializeField] Vector2 cursorOffset = Vector2.zero;
+    RectTransform cursor;                      // 生成されたカーソル（実体）
     [SerializeField] GameObject readyMark;     // 決定後に表示する「READY」表示（Inspectorで非アクティブにしておく）
-    [SerializeField] Image previewImage;       // 選択中ステージのプレビュー表示用UI Image
+    [SerializeField] Image previewImage;       // 選択中ステージのプレビュー表示用UI Image（プレハブ未設定時のフォールバック）
+    GameObject previewInstance;                // 現在出現中のプレビュー用プレハブ
     [SerializeField] float cursorMoveSpeed = 12f;
 
     [Header("SE")]
@@ -59,6 +67,9 @@ public class StageSelectController : MonoBehaviour
         decided = false;
         isTransitioning = false;
         SetReadyMarkActive(false);
+
+        // OnDisableでプレビューを破棄しているため、再アクティブ化時は作り直す
+        if (stages != null && stages.Length > 0) UpdatePreview();
     }
 
     void Start()
@@ -71,13 +82,29 @@ public class StageSelectController : MonoBehaviour
 
         currentIndex = 0;
 
-        if (cursor != null && stages[0].anchor != null)
+        if (cursorPrefab != null && stages[0].anchor != null)
         {
-            cursor.position = stages[0].anchor.position;
+            // anchorと同じ親（同じ座標系）の下にカーソルを生成し、最前面に表示する
+            var cursorObj = Instantiate(cursorPrefab, stages[0].anchor.parent, false);
+            cursor = cursorObj.GetComponent<RectTransform>();
+            if (cursor == null)
+            {
+                Debug.LogError("[StageSelectController] cursorPrefab のルートに RectTransform がありません（UIオブジェクトにしてください）。", cursorObj);
+                return;
+            }
+
+            // anchorの親がGridLayoutGroup等でも、レイアウトに位置を上書きされないようにする
+            var layoutElement = cursorObj.GetComponent<LayoutElement>();
+            if (layoutElement == null) layoutElement = cursorObj.AddComponent<LayoutElement>();
+            layoutElement.ignoreLayout = true;
+
+            cursor.pivot = new Vector2(0.5f, 0f); // カーソルの下辺中央を基準にして、アンカーの上に乗せる
+            cursor.position = GetCursorTarget(stages[0].anchor);
+            cursor.SetAsLastSibling();
         }
         else
         {
-            Debug.LogWarning("[StageSelectController] cursor または stages[0].anchor が未設定です。", this);
+            Debug.LogWarning("[StageSelectController] cursorPrefab または stages[0].anchor が未設定です。", this);
         }
 
         SetReadyMarkActive(false);
@@ -101,7 +128,7 @@ public class StageSelectController : MonoBehaviour
                 if (cursor != null && stages[currentIndex].anchor != null)
                 {
                     if (cursorRoutine != null) StopCoroutine(cursorRoutine);
-                    cursorRoutine = StartCoroutine(MoveCursorSmooth(cursor, stages[currentIndex].anchor.position));
+                    cursorRoutine = StartCoroutine(MoveCursorSmooth(cursor, GetCursorTarget(stages[currentIndex].anchor)));
                 }
 
                 UpdatePreview();
@@ -123,7 +150,7 @@ public class StageSelectController : MonoBehaviour
         var fromAnchor = stages[fromIndex].anchor;
         if (fromAnchor == null) return -1;
 
-        Vector2 currentPos = fromAnchor.position;
+        Vector2 currentPos = GetCenter(fromAnchor);
         Vector2 dirNormalized = dir.normalized;
         Vector2 perpAxis = new Vector2(-dirNormalized.y, dirNormalized.x); // dirに直交する軸
 
@@ -137,7 +164,7 @@ public class StageSelectController : MonoBehaviour
             var anchor = stages[i].anchor;
             if (anchor == null) continue;
 
-            Vector2 offset = (Vector2)anchor.position - currentPos;
+            Vector2 offset = (Vector2)GetCenter(anchor) - currentPos;
 
             float primary = Vector2.Dot(offset, dirNormalized);
             if (primary <= 0.01f) continue; // 指定方向とは逆・同位置にあるものは除外
@@ -156,6 +183,21 @@ public class StageSelectController : MonoBehaviour
         }
 
         return bestIndex;
+    }
+
+    // UI（Image）の見た目上の中心のワールド座標を返す。
+    // pivotが中心でないUIでも、rect.center経由で正しく真ん中を取れる。
+    static Vector3 GetCenter(RectTransform rt)
+    {
+        return rt.TransformPoint(rt.rect.center);
+    }
+
+    // カーソルの表示位置：アンカー（UI）の「上辺の真ん中」＋cursorOffset。
+    // カーソルのpivotは下辺中央なので、アンカーの真ん中の上にカーソルが乗る形になる。
+    Vector3 GetCursorTarget(RectTransform rt)
+    {
+        Vector3 topCenter = rt.TransformPoint(new Vector2(rt.rect.center.x, rt.rect.yMax));
+        return topCenter + (Vector3)cursorOffset;
     }
 
     void Decide()
@@ -226,14 +268,43 @@ public class StageSelectController : MonoBehaviour
     // カーソルが乗っているステージのプレビュー画像をpreviewImageに反映する
     void UpdatePreview()
     {
-        if (previewImage == null) return;
         if (stages == null || stages.Length == 0) return;
 
-        var sprite = stages[currentIndex].preview;
-        previewImage.sprite = sprite;
+        var entry = stages[currentIndex];
 
+        // 前のプレビューを消す
+        ClearPreviewInstance();
+
+        // プレハブが設定されていれば、それを出現させる
+        // 出現先はステージごとの空オブジェクト
+        Transform parent = entry.previewSpawnPoint;
+
+        if (entry.previewPrefab != null && parent != null)
+        {
+            previewInstance = Instantiate(entry.previewPrefab, parent, false);
+            if (previewImage != null) previewImage.enabled = false;
+            return;
+        }
+
+        // プレハブ未設定なら従来の画像表示にフォールバック
+        if (previewImage == null) return;
+        previewImage.sprite = entry.preview;
         // preview未設定のステージの場合はImageを非表示にして「空の白い四角」が出ないようにする
-        previewImage.enabled = sprite != null;
+        previewImage.enabled = entry.preview != null;
+    }
+
+    void ClearPreviewInstance()
+    {
+        if (previewInstance != null)
+        {
+            Destroy(previewInstance);
+            previewInstance = null;
+        }
+    }
+
+    void OnDisable()
+    {
+        ClearPreviewInstance();
     }
 
     // AudioClipがInspectorで未設定の場合にPlayOneShot(null)警告が出るのを防ぐ

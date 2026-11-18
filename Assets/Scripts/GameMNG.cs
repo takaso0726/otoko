@@ -141,7 +141,7 @@ public class GameMNG : MonoBehaviour
     [SerializeField] string inGame1v1ResultSceneName = "Judgment"; // InGame1v1（対人戦）の勝敗結果画面
 
     //=======================================================================
-    // ポーズメニュー（InGame1v1のみ）
+    // ポーズメニュー（InGame1v1 / TrainingRoom）
     //   コントローラーのオプションボタン（PS系）／メニューボタン（Xbox系）＝InputSystemのstartButtonで開閉する。
     //   メニュー表示中は、キャラの操作ができなくなり、メニューのカーソル（ボタン選択）だけ動かせる。
     //   ※シーンのEventSystemに「Input System UI Input Module」が付いていること（スティック／十字キーでの選択に必要）。
@@ -167,7 +167,7 @@ public class GameMNG : MonoBehaviour
         public string sceneName;
     }
 
-    [Header("ポーズメニュー（InGame1v1のみ）")]
+    [Header("ポーズメニュー（InGame1v1 / TrainingRoom）")]
     [Tooltip("メニュー全体のGameObject（Canvas内のPanelなど）。ゲーム開始時は自動で非表示になります。")]
     [SerializeField] GameObject pauseMenuRoot;
     [Tooltip("ポーズ中に出すボタンの一覧。上から順に並び、最初のボタンに最初にカーソルが合う。押した時の動作は各ボタンのActionで選ぶ。ポーズ中だけ表示され、解除で消える。")]
@@ -234,6 +234,7 @@ public class GameMNG : MonoBehaviour
                 break;
 
             case "InGame1v1":
+            case "TrainingRoom": // ★追加：トレーニングルームも対人戦と同じ初期化（2P=Live・対戦結果リセット）
                 // HPバーを現在出ているキャラクターに設定する
                 if (E_HPbar != null && p2 != null) E_HPbar.value = p2.HP;
 
@@ -373,6 +374,7 @@ public class GameMNG : MonoBehaviour
                 break;
 
             case "InGame1v1":
+            case "TrainingRoom": // ★追加：トレーニングルームも勝者をMatchResultに書き込み、Judgmentへ遷移する
                 // ★追加：オプション／メニューボタンでポーズメニューを開閉する
                 HandlePauseMenuInput();
 
@@ -383,7 +385,7 @@ public class GameMNG : MonoBehaviour
     }
 
     //=======================================================================
-    // ポーズメニュー（InGame1v1用）
+    // ポーズメニュー（InGame1v1 / TrainingRoom用）
     //=======================================================================
 
     // いずれかのコントローラーのオプション／メニューボタンが押された瞬間にメニューを開閉する

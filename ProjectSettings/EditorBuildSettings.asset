@@ -30,6 +30,9 @@ EditorBuildSettings:
     path: Assets/Scenes/CPU/SFC.unity
     guid: 5b413719266a32a4ca9fc47dcdef418d
   - enabled: 1
+    path: Assets/Scenes/1v1/TrainingRoom.unity
+    guid: 062dcc00f2481be4eb1e0288ff7dd60b
+  - enabled: 1
     path: Assets/Scenes/1v1/Judgment.unity
     guid: 42f59c4ff9be14d48a43633beabcc71b
   - enabled: 1
