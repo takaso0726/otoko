@@ -918,7 +918,17 @@ public class Player : MonoBehaviour
     // ★内部状態
     //=====================================================
     Animator currentanimator;                               //現在のアニメーションを管理する変数
-    private PlayerState currentState = PlayerState.Idle;   // 現在の行動状態
+    // ★変更：currentStateをプロパティ化。どこで代入されても、Idleかどうかを即座にAnimatorの"Idle"(Bool)へ反映する。
+    private PlayerState _currentState = PlayerState.Idle;
+    private PlayerState currentState                       // 現在の行動状態
+    {
+        get => _currentState;
+        set
+        {
+            _currentState = value;
+            SyncIdleAnimation();
+        }
+    }
     private int stateTimer;                               // 現在の行動が終わるまでの残りフレーム数
     private int currentAttackMissFrames;                // ★追加：今出している通常攻撃の「空振り時」拘束時間（命中時に経過時間を求めるために保持）
 
@@ -949,6 +959,8 @@ public class Player : MonoBehaviour
     bool autoFaceSnapped;            // ★追加：最初に相手を認識した時に、補間なしで即座に向き合わせたか
     float autoFaceSign = 1f;         // ★追加：現在向いている（向こうとしている）Z方向。密着中に判定が揺れても、確定するまで変えない
     bool hasMoveBackwardParam;       // ★追加：Animatorに"MoveBackward"(Bool)が存在するか（存在する時だけ値を送る）
+    bool hasIdleParam;               // ★追加：Animatorに"Idle"(Bool)が存在するか（存在する時だけ値を送る）
+    const string IdleParam = "Idle"; // ★待機(Idle)状態の時だけtrueにするAnimatorパラメータ名（Bool）
     bool hasIdleFacingRightParam;    // ★追加：Animatorに"IdleFacingRight"(Bool)が存在するか（存在する時だけ値を送る）
     const string IdleFacingRightParam = "IdleFacingRight"; // ★待機アニメーションを左向き／右向きで分けるためのAnimatorパラメータ名（Bool：true=右向き(+Z)／false=左向き(-Z)）
     bool hasGuardParam;              // ★変更：Animatorに"Guard"(Trigger)が存在するか（存在する時だけトリガーを立てる）
@@ -1392,6 +1404,21 @@ public class Player : MonoBehaviour
                 }
             }
 
+            // ★追加：待機状態用の"Idle"(Bool)がAnimatorにあるか調べる。無ければ警告を1回だけ出して値は送らない。
+            foreach (var param in animator.parameters)
+            {
+                if (param.name == IdleParam && param.type == AnimatorControllerParameterType.Bool)
+                {
+                    hasIdleParam = true;
+                    break;
+                }
+            }
+            if (!hasIdleParam)
+            {
+                Debug.LogWarning($"[{PlayerName}] Animatorに'{IdleParam}'(Bool)パラメータがありません。Idleの値は送られません。", this);
+            }
+            SyncIdleAnimation(); // 初期状態（Idle）を反映
+
             // ★追加：待機アニメーションの左右分岐用"IdleFacingRight"(Bool)がAnimatorにあるか調べる。
             //   無い場合はSetBoolを呼ばない（毎フレーム警告が出るのを防ぐ）。
             foreach (var param in animator.parameters)
@@ -1782,6 +1809,7 @@ public class Player : MonoBehaviour
     void Update()
     {
         AdvanceFrameClock(); // ★追加：60fps固定の論理フレームを進める（各タイマーはframeStep分だけ減らす）
+        SyncIdleAnimation(); // ★追加：Idle状態の時だけAnimatorの"Idle"をtrueにする（取りこぼし防止の保険）
         SyncIdleFacingAnimation(); // ★追加：待機アニメーションを左向き／右向きで分けるため、現在の向きをAnimatorへ渡す
 
         // ★追加：復活後の停止が終わったら、非表示にしていた相手を再表示する
@@ -3348,6 +3376,14 @@ public class Player : MonoBehaviour
     bool IsFacingRight()
     {
         return transform.forward.z >= 0f;
+    }
+
+    // ★追加：currentStateがIdleの間だけAnimatorの"Idle"(Bool)をtrueにする。
+    //   Move・攻撃・ガード・被弾など、Idle以外の状態に入った瞬間にfalseへ戻る。
+    void SyncIdleAnimation()
+    {
+        if (!hasIdleParam || animator == null) return;
+        animator.SetBool(IdleParam, _currentState == PlayerState.Idle);
     }
 
     // ★追加：現在の向き（右向き=+Z／左向き=-Z）をAnimatorの"IdleFacingRight"(Bool)へ毎フレーム渡す。

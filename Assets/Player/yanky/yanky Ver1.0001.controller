@@ -47,7 +47,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: 676890181666ec0498bd39bccc85c6e8, type: 3}
+  m_Motion: {fileID: 1827226128182048838, guid: 73ca1bd920d601241abe0ca76f541752, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -74,7 +74,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: 1827226128182048838, guid: 91a4641de13349840a74289ddc8b5877, type: 3}
+  m_Motion: {fileID: 1827226128182048838, guid: 8790469402dfc3744847ebbf620200a0, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
@@ -544,7 +544,7 @@ AnimatorState:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: hariken
+  m_Name: Ult
   m_Speed: 0.89
   m_CycleOffset: 0
   m_Transitions:
@@ -722,7 +722,7 @@ AnimatorState:
   m_MirrorParameterActive: 0
   m_CycleOffsetParameterActive: 0
   m_TimeParameterActive: 0
-  m_Motion: {fileID: -203655887218126122, guid: dcd828461c2ba0c4a8ba1e9da2a61d94, type: 3}
+  m_Motion: {fileID: 1827226128182048838, guid: 39ac20f313a25e140ad38da2c871654a, type: 3}
   m_Tag: 
   m_SpeedParameter: 
   m_MirrorParameter: 
