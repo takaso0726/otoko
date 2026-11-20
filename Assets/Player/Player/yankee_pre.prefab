@@ -1646,7 +1646,7 @@ Animator:
   m_GameObject: {fileID: 8961988206862004714}
   m_Enabled: 1
   m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: 991f59df32c3cb54bbdfe8c0b0d1bdc8, type: 2}
+  m_Controller: {fileID: 9100000, guid: f194642fb9d9acb469be8afc13240086, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -1829,6 +1829,8 @@ MonoBehaviour:
   autoFaceDeadZone: 0.05
   autoFaceFlipThreshold: 1
   lockFacingDuringAction: 0
+  enableBackStepAnimation: 1
+  backStepSpeedRatio: 1
   isResultMode: 0
   autoDetectResultScene: 1
   moveInputThreshold: 0.03
