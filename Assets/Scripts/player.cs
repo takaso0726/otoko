@@ -4807,6 +4807,11 @@ public class Player : MonoBehaviour
 
             Jumpflag = true;
 
+            // ★追加：ジャンプ終了（着地）の際に、空中でパンチを押して予約された"Flying-kick"トリガーが
+            //   消費されないまま残っていたらオフにする。残ったままだと、着地後や次のジャンプ時に
+            //   Flying-kickが誤って再生されてしまう（ジャンプ終了間際のパンチ入力で起きる不具合の対策）。
+            if (animator != null) animator.ResetTrigger("Flying-kick");
+
             // ★追加：投げで放物線状に吹き飛ばされている最中に地面へ着地したら、Thrown状態を終えて復帰する
             //   （この場合の着地アニメーションは、LandFromThrow内の"Thrown-land"が担当するので"Land"は立てない）
             if (currentState == PlayerState.Thrown)
