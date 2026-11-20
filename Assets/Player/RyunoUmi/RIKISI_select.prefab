@@ -1400,6 +1400,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 005a06bc8750c76418b78bd6c679bb2f, type: 3}
       insertIndex: -1
       addedObject: {fileID: -5529938534496281643}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 005a06bc8750c76418b78bd6c679bb2f, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -289810057791221964}
   m_SourcePrefab: {fileID: 100100000, guid: 005a06bc8750c76418b78bd6c679bb2f, type: 3}
 --- !u!1 &7402421456741996747 stripped
 GameObject:
@@ -1428,6 +1431,21 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &-289810057791221964
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7402421456741996747}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8876490db6e8d874c9e6a1a06ee14e5d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SelectSceneAnimatorParam
+  animator: {fileID: 0}
+  sceneName: Select
+  parameterName: Select
 --- !u!4 &7922253633887289969 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 005a06bc8750c76418b78bd6c679bb2f, type: 3}
