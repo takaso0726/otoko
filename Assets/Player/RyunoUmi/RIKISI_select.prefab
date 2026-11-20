@@ -1346,7 +1346,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 005a06bc8750c76418b78bd6c679bb2f, type: 3}
       propertyPath: m_Name
-      value: RIKISI_akarui
+      value: RIKISI_select
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1396,8 +1396,38 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: 005a06bc8750c76418b78bd6c679bb2f, type: 3}
       insertIndex: 14
       addedObject: {fileID: 5713655421792257749}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 005a06bc8750c76418b78bd6c679bb2f, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -5529938534496281643}
   m_SourcePrefab: {fileID: 100100000, guid: 005a06bc8750c76418b78bd6c679bb2f, type: 3}
+--- !u!1 &7402421456741996747 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 005a06bc8750c76418b78bd6c679bb2f, type: 3}
+  m_PrefabInstance: {fileID: 7672944959881422234}
+  m_PrefabAsset: {fileID: 0}
+--- !u!95 &-5529938534496281643
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7402421456741996747}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: 15bdbf6d9b8514a48a375e1e423066c8, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!4 &7922253633887289969 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 005a06bc8750c76418b78bd6c679bb2f, type: 3}
