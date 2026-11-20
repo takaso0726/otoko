@@ -1992,7 +1992,7 @@ MonoBehaviour:
     portraitPrefab: {fileID: 7402421456741996747, guid: b7ba5537637fa5d44b05ddc05479c235, type: 3}
     portraitOffsetP1: {x: 0, y: -1.15, z: 0}
     portraitOffsetP2: {x: 0, y: -1.15, z: 0}
-    portraitRotationP1: {x: 0, y: 0, z: 0}
+    portraitRotationP1: {x: 0, y: 55, z: 0}
     portraitRotationP2: {x: 0, y: 180, z: 0}
     portraitScaleMultiplier: 1
     nameImage: {fileID: 21300000, guid: 02513bc158fbeae4e9fddbf2b2b05cab, type: 3}
