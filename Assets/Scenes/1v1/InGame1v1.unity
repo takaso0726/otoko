@@ -270,16 +270,7 @@ MonoBehaviour:
   cellSpacing: 1.65
   showCursor: 1
   fontSize: 50
-  scaleWithScreen: 1
-  referenceResolution: {x: 1920, y: 1080}
-  matchWidthOrHeight: 0.5
-  autoFitFrames: 1
-  minFrames: 20
-  fitMargin: 16
-  xRatio: 0.5
   yRatio: 0.8
-  offset: {x: 0, y: 0}
-  clampToScreen: 1
   holdIdleFrames: 30
   texFrame: {fileID: 2800000, guid: 17b5de98eca9ab44f89ef844dd75e33e, type: 3}
   texIdle: {fileID: 2800000, guid: 7e965cbd20d1abe43b443f535d8e45d3, type: 3}
@@ -2481,8 +2472,8 @@ MonoBehaviour:
   player1SpawnPoint: {fileID: 1435874237}
   player2SpawnPoint: {fileID: 1195980007}
   fallbackPrefab: {fileID: 0}
-  debugPlayer1Prefab: {fileID: 1123702133609149220, guid: 62980fe514fbfc74ebf72b0b974b4d02, type: 3}
-  debugPlayer2Prefab: {fileID: 1123702133609149220, guid: 62980fe514fbfc74ebf72b0b974b4d02, type: 3}
+  debugPlayer1Prefab: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
+  debugPlayer2Prefab: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
   debugSpawnKey: 102
   gameMNG: {fileID: 0}
   cameraController: {fileID: 0}
