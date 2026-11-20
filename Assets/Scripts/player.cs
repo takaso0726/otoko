@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
-using UnityEngine.SceneManagement; // ★追加：現在のシーン名を調べてAnimatorの"Select"へ反映するため
 using UnityEngine.UIElements;
 
 //=====================================================
@@ -960,12 +959,6 @@ public class Player : MonoBehaviour
     bool autoFaceSnapped;            // ★追加：最初に相手を認識した時に、補間なしで即座に向き合わせたか
     float autoFaceSign = 1f;         // ★追加：現在向いている（向こうとしている）Z方向。密着中に判定が揺れても、確定するまで変えない
     bool hasMoveBackwardParam;       // ★追加：Animatorに"MoveBackward"(Bool)が存在するか（存在する時だけ値を送る）
-    // ★追加：現在のシーンがSelectシーンの時だけAnimatorの"Select"(Bool)をtrueにする
-    [Header("セレクトシーン用アニメーション")]
-    [Tooltip("このシーン名の時だけ、Animatorの\"Select\"(Bool)をtrueにします。")]
-    [SerializeField] string selectSceneName = "Select";
-    bool hasSelectParam;             // ★追加：Animatorに"Select"(Bool)が存在するか（存在する時だけ値を送る）
-    const string SelectParam = "Select"; // ★Selectシーンの時だけtrueにするAnimatorパラメータ名（Bool）
     bool hasIdleParam;               // ★追加：Animatorに"Idle"(Bool)が存在するか（存在する時だけ値を送る）
     const string IdleParam = "Idle"; // ★待機(Idle)状態の時だけtrueにするAnimatorパラメータ名（Bool）
     bool hasIdleFacingRightParam;    // ★追加：Animatorに"IdleFacingRight"(Bool)が存在するか（存在する時だけ値を送る）
@@ -1425,21 +1418,6 @@ public class Player : MonoBehaviour
                 Debug.LogWarning($"[{PlayerName}] Animatorに'{IdleParam}'(Bool)パラメータがありません。Idleの値は送られません。", this);
             }
             SyncIdleAnimation(); // 初期状態（Idle）を反映
-
-            // ★追加：セレクトシーン用の"Select"(Bool)がAnimatorにあるか調べる。無ければ警告を1回だけ出して値は送らない。
-            foreach (var param in animator.parameters)
-            {
-                if (param.name == SelectParam && param.type == AnimatorControllerParameterType.Bool)
-                {
-                    hasSelectParam = true;
-                    break;
-                }
-            }
-            if (!hasSelectParam)
-            {
-                Debug.LogWarning($"[{PlayerName}] Animatorに'{SelectParam}'(Bool)パラメータがありません。Selectシーン用の値は送られません。", this);
-            }
-            SyncSelectSceneAnimation(SceneManager.GetActiveScene().name); // 起動時のシーンを反映
 
             // ★追加：待機アニメーションの左右分岐用"IdleFacingRight"(Bool)がAnimatorにあるか調べる。
             //   無い場合はSetBoolを呼ばない（毎フレーム警告が出るのを防ぐ）。
@@ -3398,30 +3376,6 @@ public class Player : MonoBehaviour
     bool IsFacingRight()
     {
         return transform.forward.z >= 0f;
-    }
-
-    // ★追加：アクティブシーンが切り替わった時にも"Select"を更新する（キャラがシーンをまたいで残る場合に備える）
-    void OnEnable()
-    {
-        SceneManager.activeSceneChanged += OnActiveSceneChanged;
-    }
-
-    void OnDisable()
-    {
-        SceneManager.activeSceneChanged -= OnActiveSceneChanged;
-    }
-
-    void OnActiveSceneChanged(Scene previous, Scene next)
-    {
-        SyncSelectSceneAnimation(next.name);
-    }
-
-    // ★追加：シーン名がselectSceneNameと一致する間だけAnimatorの"Select"(Bool)をtrueにする。
-    //   シーン名の取得は文字列を生成するため毎フレームは呼ばず、起動時とシーン切替時だけ呼ぶ。
-    void SyncSelectSceneAnimation(string sceneName)
-    {
-        if (!hasSelectParam || animator == null) return;
-        animator.SetBool(SelectParam, sceneName == selectSceneName);
     }
 
     // ★追加：currentStateがIdleの間だけAnimatorの"Idle"(Bool)をtrueにする。
