@@ -333,7 +333,6 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
-  m_UseReflectionProbes: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
@@ -441,8 +440,8 @@ MonoBehaviour:
   - characterName: YANGKY
     displayObject: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
   - characterName: MACHO
-    displayObject: {fileID: 1123702133609149220, guid: 62980fe514fbfc74ebf72b0b974b4d02, type: 3}
-  - characterName: MACHO
+    displayObject: {fileID: 1851683348964373382, guid: 3e4740023ebd16b448e0343c1f99043c, type: 3}
+  - characterName: RIKISI
     displayObject: {fileID: 7402421456741996747, guid: b7e74d8823895804d9afa4d20b48dddc, type: 3}
   winnerSpawnPoint: {fileID: 865107448}
   fallbackWinnerDisplay: {fileID: 0}
@@ -762,7 +761,7 @@ Light:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 625142605}
   m_Enabled: 1
-  serializedVersion: 13
+  serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
   m_Intensity: 1
@@ -814,7 +813,7 @@ Light:
   m_UseBoundingSphereOverride: 0
   m_UseViewFrustumForShadowCasterCull: 1
   m_ForceVisible: 0
-  m_ShapeRadius: 0.025
+  m_ShadowRadius: 0
   m_ShadowAngle: 0
   m_LightUnit: 1
   m_LuxAtDistance: 1

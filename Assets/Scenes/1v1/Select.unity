@@ -1977,11 +1977,11 @@ MonoBehaviour:
     anchor: {fileID: 232355151}
     selectableBy: 0
     sameCharacterGroup: 
-    portraitPrefab: {fileID: 1123702133609149220, guid: 75e61bd66c94bbb419ce9e58ae5a3124, type: 3}
+    portraitPrefab: {fileID: 1851683348964373382, guid: 3cac479db24d7d14da553955d7253937, type: 3}
     portraitOffsetP1: {x: 0, y: -1.1, z: 0}
     portraitOffsetP2: {x: 0, y: -1.1, z: 0}
-    portraitRotationP1: {x: 0, y: 0, z: 0}
-    portraitRotationP2: {x: 0, y: 180, z: 0}
+    portraitRotationP1: {x: 0, y: 45, z: 0}
+    portraitRotationP2: {x: 0, y: -190, z: 0}
     portraitScaleMultiplier: 1
     nameImage: {fileID: 21300000, guid: 8e43d1fdcd29fd341a9e85b774cd56bb, type: 3}
     parameterData: {fileID: 11400000, guid: 0d30f9b633fc250439c3c429f459df91, type: 2}

@@ -1444,6 +1444,10 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: -7956919756574189296, guid: 8c5f30cca56cf0941a8652b7417c5358, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 058daf6f73aa48b45926693f0479ece9, type: 2}
     - target: {fileID: 919132149155446097, guid: 8c5f30cca56cf0941a8652b7417c5358, type: 3}
       propertyPath: m_Name
       value: Macho_pre
@@ -1452,6 +1456,18 @@ PrefabInstance:
       propertyPath: m_Controller
       value: 
       objectReference: {fileID: 9100000, guid: 56163d1dd0da9bc488c2cf5363732ac4, type: 2}
+    - target: {fileID: 5866666021909216657, guid: 8c5f30cca56cf0941a8652b7417c5358, type: 3}
+      propertyPath: m_WarningMessage
+      value: "\nBinding warning: Some generic clip(s) animate transforms that are
+        already bound by a Humanoid avatar. These transforms can only be changed
+        by Humanoid clips.\n\tTransform 'Macho_R_HandThumb1'\n\tTransform 'Macho_L_HandMiddle1'\n\tTransform
+        'Macho_R_ToeBase'\n\tTransform 'Macho_Spine2'\n\tTransform 'Macho_L_HandRing3'\n\tTransform
+        'Macho_L_Arm'\n\tTransform 'Macho_R_HandIndex3'\n\tTransform 'Macho_R_HandPinky2'\n\tTransform
+        'Macho_L_HandRing2'\n\tTransform 'Macho_L_Hand'\n\tand more ...\n\tFrom animation
+        clip 'IdleR'\n\tFrom animation clip 'IdleL'\n\tFrom animation clip 'mixamo.com'\n\tFrom
+        animation clip 'mixamo.com'\n\tFrom animation clip 'mixamo.com'\n\tFrom animation
+        clip 'IdleR'"
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -1550,7 +1566,7 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1851683348964373382}
   serializedVersion: 5
-  m_Mass: 0.58
+  m_Mass: 2
   m_LinearDamping: 0
   m_AngularDamping: 0.93
   m_CenterOfMass: {x: 0, y: 0, z: 0}
@@ -1773,7 +1789,7 @@ MonoBehaviour:
   minMoveAnimSpeed: 0.4
   maxMoveAnimSpeed: 1.4
   minMoveSpeedRatio: 0.4
-  minPosition: {x: -10, y: 0.12, z: -10}
+  minPosition: {x: -10, y: 0, z: -10}
   maxPosition: {x: 10, y: 10, z: 10}
   force: {x: 0, y: 500, z: 0}
   Jumpflag: 1
