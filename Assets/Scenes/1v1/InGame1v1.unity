@@ -2466,14 +2466,14 @@ MonoBehaviour:
   - characterName: YANGKY
     prefab: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
   - characterName: MACHO
-    prefab: {fileID: 1123702133609149220, guid: 62980fe514fbfc74ebf72b0b974b4d02, type: 3}
+    prefab: {fileID: 1851683348964373382, guid: 3e4740023ebd16b448e0343c1f99043c, type: 3}
   - characterName: RIKISHI
     prefab: {fileID: 7402421456741996747, guid: b7e74d8823895804d9afa4d20b48dddc, type: 3}
   player1SpawnPoint: {fileID: 1435874237}
   player2SpawnPoint: {fileID: 1195980007}
   fallbackPrefab: {fileID: 0}
-  debugPlayer1Prefab: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
-  debugPlayer2Prefab: {fileID: 8961988206862004714, guid: 588c7e50f2dc6734a9500b7ee0593095, type: 3}
+  debugPlayer1Prefab: {fileID: 1851683348964373382, guid: 3e4740023ebd16b448e0343c1f99043c, type: 3}
+  debugPlayer2Prefab: {fileID: 1851683348964373382, guid: 3e4740023ebd16b448e0343c1f99043c, type: 3}
   debugSpawnKey: 102
   gameMNG: {fileID: 0}
   cameraController: {fileID: 0}
