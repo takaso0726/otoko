@@ -645,8 +645,8 @@ Transform:
   m_GameObject: {fileID: 4810159745550080633}
   serializedVersion: 2
   m_LocalRotation: {x: 0.06267164, y: -0.96935755, z: -0.23381662, w: -0.041809537}
-  m_LocalPosition: {x: -0.004700115, y: 0.087119535, z: 0.046555124}
-  m_LocalScale: {x: 0.15, y: 0.325, z: 0.15}
+  m_LocalPosition: {x: -0.10104, y: 0.092363, z: 0.042771}
+  m_LocalScale: {x: 0.20170501, y: 0.5133325, z: 0.20170501}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2016014491480911333}
@@ -963,8 +963,8 @@ Transform:
   m_GameObject: {fileID: 6786919335663998109}
   serializedVersion: 2
   m_LocalRotation: {x: 0.0070113814, y: -0.97136074, z: -0.23619407, w: 0.024932217}
-  m_LocalPosition: {x: 0.0048131323, y: 0.077322595, z: 0.046526574}
-  m_LocalScale: {x: 0.14999996, y: 0.32500002, z: 0.14999996}
+  m_LocalPosition: {x: 0.1068, y: 0.077286, z: 0.041434}
+  m_LocalScale: {x: 0.20170495, y: 0.5133325, z: 0.20170495}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2195584722105295682}
@@ -1658,26 +1658,26 @@ MonoBehaviour:
   enemyAttackStrength: 1
   enableHeadHitboxOnAttack: 0
   punchTiming:
-    startupFrames: 0
-    activeFrames: 0
+    startupFrames: 4
+    activeFrames: 4
   flyingKickTiming:
     startupFrames: 0
-    activeFrames: 0
+    activeFrames: 4
   kickTiming:
     startupFrames: 0
-    activeFrames: 0
+    activeFrames: 4
   upKickTiming:
-    startupFrames: 0
-    activeFrames: 0
+    startupFrames: 4
+    activeFrames: 6
   downKickTiming:
     startupFrames: 0
-    activeFrames: 0
+    activeFrames: 4
   specialTiming:
     startupFrames: 0
-    activeFrames: 0
+    activeFrames: 4
   punchAtk: 10
-  punchMissFrames: 15
-  punchHitFrames: 15
+  punchMissFrames: 12
+  punchHitFrames: 10
   punchStunFrames: 9
   punchHitStopFrames: 2
   punchKnockback:
@@ -1750,15 +1750,15 @@ MonoBehaviour:
     rightArm: 0
     rightForeArm: 0
     rightHand: 0
-    rightUpLeg: 0
+    rightUpLeg: 1
     rightLeg: 1
     rightFoot: 1
     leftArm: 0
     leftForeArm: 0
     leftHand: 0
-    leftUpLeg: 0
-    leftLeg: 0
-    leftFoot: 0
+    leftUpLeg: 1
+    leftLeg: 1
+    leftFoot: 1
   downKickAtk: 20
   downKickMissFrames: 15
   downKickHitFrames: 15
@@ -2039,10 +2039,10 @@ CapsuleCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.64
-  m_Height: 1.88
+  m_Radius: 0.4
+  m_Height: 1.78
   m_Direction: 1
-  m_Center: {x: 0, y: 0.89, z: 0}
+  m_Center: {x: 0, y: 0.98, z: 0}
 --- !u!95 &4745483415712309229
 Animator:
   serializedVersion: 7

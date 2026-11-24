@@ -25,6 +25,9 @@ public class FrameMeter : MonoBehaviour
 
     [Header("表示設定")]
     public bool visible = true;
+    [Tooltip("0=非表示 1=小 2=中 3=大。F11で切り替え")]
+    [Range(0, 3)] public int sizeLevel = 2;
+    public float[] sizeScales = { 0f, 0.5f, 0.75f, 1f }; // 各段階の倍率（大＝Inspectorの値そのまま）
     public int maxFrames = 80;          // 横に並べるフレーム数
     public float cellWidth = 12f;       // 1フレームのマスの幅
     public float cellHeight = 12f;      // 1フレームのマスの高さ
@@ -71,7 +74,11 @@ public class FrameMeter : MonoBehaviour
     void Update()
     {
         if (Keyboard.current != null && Keyboard.current.f11Key.wasPressedThisFrame)
-            visible = !visible;
+        {
+            // F11：非表示 → 大 → 中 → 小 → 非表示…
+            sizeLevel = (sizeLevel + 3) % 4; // 0→3→2→1→0
+            visible = sizeLevel > 0;
+        }
 
         if (autoAssign)
         {
@@ -144,44 +151,61 @@ public class FrameMeter : MonoBehaviour
     //------------------------------------------------------
     void OnGUI()
     {
-        if (!visible || p1 == null || p2 == null) return;
+        if (!visible || sizeLevel <= 0 || p1 == null || p2 == null) return;
+
+        float sc = sizeScales[Mathf.Clamp(sizeLevel, 0, sizeScales.Length - 1)];
 
         if (style == null)
         {
-            style = new GUIStyle(GUI.skin.label) { fontSize = fontSize, richText = true };
+            style = new GUIStyle(GUI.skin.label) { richText = true };
             style.normal.textColor = Color.white;
         }
+        style.fontSize = Mathf.Max(8, Mathf.RoundToInt(fontSize * sc));
+        style.wordWrap = false;                      // 折り返さない（見切れ防止）
+        style.clipping = TextClipping.Overflow;      // はみ出しても切らない
 
         EnsureDisplay();
-        float pitch = cellWidth + cellSpacing;
+        float cw = cellWidth * sc;
+        float ch = cellHeight * sc;
+        float pitch = cw + cellSpacing * sc;
         float rowWidth = maxFrames * pitch;
-        float textH = fontSize + 8f;
-        float rowH = cellHeight + 10f;
-        float pad = backgroundPadding;
+        float rowH = ch + 10f * sc;
+        float pad = backgroundPadding * sc;
 
-        float x = (Screen.width - rowWidth) * 0.5f;
+        string legend = "<color=#8c8c8c>■灰 待機</color>  <color=#1ad973>■緑 発生</color>  <color=#ff3340>■赤 判定ON</color>  " +
+                        "<color=#3380ff>■青 硬直</color>  <color=#fff21a>■黄 やられ</color>";
+        string info1 = "P1  " + BuildInfo(log1, log2);
+        string info2 = "P2  " + BuildInfo(log2, log1);
+
+        // 文字の実寸に合わせて枠の幅と高さを決める
+        float textH = Mathf.Ceil(style.lineHeight) + 4f;
+        float textW = Mathf.Max(style.CalcSize(new GUIContent(legend)).x,
+                      Mathf.Max(style.CalcSize(new GUIContent(info1)).x,
+                                style.CalcSize(new GUIContent(info2)).x));
+        float panelW = Mathf.Max(rowWidth, textW);
+
+        float x = (Screen.width - panelW) * 0.5f;
         float y = Screen.height * yRatio;
         float totalH = textH * 3f + rowH * 2f + pad * 2f;
+        float rowX = x + (panelW - rowWidth) * 0.5f; // マス目は中央寄せ
 
         // 一番後ろの黒い枠
-        DrawRect(new Rect(x - pad, y - pad, rowWidth + pad * 2f, totalH), backgroundColor);
+        DrawRect(new Rect(x - pad, y - pad, panelW + pad * 2f, totalH), backgroundColor);
 
         // 色の凡例
-        DrawLabel(new Rect(x, y, rowWidth, textH),
-            "<color=#8c8c8c>■灰 待機</color>  <color=#1ad973>■緑 発生</color>  <color=#ff3340>■赤 判定ON</color>  " +
-            "<color=#3380ff>■青 硬直</color>  <color=#fff21a>■黄 やられ</color>", style);
+        DrawLabel(new Rect(x, y, panelW, textH), legend, style);
         y += textH;
 
         // P1
-        DrawLabel(new Rect(x, y, rowWidth, textH), "P1  " + BuildInfo(log1, log2), style);
+        DrawLabel(new Rect(x, y, panelW, textH), info1, style);
         y += textH;
-        DrawRow(x, y, disp1, pitch);
+        DrawRow(rowX, y, disp1, pitch, cw, ch, sc);
         y += rowH;
 
         // P2
-        DrawRow(x, y, disp2, pitch);
+        DrawRow(rowX, y, disp2, pitch, cw, ch, sc);
         y += rowH;
-        DrawLabel(new Rect(x, y, rowWidth, textH), "P2  " + BuildInfo(log2, log1), style);
+        DrawLabel(new Rect(x, y, panelW, textH), info2, style);
     }
 
     void DrawLabel(Rect r, string text, GUIStyle st)
@@ -189,23 +213,24 @@ public class FrameMeter : MonoBehaviour
         if (showText) GUI.Label(r, text, st);
     }
 
-    void DrawRow(float x, float y, int[] disp, float pitch)
+    void DrawRow(float x, float y, int[] disp, float pitch, float cw, float ch, float sc)
     {
         float rowWidth = maxFrames * pitch;
+        float m = 4f * sc;
         if (texFrame != null)
-            GUI.DrawTexture(new Rect(x - 4f, y - 4f, rowWidth + 8f, cellHeight + 8f), texFrame, ScaleMode.StretchToFill);
+            GUI.DrawTexture(new Rect(x - m, y - m, rowWidth + m * 2f, ch + m * 2f), texFrame, ScaleMode.StretchToFill);
 
         for (int i = 0; i < maxFrames; i++)
         {
             float cx = x + i * pitch;
-            Rect cell = new Rect(cx, y, cellWidth, cellHeight);
+            Rect cell = new Rect(cx, y, cw, ch);
             if (disp[i] >= 0) DrawCell(cell, (MeterState)disp[i]);
             else if (texFrame == null) DrawRect(cell, cEmpty); // 黒枠画像がある時は空きマスは黒枠のまま見せる
         }
 
         // 今どこまで書いたかを示す白い線（次に上書きされるマスの左端）
         if (showCursor)
-            DrawRect(new Rect(x + head * pitch - 1f, y - 2f, 2f, cellHeight + 4f), Color.white);
+            DrawRect(new Rect(x + head * pitch - 1f, y - 2f * sc, 2f, ch + 4f * sc), Color.white);
     }
 
     void DrawCell(Rect r, MeterState st)
