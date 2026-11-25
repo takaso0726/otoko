@@ -198,7 +198,7 @@ GameObject:
   - component: {fileID: 1498953480772881866}
   m_Layer: 12
   m_Name: P-RightFoot-Ground
-  m_TagString: P1Attack
+  m_TagString: P1
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -934,7 +934,7 @@ GameObject:
   - component: {fileID: 8429598620243318773}
   m_Layer: 12
   m_Name: P-LeftFoot-Ground
-  m_TagString: P1Attack
+  m_TagString: P1
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -1684,8 +1684,11 @@ PrefabInstance:
         'Macho_R_ToeBase'\n\tTransform 'Macho_Spine2'\n\tTransform 'Macho_L_HandRing3'\n\tTransform
         'Macho_L_Arm'\n\tTransform 'Macho_R_HandIndex3'\n\tTransform 'Macho_R_HandPinky2'\n\tTransform
         'Macho_L_HandRing2'\n\tTransform 'Macho_L_Hand'\n\tand more ...\n\tFrom animation
-        clip 'IdleR'\n\tFrom animation clip 'IdleL'\n\tFrom animation clip 'mixamo.com'\n\tFrom
-        animation clip 'mixamo.com'\n\tFrom animation clip 'IdleR'"
+        clip 'IdleL'\n\tFrom animation clip 'mixamo.com'\n\tFrom animation clip 'mixamo.com'"
+      objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: 8c5f30cca56cf0941a8652b7417c5358, type: 3}
+      propertyPath: m_ApplyRootMotion
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6284696664716227830, guid: 8c5f30cca56cf0941a8652b7417c5358, type: 3}
       propertyPath: m_Layer
@@ -1890,7 +1893,7 @@ CapsuleCollider:
   m_Radius: 0.64
   m_Height: 1.88
   m_Direction: 1
-  m_Center: {x: 0, y: 0.89, z: 0}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!82 &910698106140269420
 AudioSource:
   m_ObjectHideFlags: 0
@@ -2072,8 +2075,8 @@ MonoBehaviour:
   minMoveAnimSpeed: 0.4
   maxMoveAnimSpeed: 1.4
   minMoveSpeedRatio: 0.4
-  minPosition: {x: -10, y: 1.8, z: -10}
-  maxPosition: {x: 10, y: 10, z: 10}
+  minPosition: {x: -273.69, y: -111.16, z: -242.88}
+  maxPosition: {x: 237.68, y: 90.69, z: 199.06}
   force: {x: 0, y: 500, z: 0}
   Jumpflag: 1
   HP: 1000
@@ -2122,9 +2125,9 @@ MonoBehaviour:
   mashWithAnyButton: 1
   mashThresholdStep: 3
   standHeight: 2
-  standCenter: {x: 0, y: 1, z: 0}
-  crouchHeight: 0.65
-  crouchCenter: {x: 0, y: 0.5, z: 0}
+  standCenter: {x: 0, y: 0, z: 0}
+  crouchHeight: 1
+  crouchCenter: {x: 0, y: -0.5, z: 0}
   MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
