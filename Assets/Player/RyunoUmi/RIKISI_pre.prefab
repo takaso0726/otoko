@@ -1572,7 +1572,7 @@ MonoBehaviour:
   minMoveAnimSpeed: 0.6
   maxMoveAnimSpeed: 1.4
   minMoveSpeedRatio: 0.4
-  minPosition: {x: -10, y: 0.2, z: -10}
+  minPosition: {x: -10, y: 0.4, z: -10}
   maxPosition: {x: 10, y: 10, z: 10}
   limitByFootPosition: 1
   force: {x: 0, y: 500, z: 0}
@@ -1598,6 +1598,7 @@ MonoBehaviour:
   throwInputStartDelayFrames: 10
   throwHitbox:
     head: 0
+    body: 0
     rightArm: 0
     rightForeArm: 0
     rightHand: 0
@@ -1668,6 +1669,8 @@ MonoBehaviour:
   airHitStateHeavy: AirHitHeavy
   enemyAttackStrength: 1
   enableHeadHitboxOnAttack: 0
+  enableBodyHitboxOnAttack: 0
+  bodyHitboxObjectName: body
   punchTiming:
     startupFrames: 4
     activeFrames: 4
@@ -1707,6 +1710,7 @@ MonoBehaviour:
   flyingKickStrength: 1
   punchHitbox:
     head: 0
+    body: 0
     rightArm: 0
     rightForeArm: 0
     rightHand: 1
@@ -1721,6 +1725,7 @@ MonoBehaviour:
     leftFoot: 0
   flyingKickHitbox:
     head: 1
+    body: 0
     rightArm: 0
     rightForeArm: 0
     rightHand: 1
@@ -1744,6 +1749,7 @@ MonoBehaviour:
   upPunchStrength: 1
   upPunchHitbox:
     head: 0
+    body: 0
     rightArm: 0
     rightForeArm: 1
     rightHand: 1
@@ -1767,6 +1773,7 @@ MonoBehaviour:
   downPunchStrength: 0
   downPunchHitbox:
     head: 0
+    body: 0
     rightArm: 0
     rightForeArm: 0
     rightHand: 1
@@ -1790,6 +1797,7 @@ MonoBehaviour:
   crouchPunchStrength: 0
   crouchPunchHitbox:
     head: 0
+    body: 0
     rightArm: 0
     rightForeArm: 0
     rightHand: 1
@@ -1813,6 +1821,7 @@ MonoBehaviour:
   kickStrength: 1
   kickHitbox:
     head: 0
+    body: 0
     rightArm: 0
     rightForeArm: 0
     rightHand: 0
@@ -1836,6 +1845,7 @@ MonoBehaviour:
   upKickStrength: 2
   upKickHitbox:
     head: 0
+    body: 0
     rightArm: 0
     rightForeArm: 0
     rightHand: 0
@@ -1859,6 +1869,7 @@ MonoBehaviour:
   downKickStrength: 1
   downKickHitbox:
     head: 0
+    body: 0
     rightArm: 0
     rightForeArm: 0
     rightHand: 0
@@ -1880,6 +1891,7 @@ MonoBehaviour:
   specialStunFrames: 10
   specialHitbox:
     head: 0
+    body: 0
     rightArm: 0
     rightForeArm: 0
     rightHand: 0
@@ -1938,6 +1950,10 @@ MonoBehaviour:
   downFailTrigger: Down-fail
   rebornStandUpFreezeFrames: 180
   hideOpponentDuringRebornFreeze: 1
+  hideOpponentOnDualDownReborn: 1
+  enableRebornKnockback: 1
+  rebornKnockbackHorizontalSpeed: 4
+  rebornKnockbackUpSpeed: 0
   enableDualDownLayout: 1
   dualDownLeftXRatio: 0.25
   dualDownRightXRatio: 0.75

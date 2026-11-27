@@ -1104,9 +1104,20 @@ public class Player : MonoBehaviour
     [Tooltip("復活に成功した瞬間から、自分・相手ともに動けなくなるフレーム数（60F=1秒）。\n" +
              "この間、カメラは復活したキャラの正面の引きの画を映す。")]
     [SerializeField] int rebornStandUpFreezeFrames = 180;
-    [Tooltip("ONにすると、復活後の停止中は相手（P2／CPU）を非表示にする。復活演出のカメラに相手が映り込むのを防ぐ。\n" +
-             "同時ダウン後の復活はカメラ演出をしないので、非表示にもしない。")]
+    [Tooltip("ONにすると、復活後の停止中は、復活していない側（相手＝P2／CPU）を非表示にする。復活演出のカメラに相手が映り込むのを防ぐ。")]
     [SerializeField] bool hideOpponentDuringRebornFreeze = true;
+    [Tooltip("ONにすると、同時ダウン後の復活でも、復活していない側（まだダウン中の相手）を停止中は非表示にする。\n" +
+             "OFFなら、同時ダウン後の復活では従来どおり相手を非表示にしない。")]
+    [SerializeField] bool hideOpponentOnDualDownReborn = true;
+
+    [Header("復活後のノックバック（お互いに距離を離す）")]
+    [Tooltip("ONにすると、復活後の停止が終わった瞬間に、復活した側と相手の両方を、互いに離れる方向（Z軸）へノックバックさせる。")]
+    [SerializeField] bool enableRebornKnockback = true;
+    [Tooltip("復活後のノックバックの水平方向の速さ（お互いに離れる向き）。")]
+    [SerializeField] float rebornKnockbackHorizontalSpeed = 4f;
+    [Tooltip("復活後のノックバックの上方向の速さ。1以上だと空中扱いになる。")]
+    [SerializeField] float rebornKnockbackUpSpeed = 0f;
+    bool pendingRebornKnockback; // 復活後の停止が終わったらノックバックを出す予約
 
     bool downWasDual;                                                                   // 今回のダウン中に、一度でも同時ダウン（両者HP0）になったか
     readonly System.Collections.Generic.List<UnityEngine.Renderer> hiddenOpponentRenderers
@@ -1992,6 +2003,13 @@ public class Player : MonoBehaviour
 
         // ★追加：復活後の停止が終わったら、非表示にしていた相手を再表示する
         if (hiddenOpponentRenderers.Count > 0 && !IsRebornFreezing) ShowOpponentAfterReborn();
+
+        // ★追加：復活後の停止が終わった瞬間に、お互いにノックバックさせて距離を離す
+        if (pendingRebornKnockback && !IsRebornFreezing)
+        {
+            pendingRebornKnockback = false;
+            ApplyRebornKnockbackToBoth();
+        }
 
         // ★追加：掴みポーズで止めている最中に、被弾やダウン等でThrow状態から外れた場合の保険として必ず再生を再開する
         if (grabHoldFrozen && currentState != PlayerState.Throw) ResumeGrabHoldAnimation();
@@ -4713,7 +4731,7 @@ public class Player : MonoBehaviour
         downAnimPlayed = false;
         bool wasDual = downWasDual;
         downWasDual = false;
-        StartRebornFreeze(!wasDual); // ★追加：復活の瞬間から、自分・相手ともに動けなくする（同時ダウン後でなければ相手を非表示にする）
+        StartRebornFreeze(!wasDual || hideOpponentOnDualDownReborn); // ★追加：復活の瞬間から、自分・相手ともに動けなくする（復活していない側を非表示にする）
         if (animator == null) return;
 
         SetDownBool(downBoolParam, false);
@@ -4742,6 +4760,10 @@ public class Player : MonoBehaviour
     {
         if (hiddenOpponentRenderers.Count > 0) return; // すでに隠している
 
+        // 相手が先に復活していて、こちら（今復活した側）を隠している場合は先に戻す。
+        //   両方が同時に見えなくなるのを防ぐ（今復活した側を表示し、復活していない側を隠す）。
+        if (enemyPlayer != null) enemyPlayer.ShowOpponentAfterReborn();
+
         Component opponent = enemyPlayer != null ? (Component)enemyPlayer : (Component)enemy;
         if (opponent == null) return;
 
@@ -4751,6 +4773,53 @@ public class Player : MonoBehaviour
             r.enabled = false;
             hiddenOpponentRenderers.Add(r);
         }
+    }
+
+    // ★追加：復活後の停止が終わった瞬間に、復活した側（自分）と相手の両方を、互いに離れる向き（Z軸）へノックバックさせる。
+    //   ・相手がPlayerの場合：ダウン中（KnockedDown/Dead）や掴まれ・投げ飛ばし中は動かさない。
+    //   ・相手がCPU(Enemy)の場合：EnemyのRigidbodyへ直接初速を与える（Enemy.cs側の変更は不要）。
+    //   ・同時に復活した場合に二重で出ないよう、相手Playerの予約は消しておく。
+    void ApplyRebornKnockbackToBoth()
+    {
+        Transform opponentTf = GetOpponentTransform();
+        if (opponentTf == null) return;
+
+        // 自分から見て、相手と反対側（離れる向き）のZ方向。ほぼ同じ位置なら、向いている方向の逆へ離れる
+        float deltaZ = transform.position.z - opponentTf.position.z;
+        float myDir = Mathf.Abs(deltaZ) > 0.01f ? Mathf.Sign(deltaZ) : (transform.forward.z >= 0f ? -1f : 1f);
+        float speed = rebornKnockbackHorizontalSpeed;
+        float up = rebornKnockbackUpSpeed;
+
+        // 自分
+        ApplyKnockback(new Vector3(0f, up, myDir * speed));
+
+        // 相手（Player）
+        if (enemyPlayer != null)
+        {
+            enemyPlayer.pendingRebornKnockback = false; // 同時復活で二重に出さない
+            PlayerState s = enemyPlayer.currentState;
+            if (s != PlayerState.KnockedDown && s != PlayerState.Dead
+                && s != PlayerState.Grabbed && s != PlayerState.Thrown)
+            {
+                enemyPlayer.ApplyKnockback(new Vector3(0f, up, -myDir * speed));
+            }
+        }
+        // 相手（CPU）
+        else if (enemy != null)
+        {
+            Rigidbody enemyRb = enemy.GetComponent<Rigidbody>();
+            if (enemyRb != null)
+            {
+#if UNITY_6000_0_OR_NEWER
+                enemyRb.linearVelocity = Vector3.zero;
+#else
+                enemyRb.velocity = Vector3.zero;
+#endif
+                enemyRb.AddForce(new Vector3(0f, up, -myDir * speed), ForceMode.VelocityChange);
+            }
+        }
+
+        DLog($"[{PlayerName}] 復活後ノックバック：水平={speed} / 上={up}");
     }
 
     // ★追加：非表示にしていた相手のRendererを元に戻す。
@@ -4767,6 +4836,7 @@ public class Player : MonoBehaviour
     //   動作の途中だった相手の攻撃は、当たり判定を消して待機に戻す（止まったまま当たり判定が残らないように）。
     void StartRebornFreeze(bool hideOpponent)
     {
+        pendingRebornKnockback = enableRebornKnockback; // 停止が終わったらお互いにノックバックさせる予約（停止0Fなら次フレームに実行）
         if (rebornStandUpFreezeFrames <= 0) return;
 
         rebornFreezeEndFrame = CurrentFrame + rebornStandUpFreezeFrames;
