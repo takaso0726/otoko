@@ -37,6 +37,9 @@ public class Player : MonoBehaviour
         Move,       // 前後移動
         Crouch,     // しゃがみ
         Punch,      // パンチ（空中では飛び蹴りになる）
+        UpPunch,    // 上パンチ（地上で上入力＋パンチ）
+        DownPunch,  // 下パンチ（地上で下を浅く倒す＋パンチ）
+        CrouchPunch,// シャガミパンチ（地上でしゃがみ入力＋パンチ）
         Kick,       // 通常キック
         UpKick,     // 上キック
         DownKick,   // 下キック
@@ -225,6 +228,9 @@ public class Player : MonoBehaviour
     [SerializeField] float moveInputThreshold = 0.03f;    // 左右移動と判定するスティックの入力量
     [SerializeField] float crouchInputThreshold = -0.43f; // しゃがみ／下キックと判定するスティックの下入力量
     [SerializeField] float upKickInputThreshold = 0.25f;  // 上キックと判定するスティックの上入力量
+    [SerializeField] float upPunchInputThreshold = 0.25f;    // 上パンチと判定するスティックの上入力量
+    [Tooltip("下パンチと判定するスティックの下入力量。この値以下、かつcrouchInputThresholdより上（しゃがむ手前）の入力で下パンチが出る。しゃがみ入力まで倒すとシャガミパンチになる。")]
+    [SerializeField] float downPunchInputThreshold = -0.2f;
 
     // ★追加：前進／後退アニメーション（frontMove / BackMove）の再生速度を、
     //   スティックの倒し具合（moveInput.xの絶対値）に応じて変化させるための範囲設定。
@@ -455,6 +461,12 @@ public class Player : MonoBehaviour
     [SerializeField] AudioClip upKickSe;
     [Tooltip("下キックが空振りでなかった（命中した）時のSE。")]
     [SerializeField] AudioClip downKickSe;
+    [Tooltip("上パンチが空振りでなかった（命中した）時のSE。")]
+    [SerializeField] AudioClip upPunchSe;
+    [Tooltip("下パンチが空振りでなかった（命中した）時のSE。")]
+    [SerializeField] AudioClip downPunchSe;
+    [Tooltip("シャガミパンチが空振りでなかった（命中した）時のSE。")]
+    [SerializeField] AudioClip crouchPunchSe;
     [Tooltip("攻撃（パンチ・キック・上キック・下キック）が当たらなかった時、または投げで相手を掴めなかった時のSE。空振りの時は、この音だけを鳴らす。")]
     [SerializeField] AudioClip missSe;
     [Tooltip("空振りと判定するまでの、攻撃開始からのフレーム数（60F=1秒）。この時間が経っても未命中ならmissSeを鳴らす。\n0＝攻撃モーションが終わった時に鳴らす。\n※空振りと確定した後に命中しても、その攻撃の技SEは鳴らない。")]
@@ -624,6 +636,9 @@ public class Player : MonoBehaviour
      [SerializeField] AttackTiming kickTiming = new AttackTiming();
      [SerializeField] AttackTiming upKickTiming = new AttackTiming();
      [SerializeField] AttackTiming downKickTiming = new AttackTiming();
+     [SerializeField] AttackTiming upPunchTiming = new AttackTiming();
+     [SerializeField] AttackTiming downPunchTiming = new AttackTiming();
+     [SerializeField] AttackTiming crouchPunchTiming = new AttackTiming();
      [SerializeField] AttackTiming specialTiming = new AttackTiming();
 
      enum AttackPhase { None, Startup, Active, Recovery }
@@ -675,6 +690,7 @@ public class Player : MonoBehaviour
           {
                if (currentState == PlayerState.Stunned) return MeterState.Stun;
                bool attacking = currentState == PlayerState.Punch || currentState == PlayerState.Kick
+                             || currentState == PlayerState.UpPunch || currentState == PlayerState.DownPunch || currentState == PlayerState.CrouchPunch
                              || currentState == PlayerState.UpKick || currentState == PlayerState.DownKick
                              || currentState == PlayerState.Special;
                if (!attacking) return MeterState.Idle;
@@ -708,6 +724,60 @@ public class Player : MonoBehaviour
     [SerializeField] HitboxSetting punchHitbox = new HitboxSetting { rightHand = true };
     [Tooltip("⑥ 空中攻撃（パンチ入力を空中で出した時のFlying-kick）を出している間、当たり判定をONにする部位。")]
     [SerializeField] HitboxSetting flyingKickHitbox = new HitboxSetting { leftFoot = true, leftLeg = true, rightFoot = true };
+
+    [Header("上パンチ")]
+    [Tooltip("① 上パンチの攻撃力（ダメージ量）")]
+    [SerializeField] int upPunchAtk = 10;
+    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束フレーム数。60F=1秒）。上パンチを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [SerializeField] int upPunchMissFrames = 36;
+    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束フレーム数。60F=1秒）。上パンチを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。")]
+    [SerializeField] int upPunchHitFrames = 36;
+    [Tooltip("⑤ 上パンチを当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。0だとやられ状態にならない。")]
+    [SerializeField] int upPunchStunFrames = 24;
+    [Tooltip("③ 上パンチを当てた時の、相手のヒットストップのフレーム数（60F=1秒）。0だと止まらない。")]
+    [SerializeField] int upPunchHitStopFrames = 5;
+    [Tooltip("④ 上パンチを当てた時の、相手のノックバック量")]
+    [SerializeField] KnockbackSetting upPunchKnockback = new KnockbackSetting { horizontalSpeed = 2f, upSpeed = 4f };
+    [Tooltip("⑦ 上パンチの強さ（弱・中・強）。この技を当てられた相手は、強さに応じたやられアニメーションを再生する。")]
+    [SerializeField] AttackStrength upPunchStrength = AttackStrength.Medium;
+    [Tooltip("⑥ 上パンチを出している間、当たり判定をONにする部位。")]
+    [SerializeField] HitboxSetting upPunchHitbox = new HitboxSetting { rightHand = true, rightForeArm = true };
+
+    [Header("下パンチ")]
+    [Tooltip("① 下パンチの攻撃力（ダメージ量）")]
+    [SerializeField] int downPunchAtk = 10;
+    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束フレーム数。60F=1秒）。下パンチを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [SerializeField] int downPunchMissFrames = 30;
+    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束フレーム数。60F=1秒）。下パンチを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。")]
+    [SerializeField] int downPunchHitFrames = 30;
+    [Tooltip("⑤ 下パンチを当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。0だとやられ状態にならない。")]
+    [SerializeField] int downPunchStunFrames = 20;
+    [Tooltip("③ 下パンチを当てた時の、相手のヒットストップのフレーム数（60F=1秒）。0だと止まらない。")]
+    [SerializeField] int downPunchHitStopFrames = 5;
+    [Tooltip("④ 下パンチを当てた時の、相手のノックバック量")]
+    [SerializeField] KnockbackSetting downPunchKnockback = new KnockbackSetting { horizontalSpeed = 2.5f, upSpeed = 0f };
+    [Tooltip("⑦ 下パンチの強さ（弱・中・強）。この技を当てられた相手は、強さに応じたやられアニメーションを再生する。")]
+    [SerializeField] AttackStrength downPunchStrength = AttackStrength.Light;
+    [Tooltip("⑥ 下パンチを出している間、当たり判定をONにする部位。")]
+    [SerializeField] HitboxSetting downPunchHitbox = new HitboxSetting { rightHand = true };
+
+    [Header("シャガミパンチ")]
+    [Tooltip("① シャガミパンチの攻撃力（ダメージ量）")]
+    [SerializeField] int crouchPunchAtk = 10;
+    [Tooltip("② 攻撃後のクールダウン【空振り時】（拘束フレーム数。60F=1秒）。シャガミパンチを出してから、相手に当たらなかった場合に次の行動ができるまでの時間。")]
+    [SerializeField] int crouchPunchMissFrames = 27;
+    [Tooltip("② 攻撃後のクールダウン【命中時】（拘束フレーム数。60F=1秒）。シャガミパンチを出してから、相手に当たった場合に次の行動ができるまでの時間（攻撃開始からの合計）。")]
+    [SerializeField] int crouchPunchHitFrames = 27;
+    [Tooltip("⑤ シャガミパンチを当てた時の、相手の【やられ状態（行動不能）】のフレーム数（60F=1秒）。0だとやられ状態にならない。")]
+    [SerializeField] int crouchPunchStunFrames = 18;
+    [Tooltip("③ シャガミパンチを当てた時の、相手のヒットストップのフレーム数（60F=1秒）。0だと止まらない。")]
+    [SerializeField] int crouchPunchHitStopFrames = 5;
+    [Tooltip("④ シャガミパンチを当てた時の、相手のノックバック量")]
+    [SerializeField] KnockbackSetting crouchPunchKnockback = new KnockbackSetting { horizontalSpeed = 2f, upSpeed = 0f };
+    [Tooltip("⑦ シャガミパンチの強さ（弱・中・強）。この技を当てられた相手は、強さに応じたやられアニメーションを再生する。")]
+    [SerializeField] AttackStrength crouchPunchStrength = AttackStrength.Light;
+    [Tooltip("⑥ シャガミパンチを出している間、当たり判定をONにする部位。")]
+    [SerializeField] HitboxSetting crouchPunchHitbox = new HitboxSetting { rightHand = true };
 
 
     [Header("通常キック")]
@@ -1057,6 +1127,9 @@ public class Player : MonoBehaviour
                 case PlayerState.Kick: return AttackType.Kick;
                 case PlayerState.UpKick: return AttackType.UpKick;
                 case PlayerState.DownKick: return AttackType.DownKick;
+                case PlayerState.UpPunch: return AttackType.UpPunch;
+                case PlayerState.DownPunch: return AttackType.DownPunch;
+                case PlayerState.CrouchPunch: return AttackType.CrouchPunch;
                 default: return AttackType.None;
             }
         }
@@ -1073,6 +1146,9 @@ public class Player : MonoBehaviour
             case AttackType.Kick: return kickAtk;
             case AttackType.UpKick: return upKickAtk;
             case AttackType.DownKick: return downKickAtk;
+            case AttackType.UpPunch: return upPunchAtk;
+            case AttackType.DownPunch: return downPunchAtk;
+            case AttackType.CrouchPunch: return crouchPunchAtk;
             default: return punchAtk; // 想定外の場合のフォールバック
         }
     }
@@ -1084,6 +1160,9 @@ public class Player : MonoBehaviour
         switch (type)
         {
             case AttackType.Punch:
+            case AttackType.UpPunch:
+            case AttackType.DownPunch:
+            case AttackType.CrouchPunch:
                 return punchHitEffectData;
             case AttackType.Kick:
             case AttackType.UpKick:
@@ -1125,6 +1204,12 @@ public class Player : MonoBehaviour
     [SerializeField] MultiHitSetting upKickMultiHit = new MultiHitSetting();
     [Tooltip("下キックの多段ヒット設定")]
     [SerializeField] MultiHitSetting downKickMultiHit = new MultiHitSetting();
+    [Tooltip("上パンチの多段ヒット設定")]
+    [SerializeField] MultiHitSetting upPunchMultiHit = new MultiHitSetting();
+    [Tooltip("下パンチの多段ヒット設定")]
+    [SerializeField] MultiHitSetting downPunchMultiHit = new MultiHitSetting();
+    [Tooltip("シャガミパンチの多段ヒット設定")]
+    [SerializeField] MultiHitSetting crouchPunchMultiHit = new MultiHitSetting();
     [Tooltip("必殺技（waza／左足攻撃）の多段ヒット設定。既定でON（180フレーム＝3秒間で最大5回まで命中可能）。")]
     [SerializeField] MultiHitSetting specialMultiHit = new MultiHitSetting { allowMultiHit = true, maxHitCount = 5 };
     [Tooltip("必殺技が命中してから、次のヒットが有効になるまでのクールタイム（フレーム）。多段ヒットの連続ヒット間隔を制御する。")]
@@ -1162,6 +1247,9 @@ public class Player : MonoBehaviour
             case AttackType.Kick: return kickMultiHit;
             case AttackType.UpKick: return upKickMultiHit;
             case AttackType.DownKick: return downKickMultiHit;
+            case AttackType.UpPunch: return upPunchMultiHit;
+            case AttackType.DownPunch: return downPunchMultiHit;
+            case AttackType.CrouchPunch: return crouchPunchMultiHit;
             default: return punchMultiHit; // 想定外の場合のフォールバック
         }
     }
@@ -1180,6 +1268,9 @@ public class Player : MonoBehaviour
             case AttackType.Kick: return kickKnockback;
             case AttackType.UpKick: return upKickKnockback;
             case AttackType.DownKick: return downKickKnockback;
+            case AttackType.UpPunch: return upPunchKnockback;
+            case AttackType.DownPunch: return downPunchKnockback;
+            case AttackType.CrouchPunch: return crouchPunchKnockback;
             default: return null;
         }
     }
@@ -1198,6 +1289,9 @@ public class Player : MonoBehaviour
             case AttackType.Kick: return kickHitStopFrames;
             case AttackType.UpKick: return upKickHitStopFrames;
             case AttackType.DownKick: return downKickHitStopFrames;
+            case AttackType.UpPunch: return upPunchHitStopFrames;
+            case AttackType.DownPunch: return downPunchHitStopFrames;
+            case AttackType.CrouchPunch: return crouchPunchHitStopFrames;
             default: return -1;
         }
     }
@@ -1215,6 +1309,9 @@ public class Player : MonoBehaviour
             case AttackType.Kick: return kickStunFrames;
             case AttackType.UpKick: return upKickStunFrames;
             case AttackType.DownKick: return downKickStunFrames;
+            case AttackType.UpPunch: return upPunchStunFrames;
+            case AttackType.DownPunch: return downPunchStunFrames;
+            case AttackType.CrouchPunch: return crouchPunchStunFrames;
             default: return 0;
         }
     }
@@ -1232,6 +1329,9 @@ public class Player : MonoBehaviour
             case AttackType.Kick: return kickStrength;
             case AttackType.UpKick: return upKickStrength;
             case AttackType.DownKick: return downKickStrength;
+            case AttackType.UpPunch: return upPunchStrength;
+            case AttackType.DownPunch: return downPunchStrength;
+            case AttackType.CrouchPunch: return crouchPunchStrength;
             default: return AttackStrength.Medium;
         }
     }
@@ -1279,6 +1379,9 @@ public class Player : MonoBehaviour
             case AttackType.Kick: return kickHitFrames;
             case AttackType.UpKick: return upKickHitFrames;
             case AttackType.DownKick: return downKickHitFrames;
+            case AttackType.UpPunch: return upPunchHitFrames;
+            case AttackType.DownPunch: return downPunchHitFrames;
+            case AttackType.CrouchPunch: return crouchPunchHitFrames;
             default: return 0;
         }
     }
@@ -2815,6 +2918,9 @@ public class Player : MonoBehaviour
             case PlayerState.Kick: attackName = "キック"; break;
             case PlayerState.UpKick: attackName = "上キック"; break;
             case PlayerState.DownKick: attackName = "下キック"; break;
+            case PlayerState.UpPunch: attackName = "上パンチ"; break;
+            case PlayerState.DownPunch: attackName = "下パンチ"; break;
+            case PlayerState.CrouchPunch: attackName = "シャガミパンチ"; break;
             default: return false;
         }
 
@@ -3099,7 +3205,7 @@ public class Player : MonoBehaviour
         }
         if (wantPunch)
         {
-            EnterPunch();
+            EnterPunch(isCrouchInput);
             return;
         }
         if (wantKick)
@@ -3288,6 +3394,9 @@ public class Player : MonoBehaviour
                 case PlayerState.Kick:
                 case PlayerState.UpKick:
                 case PlayerState.DownKick:
+                case PlayerState.UpPunch:
+                case PlayerState.DownPunch:
+                case PlayerState.CrouchPunch:
                 case PlayerState.Throw:
                 case PlayerState.Special:
                     return;
@@ -3504,8 +3613,13 @@ public class Player : MonoBehaviour
         wasInThrowForMissSe = inThrow;
     }
 
-    // パンチ（弱攻撃）処理。地上か空中かでアニメーションと当たり判定を切り替える
-    void EnterPunch()
+    // パンチ（弱攻撃）処理。地上か空中か、さらに地上ではスティック入力でパンチ／上／下／シャガミに分岐する
+    //   ・空中：飛び蹴り（従来どおり）
+    //   ・地上でしゃがみ入力（crouchInputThreshold以下）：シャガミパンチ
+    //   ・地上で上入力（upPunchInputThresholdより上）：上パンチ
+    //   ・地上で下を浅く倒した入力（downPunchInputThreshold以下、しゃがみ手前）：下パンチ
+    //   ・それ以外：通常パンチ
+    void EnterPunch(bool isCrouchInput)
     {
         // ★リザルト画面モード：パンチが実際に出たことを通知する（クールダウン中は、ここへ来ないので通知されない）
         if (isResultMode) ResultAttackPressed?.Invoke(this);
@@ -3515,32 +3629,75 @@ public class Player : MonoBehaviour
         StopMoveAnimation();
 
         ResetAttackTriggers();
-        currentState = PlayerState.Punch;
-        stateTimer = punchMissFrames;
-        currentAttackMissFrames = punchMissFrames;
         attackLandedThisAttack = false; // 空振り判定用にリセット
         ResetMultiHitCount();           // 多段ヒットカウントを新しい攻撃用にリセット
 
-        // パンチの攻撃力（Inspector設定値）を基準に、漢気ゲージ補正を反映して攻撃力を確定する
-        baseAtk = GetAttackPower(AttackType.Punch);
-        UpdateAtkByGauge();
-
-        if (Jumpflag)
-        {
-            //弱攻撃(パンチ)
-            isFlyingKickAttack = false;
-            animator.SetTrigger("Punch");
-            SetAttackSe(punchSe);
-            BeginAttackTiming(punchHitbox, punchTiming);
-          }
-        else
+        if (!Jumpflag)
         {
             //空中攻撃
+            currentState = PlayerState.Punch;
+            stateTimer = punchMissFrames;
+            currentAttackMissFrames = punchMissFrames;
+            baseAtk = GetAttackPower(AttackType.Punch);
+            UpdateAtkByGauge();
+
             isFlyingKickAttack = true;
             animator.SetTrigger("Flying-kick");
             SetAttackSe(flyingKickSe);
-               BeginAttackTiming(flyingKickHitbox, flyingKickTiming);
-          }
+            BeginAttackTiming(flyingKickHitbox, flyingKickTiming);
+            return;
+        }
+
+        isFlyingKickAttack = false;
+
+        if (isCrouchInput)
+        {
+            //シャガミパンチ
+            currentState = PlayerState.CrouchPunch;
+            stateTimer = crouchPunchMissFrames;
+            currentAttackMissFrames = crouchPunchMissFrames;
+            baseAtk = GetAttackPower(AttackType.CrouchPunch);
+            UpdateAtkByGauge();
+            animator.SetTrigger("CrouchPunch");
+            SetAttackSe(crouchPunchSe);
+            BeginAttackTiming(crouchPunchHitbox, crouchPunchTiming);
+        }
+        else if (moveInput.y > upPunchInputThreshold)
+        {
+            //上パンチ
+            currentState = PlayerState.UpPunch;
+            stateTimer = upPunchMissFrames;
+            currentAttackMissFrames = upPunchMissFrames;
+            baseAtk = GetAttackPower(AttackType.UpPunch);
+            UpdateAtkByGauge();
+            animator.SetTrigger("UpPunch");
+            SetAttackSe(upPunchSe);
+            BeginAttackTiming(upPunchHitbox, upPunchTiming);
+        }
+        else if (moveInput.y <= downPunchInputThreshold)
+        {
+            //下パンチ（しゃがむ手前の浅い下入力）
+            currentState = PlayerState.DownPunch;
+            stateTimer = downPunchMissFrames;
+            currentAttackMissFrames = downPunchMissFrames;
+            baseAtk = GetAttackPower(AttackType.DownPunch);
+            UpdateAtkByGauge();
+            animator.SetTrigger("DownPunch");
+            SetAttackSe(downPunchSe);
+            BeginAttackTiming(downPunchHitbox, downPunchTiming);
+        }
+        else
+        {
+            //弱攻撃(パンチ)
+            currentState = PlayerState.Punch;
+            stateTimer = punchMissFrames;
+            currentAttackMissFrames = punchMissFrames;
+            baseAtk = GetAttackPower(AttackType.Punch);
+            UpdateAtkByGauge();
+            animator.SetTrigger("Punch");
+            SetAttackSe(punchSe);
+            BeginAttackTiming(punchHitbox, punchTiming);
+        }
     }
 
     // キック処理。スティックの上下入力で通常／上／下キックに分岐する
@@ -4169,6 +4326,9 @@ public class Player : MonoBehaviour
         animator.ResetTrigger("Kick");
         animator.ResetTrigger("UpKick");   // ★追加：上キック/下キックのトリガー予約も消す
         animator.ResetTrigger("DownKick");
+        animator.ResetTrigger("UpPunch");
+        animator.ResetTrigger("DownPunch");
+        animator.ResetTrigger("CrouchPunch");
         animator.ResetTrigger("Jump");
     }
 
@@ -4466,7 +4626,9 @@ public class Player : MonoBehaviour
     void CancelAttackForFreeze()
     {
         if (currentState != PlayerState.Punch && currentState != PlayerState.Kick
-            && currentState != PlayerState.UpKick && currentState != PlayerState.DownKick) return;
+            && currentState != PlayerState.UpKick && currentState != PlayerState.DownKick
+            && currentState != PlayerState.UpPunch && currentState != PlayerState.DownPunch
+            && currentState != PlayerState.CrouchPunch) return;
 
         DisableAllHitboxes();
         ResetAttackTriggers();

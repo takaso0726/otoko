@@ -1,6 +1,6 @@
 /// <summary>
-/// 攻撃の種類。PlayerとEnemy(CPU)の両方から参照し、
-/// 「今どんな攻撃をしているか」に応じて擬音演出(HitEffectData)を出し分けるために使う。
+/// 攻撁E�E種類。PlayerとEnemy(CPU)の両方から参�Eし、E
+/// 「今どんな攻撁E��してぁE��か」に応じて擬音演�E(HitEffectData)を�Eし�Eけるために使ぁE��E
 /// </summary>
 public enum AttackType
 {
@@ -8,5 +8,8 @@ public enum AttackType
     Kick,
     UpKick,
     DownKick,
+    UpPunch,
+    DownPunch,
+    CrouchPunch,
     None
 }
