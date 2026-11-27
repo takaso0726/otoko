@@ -255,6 +255,10 @@ public class Player : MonoBehaviour
     [SerializeField] Vector3 minPosition = new Vector3(-10f, -10f, -10f);
     [Tooltip("ワールド座標の各軸の最大値（右端・上端・手前側の限界）")]
     [SerializeField] Vector3 maxPosition = new Vector3(10f, 10f, 10f);
+    [Tooltip("ONなら、足（P-LeftFoot／P-RightFoot）の位置がminPosition～maxPositionの範囲内に収まるように制限する（範囲を超えた分だけ本体を戻す）。\n" +
+             "OFFなら従来どおり、本体（一番親のTransform＝胴体の当たり判定の位置）を基準に制限する。\n" +
+             "※足が見つからない場合は自動的に本体基準になる。")]
+    [SerializeField] bool limitByFootPosition = true;
 
     //=====================================================
     // ★ジャンプ
@@ -429,6 +433,28 @@ public class Player : MonoBehaviour
     [SerializeField] Vector3 crouchCenter = new Vector3(0, 0.5f, 0);
 
     //=====================================================
+    // ★ジャンプ中・空中パンチ（Flying-kick）中の本体コライダー設定
+    //   空中にいる間（Jumpflag=false）だけ、本体CapsuleColliderの高さ・中心を上書きする。
+    //   着地すると自動で立ち／しゃがみの設定に戻る。Centerはキャラ基準のローカル座標なので、
+    //   Z（前後）を動かしても左右どちらを向いていても「前方向」へ正しくずれる。
+    //   値は毎フレーム反映されるので、Play中にInspectorを触りながら調整できる。
+    //=====================================================
+    [Header("ジャンプ・空中パンチ時のコライダー設定")]
+    [Tooltip("ONにすると、空中にいる間だけ本体コライダーの高さ・中心を下の値に切り替える。OFFなら従来どおり（立ち／しゃがみの値のまま）。")]
+    [SerializeField] bool enableAirColliderAdjust = true;
+    [Tooltip("ジャンプ中（空中パンチ以外）の本体コライダーの高さ")]
+    [SerializeField] float jumpHeight = 2.0f;
+    [Tooltip("ジャンプ中（空中パンチ以外）の本体コライダーの中心（キャラ基準のローカル座標。Zが前方向）")]
+    [SerializeField] Vector3 jumpCenter = new Vector3(0, 1.0f, 0);
+    [Tooltip("空中パンチ（Flying-kick）中の本体コライダーの高さ")]
+    [SerializeField] float flyingKickColliderHeight = 2.0f;
+    [Tooltip("空中パンチ（Flying-kick）中の本体コライダーの中心（キャラ基準のローカル座標。Zが前方向）")]
+    [SerializeField] Vector3 flyingKickColliderCenter = new Vector3(0, 1.0f, 0);
+
+    enum AirColliderProfile { None, Jump, FlyingKick }
+    AirColliderProfile airColliderProfile = AirColliderProfile.None; // 今、空中用の値を適用中か
+
+    //=====================================================
     // ★エフェクト・効果音
     //=====================================================
     [Header("エフェクト・SE")]
@@ -597,6 +623,7 @@ public class Player : MonoBehaviour
     public class HitboxSetting
     {
         [Tooltip("P-Head（頭）")] public bool head;
+        [Tooltip("body（力士の体）。bodyコライダーを持つキャラ（力士）のみ有効。")] public bool body;
         [Tooltip("P-RightArm（右上腕）")] public bool rightArm;
         [Tooltip("P-RightForeArm（右前腕）")] public bool rightForeArm;
         [Tooltip("P-RightHand（右手）")] public bool rightHand;
@@ -616,6 +643,14 @@ public class Player : MonoBehaviour
              "OFF：各技の「当たり判定」のチェックボックス設定どおり（P-Headは、その技のheadにチェックを入れた時だけONになる）。\n" +
              "※投げ（掴み）には適用されない。投げでP-Headを使いたい場合は、投げの「当たり判定」のheadにチェックを入れる。")]
     [SerializeField] bool enableHeadHitboxOnAttack = false;
+
+    [Header("力士用：体（body）の当たり判定設定")]
+    [Tooltip("ON：下の各技の「当たり判定」設定に関係なく、パンチ（空中攻撃含む）・キック（通常／上／下）・必殺技を出している間、body（体）の当たり判定も必ずONにする。力士のみONにしてください。\n" +
+             "OFF：各技の「当たり判定」のチェックボックス設定どおり（bodyは、その技のbodyにチェックを入れた時だけONになる）。\n" +
+             "※投げ（掴み）には適用されない。投げでbodyを使いたい場合は、投げの「当たり判定」のbodyにチェックを入れる。")]
+    [SerializeField] bool enableBodyHitboxOnAttack = false;
+    [Tooltip("体の当たり判定コライダー（CapsuleCollider）を持つ子オブジェクトの名前。この名前のオブジェクトが見つからないキャラ（力士以外）では、bodyは使われない。")]
+    [SerializeField] string bodyHitboxObjectName = "body";
 
 
      //=====================================================
@@ -1102,6 +1137,7 @@ public class Player : MonoBehaviour
 
     //当たり判定の子オブジェクト
     CapsuleCollider Head;
+    CapsuleCollider BodyHitbox;               // 力士用：体（body）の攻撃用コライダー（無いキャラではnull）
     CapsuleCollider RightArm, RightForeArm, RightHand, RightFoot, RightUpLeg, RightLeg;
     CapsuleCollider LeftArm, LeftForeArm, LeftHand, LeftFoot, LeftUpLeg, LeftLeg;
     CapsuleCollider Player_Collider;          // 本体（胴体）のコライダー。しゃがみ時にサイズ変更する
@@ -1589,6 +1625,15 @@ public class Player : MonoBehaviour
             LeftArm, LeftForeArm, LeftHand, LeftFoot, LeftUpLeg, LeftLeg,
         };
 
+        // 力士用：bodyコライダーがあれば、攻撃用当たり判定の配列に加える（無いキャラ＝力士以外では何もしない）。
+        //   配列に入れることで、DisableAllHitboxes()での一括OFFや、相手側の「攻撃用ヒットボックスか？」判定にも自動で含まれる。
+        BodyHitbox = FindOptionalHitbox(bodyHitboxObjectName, enableBodyHitboxOnAttack);
+        if (BodyHitbox != null)
+        {
+            System.Array.Resize(ref allHitboxes, allHitboxes.Length + 1);
+            allHitboxes[allHitboxes.Length - 1] = BodyHitbox;
+        }
+
         // 全身の攻撃用当たり判定コライダーを一括でOFFにする
         DisableAllHitboxes();
 
@@ -1602,6 +1647,25 @@ public class Player : MonoBehaviour
             DLog($"[{gameObject.name}] hitbox取得: {(hb != null ? hb.name + " / owner=" + hb.transform.root.name : "null!")}");
         }
         
+    }
+
+    // 指定した名前の子オブジェクトからCapsuleColliderを取得するヘルパー（無くても正常なもの用）。
+    //   見つからない／CapsuleColliderでない場合はnullを返す。logErrorがtrueの時だけエラーログを出す。
+    CapsuleCollider FindOptionalHitbox(string objectName, bool logError)
+    {
+        if (string.IsNullOrEmpty(objectName)) return null;
+
+        Transform tf = FindDeepChild(transform, objectName);
+        if (tf == null)
+        {
+            if (logError) Debug.LogError($"[{gameObject.name}] ヒットボックス '{objectName}' が自分の階層内に見つかりません", this);
+            return null;
+        }
+
+        CapsuleCollider col = tf.GetComponent<CapsuleCollider>();
+        if (col == null && logError)
+            Debug.LogError($"[{gameObject.name}] '{objectName}' にCapsuleColliderがありません（Box／SphereなどはCapsuleColliderに変更してください）", this);
+        return col;
     }
 
     // 指定した名前の子オブジェクトからCapsuleColliderを取得するヘルパー
@@ -1671,6 +1735,17 @@ public class Player : MonoBehaviour
 
             TrySetTag(part.gameObject, attackTag);
             if (layer >= 0) part.gameObject.layer = layer;
+        }
+
+        // 力士用：bodyコライダー（CapsuleCollider）がある場合だけ、他の部位と同じtag/layerにする
+        if (!string.IsNullOrEmpty(bodyHitboxObjectName))
+        {
+            Transform bodyPart = FindDeepChild(transform, bodyHitboxObjectName);
+            if (bodyPart != null && bodyPart.GetComponent<CapsuleCollider>() != null)
+            {
+                TrySetTag(bodyPart.gameObject, attackTag);
+                if (layer >= 0) bodyPart.gameObject.layer = layer;
+            }
         }
 
         DLog($"[{PlayerName}] tag/layerを設定：親={bodyTag} / 部位={attackTag} / layer={playerLabel}({layer})");
@@ -1941,6 +2016,8 @@ public class Player : MonoBehaviour
             // ★変更：やられ状態中はスティック入力を無視する（しゃがみにしない）
             SyncCrouchVisual(currentState != PlayerState.Stunned && moveInput.y <= crouchInputThreshold);
         }
+        // ★追加：空中（ジャンプ／空中パンチ）の間だけ本体コライダーを上書きする（着地で立ち／しゃがみの値へ戻す）
+        SyncAirCollider();
 
         // F2キーで漢気ゲージ専用デバッグログのON/OFFを切り替える（対象キャラクターはenableF2DebugKeyで選択）
         if (Keyboard.current != null && Keyboard.current.f2Key.wasPressedThisFrame)
@@ -2326,14 +2403,54 @@ public class Player : MonoBehaviour
         transform.position += new Vector3(0f, 0f, pushDir * pushThisFrame);
     }
 
-    // ワールド座標のX/Y/Zをそれぞれ設定した範囲内にクランプする
+    // ワールド座標のX/Y/Zをそれぞれ設定した範囲内にクランプする。
+    //   limitByFootPosition=ONの時は、足の位置を基準にする（範囲を超えた分だけ本体ごと戻す）。
+    //   OFF（または足が取得できない）の時は、従来どおり本体の位置を基準にする。
     void ClampPositionWithinBounds()
     {
+        if (limitByFootPosition && TryGetFootRange(out Vector3 footMin, out Vector3 footMax))
+        {
+            // 左右の足のうち、範囲の外へ最も出ているものが収まるように、本体全体を動かす量を求める
+            Vector3 shift = new Vector3(
+                CalcClampShift(footMin.x, footMax.x, minPosition.x, maxPosition.x),
+                CalcClampShift(footMin.y, footMax.y, minPosition.y, maxPosition.y),
+                CalcClampShift(footMin.z, footMax.z, minPosition.z, maxPosition.z));
+            if (shift != Vector3.zero) transform.position += shift;
+            return;
+        }
+
         Vector3 pos = transform.position;
         pos.x = Mathf.Clamp(pos.x, minPosition.x, maxPosition.x);
         pos.y = Mathf.Clamp(pos.y, minPosition.y, maxPosition.y);
         pos.z = Mathf.Clamp(pos.z, minPosition.z, maxPosition.z);
         transform.position = pos;
+    }
+
+    // 左右の足のワールド座標について、軸ごとの最小値・最大値を返す。足が1つも取得できなければfalse。
+    bool TryGetFootRange(out Vector3 footMin, out Vector3 footMax)
+    {
+        footMin = Vector3.zero;
+        footMax = Vector3.zero;
+
+        bool hasLeft = LeftFoot != null;
+        bool hasRight = RightFoot != null;
+        if (!hasLeft && !hasRight) return false;
+
+        Vector3 l = hasLeft ? LeftFoot.transform.position : RightFoot.transform.position;
+        Vector3 r = hasRight ? RightFoot.transform.position : LeftFoot.transform.position;
+        footMin = Vector3.Min(l, r);
+        footMax = Vector3.Max(l, r);
+        return true;
+    }
+
+    // [fMin, fMax]の範囲が[lo, hi]に収まるようにするための移動量を返す。
+    //   上限を超えていれば戻し、下限を下回っていれば引き上げる（範囲に収まりきらない場合は下限を優先）。
+    static float CalcClampShift(float fMin, float fMax, float lo, float hi)
+    {
+        float shift = 0f;
+        if (fMax > hi) shift = hi - fMax;
+        if (fMin + shift < lo) shift = lo - fMin;
+        return shift;
     }
 
     // ★追加：矢印キーが押された瞬間に、対応するアニメーションを再生する（Updateから毎フレーム呼ばれる）
@@ -3505,6 +3622,42 @@ public class Player : MonoBehaviour
         animator.SetBool(IdleFacingRightParam, IsFacingRight());
     }
 
+    // ★追加：空中にいる間だけ、本体コライダーの高さ・中心をジャンプ用／空中パンチ用の値にする。
+    //   SyncCrouchVisualは「しゃがみ入力が変化した時」だけコライダーを書き換えるので、
+    //   空中用の値は毎フレーム（変化がある時だけ）上書きし、着地したらしゃがみ状態に合った値へ戻す。
+    void SyncAirCollider()
+    {
+        if (Player_Collider == null) return;
+
+        AirColliderProfile want = AirColliderProfile.None;
+        if (enableAirColliderAdjust && !Jumpflag
+            && currentState != PlayerState.KnockedDown && currentState != PlayerState.Dead
+            && currentState != PlayerState.Grabbed && currentState != PlayerState.Thrown)
+        {
+            want = (currentState == PlayerState.Punch && isFlyingKickAttack)
+                ? AirColliderProfile.FlyingKick
+                : AirColliderProfile.Jump;
+        }
+
+        if (want == AirColliderProfile.None)
+        {
+            if (airColliderProfile != AirColliderProfile.None)
+            {
+                // 空中用の値を適用していた：立ち／しゃがみの値に戻す
+                Player_Collider.height = isCrouchVisual ? crouchHeight : standHeight;
+                Player_Collider.center = isCrouchVisual ? crouchCenter : standCenter;
+                airColliderProfile = AirColliderProfile.None;
+            }
+            return;
+        }
+
+        float h = (want == AirColliderProfile.FlyingKick) ? flyingKickColliderHeight : jumpHeight;
+        Vector3 c = (want == AirColliderProfile.FlyingKick) ? flyingKickColliderCenter : jumpCenter;
+        if (!Mathf.Approximately(Player_Collider.height, h)) Player_Collider.height = h;
+        if (Player_Collider.center != c) Player_Collider.center = c;
+        airColliderProfile = want;
+    }
+
     void SyncCrouchVisual(bool isCrouchInput)
     {
         if (isCrouchInput == isCrouchVisual) return; // 前フレームから変化なし
@@ -3759,11 +3912,13 @@ public class Player : MonoBehaviour
 
     // ★追加：技ごとの「当たり判定」設定（HitboxSetting）に従って、攻撃用コライダーをONにする。
     //   ONにするだけで、OFFに戻すのは従来どおりDisableAllHitboxes()（技の終了時など）が担当する。
-    //   applyYankeeHead=true（既定）の時は、enableHeadHitboxOnAttack（ヤンキー用）がONならP-Headも必ずONにする。
+    //   applyYankeeHead=true（既定）の時は、enableHeadHitboxOnAttack（ヤンキー用）がONならP-Headも、
+    //   enableBodyHitboxOnAttack（力士用）がONならbodyも必ずONにする。
     void EnableAttackHitboxes(HitboxSetting setting, bool applyYankeeHead = true)
     {
         if (setting == null) return;
         TurnOnHitbox(Head, setting.head || (applyYankeeHead && enableHeadHitboxOnAttack));
+        TurnOnHitbox(BodyHitbox, setting.body || (applyYankeeHead && enableBodyHitboxOnAttack)); // 力士用：body
         TurnOnHitbox(RightArm, setting.rightArm);
         TurnOnHitbox(RightForeArm, setting.rightForeArm);
         TurnOnHitbox(RightHand, setting.rightHand);

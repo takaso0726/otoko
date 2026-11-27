@@ -1567,11 +1567,14 @@ MonoBehaviour:
   moveInputThreshold: 0.03
   crouchInputThreshold: -0.7
   upKickInputThreshold: 0.25
+  upPunchInputThreshold: 0.25
+  downPunchInputThreshold: -0.2
   minMoveAnimSpeed: 0.6
   maxMoveAnimSpeed: 1.4
   minMoveSpeedRatio: 0.4
   minPosition: {x: -10, y: 0.2, z: -10}
   maxPosition: {x: 10, y: 10, z: 10}
+  limitByFootPosition: 1
   force: {x: 0, y: 500, z: 0}
   Jumpflag: 0
   HP: 1000
@@ -1623,6 +1626,11 @@ MonoBehaviour:
   standCenter: {x: 0, y: 0.82, z: 0}
   crouchHeight: 1.15
   crouchCenter: {x: 0, y: 0.47, z: 0}
+  enableAirColliderAdjust: 1
+  jumpHeight: 2
+  jumpCenter: {x: 0, y: 1, z: 0}
+  flyingKickColliderHeight: 2
+  flyingKickColliderCenter: {x: 0, y: 1, z: 0}
   MenBlock_se: {fileID: 8300000, guid: 007e2ac24e3c0ff4d9128441104ce2dc, type: 3}
   Men_particle: {fileID: 8049100662646873597, guid: eb3bdfa2eb6b25c4693f8900c7cf4ed7, type: 3}
   Hit_particle: {fileID: 3132062550767402246, guid: a48a9f201806121499896f3e561bf1c4, type: 3}
@@ -1635,6 +1643,9 @@ MonoBehaviour:
   kickSe: {fileID: 8300000, guid: 7b2b1225850ba654fbfc1d6d1860981d, type: 3}
   upKickSe: {fileID: 8300000, guid: b5078d7ec23a0a540bdb9f64a851f441, type: 3}
   downKickSe: {fileID: 8300000, guid: 89ca68a0d355e7e4ab853f080abcba7e, type: 3}
+  upPunchSe: {fileID: 0}
+  downPunchSe: {fileID: 0}
+  crouchPunchSe: {fileID: 0}
   missSe: {fileID: 8300000, guid: e7ab6d3d37fc8ff44ac29131740ff34d, type: 3}
   missSeJudgeFrames: 0
   actionSeVolume: 1
@@ -1672,6 +1683,15 @@ MonoBehaviour:
   downKickTiming:
     startupFrames: 0
     activeFrames: 4
+  upPunchTiming:
+    startupFrames: 0
+    activeFrames: 0
+  downPunchTiming:
+    startupFrames: 0
+    activeFrames: 0
+  crouchPunchTiming:
+    startupFrames: 0
+    activeFrames: 0
   specialTiming:
     startupFrames: 0
     activeFrames: 4
@@ -1713,6 +1733,75 @@ MonoBehaviour:
     leftUpLeg: 0
     leftLeg: 0
     leftFoot: 1
+  upPunchAtk: 10
+  upPunchMissFrames: 36
+  upPunchHitFrames: 36
+  upPunchStunFrames: 24
+  upPunchHitStopFrames: 5
+  upPunchKnockback:
+    horizontalSpeed: 2
+    upSpeed: 4
+  upPunchStrength: 1
+  upPunchHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 1
+    rightHand: 1
+    rightUpLeg: 0
+    rightLeg: 0
+    rightFoot: 0
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
+  downPunchAtk: 10
+  downPunchMissFrames: 30
+  downPunchHitFrames: 30
+  downPunchStunFrames: 20
+  downPunchHitStopFrames: 5
+  downPunchKnockback:
+    horizontalSpeed: 2.5
+    upSpeed: 0
+  downPunchStrength: 0
+  downPunchHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 1
+    rightUpLeg: 0
+    rightLeg: 0
+    rightFoot: 0
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
+  crouchPunchAtk: 10
+  crouchPunchMissFrames: 27
+  crouchPunchHitFrames: 27
+  crouchPunchStunFrames: 18
+  crouchPunchHitStopFrames: 5
+  crouchPunchKnockback:
+    horizontalSpeed: 2
+    upSpeed: 0
+  crouchPunchStrength: 0
+  crouchPunchHitbox:
+    head: 0
+    rightArm: 0
+    rightForeArm: 0
+    rightHand: 1
+    rightUpLeg: 0
+    rightLeg: 0
+    rightFoot: 0
+    leftArm: 0
+    leftForeArm: 0
+    leftHand: 0
+    leftUpLeg: 0
+    leftLeg: 0
+    leftFoot: 0
   kickAtk: 60
   kickMissFrames: 18
   kickHitFrames: 18
@@ -1862,6 +1951,15 @@ MonoBehaviour:
     allowMultiHit: 0
     maxHitCount: 1
   downKickMultiHit:
+    allowMultiHit: 0
+    maxHitCount: 1
+  upPunchMultiHit:
+    allowMultiHit: 0
+    maxHitCount: 1
+  downPunchMultiHit:
+    allowMultiHit: 0
+    maxHitCount: 1
+  crouchPunchMultiHit:
     allowMultiHit: 0
     maxHitCount: 1
   specialMultiHit:
