@@ -1071,8 +1071,17 @@ public class Player : MonoBehaviour
     bool hasGuardParam;              // ★変更：Animatorに"Guard"(Trigger)が存在するか（存在する時だけトリガーを立てる）
     bool guardAnimApplied;           // ★変更：直前フレームでGuard状態だったか（Guardに入った瞬間だけトリガーを立てるための記録）
     const string GuardParam = "Guard"; // ★仁王立ちアニメーション用のAnimatorパラメータ名（Trigger）
-    bool hasGuardSuccessParam;       // ★追加：Animatorに"Guard-success"(Trigger)が存在するか（存在する時だけ立てる）
-    const string GuardSuccessParam = "Guard-success"; // ★仁王立ち成功（ガード成功）アニメーション用のAnimatorパラメータ名（Trigger）
+    bool hasGuardSuccessParam;       // ★変更：Animatorに"Guard-success"(Bool)が存在するか（存在する時だけ値を送る）
+    const string GuardSuccessParam = "Guard-success"; // ★変更：仁王立ち成功（ガード成功）アニメーション用のAnimatorパラメータ名（Bool：ガード成功でtrue／ガード成功アニメーション終了でfalse）
+    // ★追加：ガード成功アニメーション(Bool)を「アニメーション終了時にOFF」にするための管理
+    [Header("仁王立ち成功アニメーション（Guard-success Bool）")]
+    [Tooltip("ガード成功アニメーションのAnimatorステート名（レイヤー0）。このステートの再生が終わった（normalizedTimeが1に達した／別ステートへ移った）時に、\"Guard-success\"(Bool)をfalseに戻す。")]
+    [SerializeField] string guardSuccessStateName = "Guard-success";
+    [Tooltip("Boolをtrueにしてから、このフレーム数が経ってもアニメーションが始まらなかった場合に、保険として強制的にfalseへ戻す（60F=1秒）。")]
+    [SerializeField] int guardSuccessAnimTimeoutFrames = 180;
+    bool guardSuccessAnimActive;     // Guard-success(Bool)をtrueにしていて、終了待ちの最中か
+    bool guardSuccessAnimEntered;    // その間に、ガード成功のステートへ実際に入ったか
+    int guardSuccessAnimStartFrame;  // Boolをtrueにした時のCurrentFrame（タイムアウト判定用）
     // ★追加：F6キーでON/OFFする、常時仁王立ちデバッグモードの現在の状態
     private bool debugAlwaysGuard = false;
     bool rebornCamStarted;           // 根性復活のクローズアップカメラを開始済みか
@@ -1592,7 +1601,7 @@ public class Player : MonoBehaviour
                 {
                     hasGuardParam = true;
                 }
-                else if (param.name == GuardSuccessParam && param.type == AnimatorControllerParameterType.Trigger)
+                else if (param.name == GuardSuccessParam && param.type == AnimatorControllerParameterType.Bool)
                 {
                     hasGuardSuccessParam = true;
                 }
@@ -1603,7 +1612,7 @@ public class Player : MonoBehaviour
             }
             if (!hasGuardSuccessParam)
             {
-                Debug.LogWarning($"[{PlayerName}] Animatorに'{GuardSuccessParam}'(Trigger)パラメータがありません。仁王立ち成功のアニメーションは再生されません。", this);
+                Debug.LogWarning($"[{PlayerName}] Animatorに'{GuardSuccessParam}'(Bool)パラメータがありません。仁王立ち成功のアニメーションは再生されません。", this);
             }
         }
 
@@ -2313,6 +2322,7 @@ public class Player : MonoBehaviour
     {
         CheckMissSeOnAttackEnd(); // ★追加：攻撃が当たらないまま終わった／中断された時の空振りSE
         SyncGuardAnimation(); // ★追加：仁王立ち（Guard状態）の間だけ、仁王立ちアニメーションを再生する
+        TickGuardSuccessAnimation(); // ★追加：ガード成功アニメーションが終わったらGuard-success(Bool)をOFFにする
 
         // ★リザルト画面モード：向きの自動変更・押しのけ・位置クランプを行わず、配置した位置のまま動かさない
         if (isResultMode) return;
@@ -4008,7 +4018,7 @@ public class Player : MonoBehaviour
     //   仁王立ちステートから抜ける遷移はAnimator側（Exit Time等）で設定する。
     void SyncGuardAnimation()
     {
-        if (!hasGuardParam || animator == null) return;
+        if (animator == null || (!hasGuardParam && !hasGuardSuccessParam)) return;
 
         bool inGuard = currentState == PlayerState.Guard;
         if (inGuard == guardAnimApplied) return;
@@ -4018,15 +4028,80 @@ public class Player : MonoBehaviour
         if (inGuard)
         {
             // Guardに入った瞬間：仁王立ちアニメーションを1回発火する
-            animator.SetTrigger(GuardParam);
+            if (hasGuardParam) animator.SetTrigger(GuardParam);
         }
         else
         {
             // Guardを抜けた：未消費の"Guard"トリガーが残って後から誤再生されないよう消しておく
-            animator.ResetTrigger(GuardParam);
-            // ガードを抜けた後に、未消費のGuard-successトリガーが残って後から誤再生されないよう消しておく
-            if (hasGuardSuccessParam) animator.ResetTrigger(GuardSuccessParam);
+            if (hasGuardParam) animator.ResetTrigger(GuardParam);
+            // ★変更："Guard-success"(Bool)は、アニメーション終了時にTickGuardSuccessAnimationがOFFにする。
+            //   ただしまだ一度も再生されていない（ヒットストップ中などにガードを抜けた）場合は、後から誤再生されないよう消しておく。
+            if (guardSuccessAnimActive && !guardSuccessAnimEntered) EndGuardSuccessAnimation("再生前にガードを抜けた");
         }
+    }
+
+    // ★追加：ガード成功時に呼ぶ。Guard-success(Bool)をtrueにし、アニメーション終了の監視を始める。
+    //   すでに再生中に連続でガード成功した場合は、アニメーションを頭から再生し直す。
+    void StartGuardSuccessAnimation()
+    {
+        if (!hasGuardSuccessParam || animator == null) return;
+
+        bool restart = guardSuccessAnimActive && guardSuccessAnimEntered;
+        guardSuccessAnimActive = true;
+        guardSuccessAnimEntered = false;
+        guardSuccessAnimStartFrame = CurrentFrame;
+        animator.SetBool(GuardSuccessParam, true);
+
+        if (restart && HasAnimatorState(guardSuccessStateName)) animator.Play(guardSuccessStateName, 0, 0f);
+    }
+
+    // ★追加：ガード成功アニメーションの終了を毎フレーム監視し、終わったらGuard-success(Bool)をfalseに戻す（LateUpdateから呼ぶ）。
+    //   ・ステートに入ったら「入った」を記録する（Boolをtrueにした直後はまだ別ステートのため）。
+    //   ・入った後、normalizedTimeが1以上になった／別ステートへ移った時に終了とみなす。
+    //   ・いつまでも入らない場合（ステート名違い・遷移未設定等）は、タイムアウトで強制的にfalseへ戻す。
+    void TickGuardSuccessAnimation()
+    {
+        if (!guardSuccessAnimActive) return;
+        if (animator == null || !hasGuardSuccessParam)
+        {
+            guardSuccessAnimActive = false;
+            guardSuccessAnimEntered = false;
+            return;
+        }
+
+        AnimatorStateInfo cur = animator.GetCurrentAnimatorStateInfo(0);
+        bool curIsGuardSuccess = cur.IsName(guardSuccessStateName);
+        bool nextIsGuardSuccess = animator.IsInTransition(0) && animator.GetNextAnimatorStateInfo(0).IsName(guardSuccessStateName);
+
+        if (!guardSuccessAnimEntered)
+        {
+            if (curIsGuardSuccess)
+            {
+                guardSuccessAnimEntered = true; // 入ったフレームは終了判定しない（再生し直し直後の古い値で誤判定しないため）
+            }
+            else if (!nextIsGuardSuccess && CurrentFrame - guardSuccessAnimStartFrame >= guardSuccessAnimTimeoutFrames)
+            {
+                EndGuardSuccessAnimation("タイムアウト（ステートに入らなかった）");
+            }
+            return;
+        }
+
+        if (!curIsGuardSuccess && !nextIsGuardSuccess)
+        {
+            EndGuardSuccessAnimation("別ステートへ移った");
+        }
+        else if (curIsGuardSuccess && cur.normalizedTime >= 1f)
+        {
+            EndGuardSuccessAnimation("アニメーション終了");
+        }
+    }
+
+    void EndGuardSuccessAnimation(string reason)
+    {
+        guardSuccessAnimActive = false;
+        guardSuccessAnimEntered = false;
+        if (hasGuardSuccessParam && animator != null) animator.SetBool(GuardSuccessParam, false);
+        DLog($"[{PlayerName}] Guard-success(Bool)をOFF：{reason}");
     }
 
     // 仁王立ち（ガード）処理。ガードフラグを立て、演出用パーティクルを再生する
@@ -4035,6 +4110,9 @@ public class Player : MonoBehaviour
         // ★修正：移動中にガードへ遷移した際、Moveアニメーション(bool)がONのまま残り、
         //   ガードよりも移動が優先されているように見えてしまう不具合を解消する。
         StopMoveAnimation();
+
+        // ★追加：前回の"Guard-success"(Bool)が残っていたら、新しい仁王立ちの開始時にfalseへ戻す
+        if (guardSuccessAnimActive) EndGuardSuccessAnimation("新しい仁王立ちの開始");
 
         currentState = PlayerState.Guard;
         stateTimer = guardFrames;
@@ -5344,13 +5422,11 @@ public class Player : MonoBehaviour
             DLog($"[{PlayerName}] ガード成功：次の技のダメージ倍率×{guardBuffMultiplier:F2}（攻撃力={atk}）");
             StartGuardBuffEffect();
 
-            // ★追加：仁王立ち成功アニメーション（Animatorの"Guard-success"トリガー）を再生する。
-            //   ヒットストップ中はanimator.speedが0になり遷移しないが、トリガーは消費されるまで残るので、
+            // ★変更：仁王立ち成功アニメーション（Animatorの"Guard-success"Bool）をtrueにする。
+            //   ヒットストップ中はanimator.speedが0になり遷移しないが、Boolはtrueのまま残るので、
             //   ヒットストップが終わった瞬間に再生が始まる。
-            if (hasGuardSuccessParam && animator != null)
-            {
-                animator.SetTrigger(GuardSuccessParam);
-            }
+            //   falseに戻すのは、ガード成功アニメーションが終わった時（TickGuardSuccessAnimation）。
+            StartGuardSuccessAnimation();
 
             // ガード成功時のヒットストップ（少しだけ動けなくする）。
             // ガードのポーズを崩したくないのでHeadHitアニメーションは再生しない。
