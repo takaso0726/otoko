@@ -1110,14 +1110,17 @@ public class Player : MonoBehaviour
              "OFFなら、同時ダウン後の復活では従来どおり相手を非表示にしない。")]
     [SerializeField] bool hideOpponentOnDualDownReborn = true;
 
-    [Header("復活後のノックバック（お互いに距離を離す）")]
-    [Tooltip("ONにすると、復活後の停止が終わった瞬間に、復活した側と相手の両方を、互いに離れる方向（Z軸）へノックバックさせる。")]
-    [SerializeField] bool enableRebornKnockback = true;
-    [Tooltip("復活後のノックバックの水平方向の速さ（お互いに離れる向き）。")]
-    [SerializeField] float rebornKnockbackHorizontalSpeed = 4f;
-    [Tooltip("復活後のノックバックの上方向の速さ。1以上だと空中扱いになる。")]
-    [SerializeField] float rebornKnockbackUpSpeed = 0f;
-    bool pendingRebornKnockback; // 復活後の停止が終わったらノックバックを出す予約
+    [Header("復活後のスポーン位置リセット（お互いにスポーン地点へ戻す）")]
+    [Tooltip("ONにすると、復活後の停止が終わった瞬間に、復活した側と相手の両方を、それぞれのスポーン位置（開始時の座標）へ戻す。")]
+    [SerializeField] bool enableRebornReturnToSpawn = true;
+    bool pendingRebornReturnToSpawn; // 復活後の停止が終わったらスポーン位置へ戻す予約
+
+    // スポーン位置（Startで記録する開始時のワールド座標）
+    Vector3 spawnPosition;
+    bool hasSpawnPosition;
+    // CPU(Enemy)が相手の場合の、Enemyのスポーン位置（Enemy.csを変更せずに済むよう、Player側で記録しておく）
+    Vector3 enemySpawnPosition;
+    bool hasEnemySpawnPosition;
 
     bool downWasDual;                                                                   // 今回のダウン中に、一度でも同時ダウン（両者HP0）になったか
     readonly System.Collections.Generic.List<UnityEngine.Renderer> hiddenOpponentRenderers
@@ -1507,6 +1510,7 @@ public class Player : MonoBehaviour
         if (foundEnemy != null)
         {
             enemy = foundEnemy;
+            CaptureEnemySpawnPosition(); // ★追加：自動で見つけたEnemyのスポーン位置も記録しておく
             Debug.LogWarning($"[{PlayerName}] enemyが未設定だったため、シーン内の'{foundEnemy.gameObject.name}'を自動で設定しました。" +
                              "Inspectorで設定し直すことをおすすめします。", this);
         }
@@ -1651,6 +1655,11 @@ public class Player : MonoBehaviour
         //ステータスを初期化する
         currentState = PlayerState.Idle;
         Player_status = Status.Live;
+
+        // ★追加：スポーン位置（開始時の座標）を記録しておく。復活後にここへ戻す。
+        spawnPosition = transform.position;
+        hasSpawnPosition = true;
+        CaptureEnemySpawnPosition();
 
         // ★デバッグ用：自分のヒットボックスが正しく取得できているか確認
         foreach (var hb in allHitboxes)
@@ -2004,11 +2013,11 @@ public class Player : MonoBehaviour
         // ★追加：復活後の停止が終わったら、非表示にしていた相手を再表示する
         if (hiddenOpponentRenderers.Count > 0 && !IsRebornFreezing) ShowOpponentAfterReborn();
 
-        // ★追加：復活後の停止が終わった瞬間に、お互いにノックバックさせて距離を離す
-        if (pendingRebornKnockback && !IsRebornFreezing)
+        // ★変更：復活後の停止が終わった瞬間に、お互いをスポーン位置へ戻す（以前はノックバックで距離を離していた）
+        if (pendingRebornReturnToSpawn && !IsRebornFreezing)
         {
-            pendingRebornKnockback = false;
-            ApplyRebornKnockbackToBoth();
+            pendingRebornReturnToSpawn = false;
+            ApplyRebornReturnToSpawnToBoth();
         }
 
         // ★追加：掴みポーズで止めている最中に、被弾やダウン等でThrow状態から外れた場合の保険として必ず再生を再開する
@@ -4775,37 +4784,48 @@ public class Player : MonoBehaviour
         }
     }
 
-    // ★追加：復活後の停止が終わった瞬間に、復活した側（自分）と相手の両方を、互いに離れる向き（Z軸）へノックバックさせる。
-    //   ・相手がPlayerの場合：ダウン中（KnockedDown/Dead）や掴まれ・投げ飛ばし中は動かさない。
-    //   ・相手がCPU(Enemy)の場合：EnemyのRigidbodyへ直接初速を与える（Enemy.cs側の変更は不要）。
-    //   ・同時に復活した場合に二重で出ないよう、相手Playerの予約は消しておく。
-    void ApplyRebornKnockbackToBoth()
+    // ★追加：CPU(Enemy)のスポーン位置を、まだ記録していなければ記録する。
+    void CaptureEnemySpawnPosition()
     {
-        Transform opponentTf = GetOpponentTransform();
-        if (opponentTf == null) return;
+        if (hasEnemySpawnPosition || enemy == null) return;
+        enemySpawnPosition = enemy.transform.position;
+        hasEnemySpawnPosition = true;
+    }
 
-        // 自分から見て、相手と反対側（離れる向き）のZ方向。ほぼ同じ位置なら、向いている方向の逆へ離れる
-        float deltaZ = transform.position.z - opponentTf.position.z;
-        float myDir = Mathf.Abs(deltaZ) > 0.01f ? Mathf.Sign(deltaZ) : (transform.forward.z >= 0f ? -1f : 1f);
-        float speed = rebornKnockbackHorizontalSpeed;
-        float up = rebornKnockbackUpSpeed;
+    // ★追加：自分をスポーン位置（Startで記録した座標）へ戻す。吹き飛び・移動の勢いが残らないよう速度は0にする。
+    //   向き（回転）は変えない（向きはAutoFaceOpponentが相手の方向へ合わせる）。相手Playerからも呼ぶためpublic。
+    public void ReturnToSpawnPosition()
+    {
+        if (!hasSpawnPosition) return;
 
+        ZeroRigidbodyVelocity();
+        transform.position = spawnPosition;
+
+        DLog($"[{PlayerName}] スポーン位置へ戻りました：{spawnPosition}");
+    }
+
+    // ★変更：復活後の停止が終わった瞬間に、復活した側（自分）と相手の両方を、それぞれのスポーン位置へ戻す。
+    //   ・相手がPlayerの場合：ダウン中（KnockedDown/Dead）や掴まれ・投げ飛ばし中は動かさない。
+    //   ・相手がCPU(Enemy)の場合：記録しておいたEnemyのスポーン位置へ戻す（Enemy.cs側の変更は不要）。
+    //   ・同時に復活した場合に二重で出ないよう、相手Playerの予約は消しておく。
+    void ApplyRebornReturnToSpawnToBoth()
+    {
         // 自分
-        ApplyKnockback(new Vector3(0f, up, myDir * speed));
+        ReturnToSpawnPosition();
 
         // 相手（Player）
         if (enemyPlayer != null)
         {
-            enemyPlayer.pendingRebornKnockback = false; // 同時復活で二重に出さない
+            enemyPlayer.pendingRebornReturnToSpawn = false; // 同時復活で二重に出さない
             PlayerState s = enemyPlayer.currentState;
             if (s != PlayerState.KnockedDown && s != PlayerState.Dead
                 && s != PlayerState.Grabbed && s != PlayerState.Thrown)
             {
-                enemyPlayer.ApplyKnockback(new Vector3(0f, up, -myDir * speed));
+                enemyPlayer.ReturnToSpawnPosition();
             }
         }
         // 相手（CPU）
-        else if (enemy != null)
+        else if (enemy != null && hasEnemySpawnPosition)
         {
             Rigidbody enemyRb = enemy.GetComponent<Rigidbody>();
             if (enemyRb != null)
@@ -4815,11 +4835,11 @@ public class Player : MonoBehaviour
 #else
                 enemyRb.velocity = Vector3.zero;
 #endif
-                enemyRb.AddForce(new Vector3(0f, up, -myDir * speed), ForceMode.VelocityChange);
             }
+            enemy.transform.position = enemySpawnPosition;
         }
 
-        DLog($"[{PlayerName}] 復活後ノックバック：水平={speed} / 上={up}");
+        DLog($"[{PlayerName}] 復活後：お互いをスポーン位置へ戻しました");
     }
 
     // ★追加：非表示にしていた相手のRendererを元に戻す。
@@ -4836,7 +4856,7 @@ public class Player : MonoBehaviour
     //   動作の途中だった相手の攻撃は、当たり判定を消して待機に戻す（止まったまま当たり判定が残らないように）。
     void StartRebornFreeze(bool hideOpponent)
     {
-        pendingRebornKnockback = enableRebornKnockback; // 停止が終わったらお互いにノックバックさせる予約（停止0Fなら次フレームに実行）
+        pendingRebornReturnToSpawn = enableRebornReturnToSpawn; // 停止が終わったらお互いをスポーン位置へ戻す予約（停止0Fなら次フレームに実行）
         if (rebornStandUpFreezeFrames <= 0) return;
 
         rebornFreezeEndFrame = CurrentFrame + rebornStandUpFreezeFrames;
