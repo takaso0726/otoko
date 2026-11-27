@@ -1700,18 +1700,18 @@ MonoBehaviour:
     leftLeg: 0
     leftFoot: 0
   flyingKickHitbox:
-    head: 0
+    head: 1
     rightArm: 0
     rightForeArm: 0
-    rightHand: 0
+    rightHand: 1
     rightUpLeg: 0
     rightLeg: 0
     rightFoot: 1
     leftArm: 0
     leftForeArm: 0
-    leftHand: 0
+    leftHand: 1
     leftUpLeg: 0
-    leftLeg: 1
+    leftLeg: 0
     leftFoot: 1
   kickAtk: 60
   kickMissFrames: 18
