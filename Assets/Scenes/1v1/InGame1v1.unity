@@ -264,6 +264,12 @@ MonoBehaviour:
   p1: {fileID: 0}
   p2: {fileID: 0}
   visible: 1
+  sizeLevel: 2
+  sizeScales:
+  - 0
+  - 0.5
+  - 0.75
+  - 1
   maxFrames: 120
   cellWidth: 15
   cellHeight: 34
@@ -2472,7 +2478,7 @@ MonoBehaviour:
   player1SpawnPoint: {fileID: 1435874237}
   player2SpawnPoint: {fileID: 1195980007}
   fallbackPrefab: {fileID: 0}
-  debugPlayer1Prefab: {fileID: 1851683348964373382, guid: 3e4740023ebd16b448e0343c1f99043c, type: 3}
+  debugPlayer1Prefab: {fileID: 258853966309222975, guid: 8193c83dda0a31745a07444649c4f09e, type: 3}
   debugPlayer2Prefab: {fileID: 1851683348964373382, guid: 3e4740023ebd16b448e0343c1f99043c, type: 3}
   debugSpawnKey: 102
   gameMNG: {fileID: 0}
